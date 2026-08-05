@@ -296,6 +296,8 @@ export const en: Record<TranslationKey, string> = {
   'settings.notificationsHint': 'Messages about tournament start, court readiness and results',
   'settings.about': 'About',
   'settings.saved': 'Settings saved',
+  'settings.version': 'Version',
+  'settings.feedback': 'Feedback and bug reports are welcome in Telegram:',
 
   'import.title': 'Import players',
   'import.hint':

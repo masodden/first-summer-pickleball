@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { SUPPORTED_LOCALES, type Locale } from '@fsp/shared';
+import { APP_VERSION, FEEDBACK_TELEGRAM, SUPPORTED_LOCALES, type Locale } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { PreferencesService, type ThemePreference } from '../../core/preferences';
 import { SessionStore } from '../../core/session';
@@ -127,14 +127,51 @@ import { RatingChip } from '../../ui/rating-chip';
         </button>
       }
 
-      <section class="glass glass--subtle card--tight row">
-        <app-ball [size]="26" motion="bounce" />
-        <div class="grow stack stack--1">
-          <span class="strong">{{ t()('app.name') }}</span>
-          <span class="tiny faint">{{ t()('app.tagline') }} · {{ platform() }}</span>
+      <section class="glass glass--subtle card--tight stack stack--3">
+        <div class="row">
+          <app-ball [size]="26" motion="bounce" />
+          <div class="grow stack stack--1">
+            <span class="strong">{{ t()('app.name') }}</span>
+            <span class="tiny faint">
+              {{ t()('settings.version') }} {{ version }} · {{ platform() }}
+            </span>
+          </div>
         </div>
+
+        <button type="button" class="feedback" (click)="openFeedback()">
+          <span class="small">{{ t()('settings.feedback') }}</span>
+          <span class="feedback__handle">&#64;{{ feedbackHandle }}</span>
+        </button>
       </section>
     </div>
+  `,
+  styles: `
+    .feedback {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      width: 100%;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background var(--motion-fast);
+    }
+
+    .feedback:hover,
+    .feedback:focus-visible {
+      background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    }
+
+    .feedback__handle {
+      font-weight: 600;
+      color: var(--color-primary);
+      white-space: nowrap;
+    }
   `,
 })
 export class SettingsPage {
@@ -148,6 +185,8 @@ export class SettingsPage {
 
   protected readonly locales = SUPPORTED_LOCALES;
   protected readonly themes: ThemePreference[] = ['system', 'light', 'dark'];
+  protected readonly version = APP_VERSION;
+  protected readonly feedbackHandle = FEEDBACK_TELEGRAM;
 
   private readonly notificationsOverride = signal<boolean | null>(null);
   /** Пока пользователь не трогал переключатель, показываем значение с сервера. */
@@ -206,6 +245,10 @@ export class SettingsPage {
       this.notificationsOverride.set(!value);
       this.toast.failure(error, () => void this.setNotifications(event));
     }
+  }
+
+  protected openFeedback(): void {
+    this.telegram.openExternal(`https://t.me/${FEEDBACK_TELEGRAM}`);
   }
 
   protected async devLogin(): Promise<void> {

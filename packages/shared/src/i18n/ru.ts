@@ -292,6 +292,8 @@ export const ru = {
   'settings.notificationsHint': 'Сообщения о старте турнира, готовности корта и результатах',
   'settings.about': 'О приложении',
   'settings.saved': 'Настройки сохранены',
+  'settings.version': 'Версия',
+  'settings.feedback': 'Оставить свой фидбэк или зарепортить баг можете мне в tg:',
 
   'import.title': 'Импорт игроков',
   'import.hint':

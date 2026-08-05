@@ -17,6 +17,7 @@ interface TelegramWebApp {
   disableVerticalSwipes?(): void;
   setHeaderColor?(color: string): void;
   openLink?(url: string): void;
+  openTelegramLink?(url: string): void;
   HapticFeedback?: TelegramHaptics;
   onEvent?(event: string, handler: () => void): void;
 }
@@ -78,6 +79,11 @@ export class TelegramService {
   }
 
   openExternal(url: string): void {
+    // Ссылку на переписку открываем внутри мессенджера: openLink увёл бы в браузер.
+    if (this.app?.openTelegramLink && url.startsWith('https://t.me/')) {
+      this.app.openTelegramLink(url);
+      return;
+    }
     if (this.app?.openLink) this.app.openLink(url);
     else window.open(url, '_blank', 'noopener');
   }

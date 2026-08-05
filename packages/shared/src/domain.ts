@@ -1,3 +1,13 @@
+/**
+ * Версия приложения. Показывается в настройках, чтобы по скриншоту от игрока
+ * было понятно, какая сборка у него на телефоне. Поднимать при релизе вместе с
+ * `version` в package.json.
+ */
+export const APP_VERSION = '0.1.0';
+
+/** Контакт для обратной связи: сюда игроки пишут про баги. */
+export const FEEDBACK_TELEGRAM = 'masodden';
+
 /** Роли. `spectator` не хранится в базе: это просто отсутствие аккаунта. */
 export const ROLES = ['admin', 'moderator', 'user'] as const;
 export type Role = (typeof ROLES)[number];
