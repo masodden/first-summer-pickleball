@@ -56,7 +56,7 @@ import { StatusBadge } from '../../ui/status-badge';
             @for (match of round.matches; track match.id) {
               <div class="glass card--tight stack stack--2">
                 <div class="row row--between">
-                  <span class="tiny faint">{{ t()('match.court', { number: match.court }) }}</span>
+                  <span class="tiny faint">{{ i18n.court(match.courtName) }}</span>
                   <span class="tiny faint">
                     {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
                   </span>

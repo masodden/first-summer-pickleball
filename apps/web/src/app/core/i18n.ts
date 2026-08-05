@@ -75,6 +75,14 @@ export class I18nService {
       : `${count} ${this.plural(count, ['корт', 'корта', 'кортов'])}`;
   }
 
+  /**
+   * Подпись корта у матча. Номер получает слово «Корт», собственное название
+   * выводится как есть: «Центральный», а не «Корт Центральный».
+   */
+  court(name: string): string {
+    return /^\d+$/.test(name) ? this.translate('match.court', { number: name }) : name;
+  }
+
   games(count: number): string {
     return this.current() === 'en'
       ? `${count} ${count === 1 ? 'game' : 'games'}`

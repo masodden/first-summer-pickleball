@@ -553,6 +553,12 @@ button {
   transform: translateX(18px);
 }
 
+/* Сам input прозрачный, поэтому обводку фокуса рисуем на видимой части. */
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Чекбокс приёма участников: крупный, чтобы нажимать на морозе одной рукой. */
 .checkbox {
   position: relative;
@@ -605,6 +611,11 @@ button {
 
 .checkbox input:checked + .checkbox__box::after {
   transform: rotate(-45deg) scale(1);
+}
+
+.checkbox input:focus-visible + .checkbox__box {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ==========================================================================

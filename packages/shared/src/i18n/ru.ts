@@ -93,6 +93,10 @@ export const ru = {
   'tournament.format': 'Формат',
   'tournament.startsAt': 'Дата и время',
   'tournament.courts': 'Количество кортов',
+  'tournament.courtNames': 'Названия кортов',
+  'tournament.courtNamesHint':
+    'Как корты подписаны на площадке: 4, 5, 6 или «Центральный». Пустые останутся под своими номерами. Первый корт в списке — главный: в mexicano на нём играют лидеры.',
+  'tournament.courtSlot': '{{number}}-й корт',
   'tournament.maxPlayers': 'Количество игроков',
   'tournament.pointsToWin': 'Максимальный счёт',
   'tournament.matchDuration': 'Время матча, минут',

@@ -1,4 +1,5 @@
 import { buildRatingLookup, matchImbalance, optimizeSeating } from './balance.js';
+import { assignRoundCourts, balanceScheduleCourts, courtUsageFromMatches } from './courts.js';
 import { PairHistory } from './history.js';
 import { buildSeatSchedule } from './pairings.js';
 import { createRng, type Rng } from './rng.js';
@@ -198,7 +199,7 @@ export function generateAmericanoSchedule(options: AmericanoScheduleOptions): Sc
   if (canUseExactSchedule(players.length, courts, rounds)) {
     const seatRounds = buildSeatSchedule(players.length, courts, rounds, rng);
     const seating = optimizeSeating(seatRounds, players, rng, { ratingBalance });
-    return seatRounds.map((round) => ({
+    const named = seatRounds.map((round) => ({
       index: round.index,
       matches: round.matches.map((match) => ({
         court: match.court,
@@ -207,6 +208,7 @@ export function generateAmericanoSchedule(options: AmericanoScheduleOptions): Sc
       })),
       sittingOut: round.sittingOut.map((seat) => seating[seat] as string),
     }));
+    return balanceScheduleCourts(named, courts, new Map(), rng);
   }
 
   const { get: rating } = buildRatingLookup(players);
@@ -228,15 +230,18 @@ export function generateAmericanoSchedule(options: AmericanoScheduleOptions): Sc
     satLastRound = sitting;
   }
 
-  return schedule;
+  return balanceScheduleCourts(schedule, courts, new Map(), rng);
 }
 
 export interface NextAmericanoRoundOptions {
   players: readonly EnginePlayer[];
   courts: number;
   roundIndex: number;
-  /** Уже сыгранные матчи турнира: из них восстанавливается история пар. */
-  playedMatches: readonly { teamA: Team; teamB: Team }[];
+  /**
+   * Уже сыгранные матчи турнира: из них восстанавливается история пар и то,
+   * кто на каких кортах уже играл.
+   */
+  playedMatches: readonly { court?: number; teamA: Team; teamB: Team }[];
   satLastRound?: readonly string[];
   ratingBalance?: boolean;
   seed?: number;
@@ -275,7 +280,13 @@ export function nextAmericanoRound(options: NextAmericanoRoundOptions): RoundPla
   const playing = ids.filter((id) => !sitting.has(id));
   const matches = buildHeuristicRound(playing, history, rating, ratingBalance, perRound, rng);
 
-  return { index: roundIndex, matches, sittingOut };
+  const courtUsage = courtUsageFromMatches(
+    playedMatches.filter(
+      (match): match is { court: number; teamA: Team; teamB: Team } => match.court !== undefined,
+    ),
+    courts,
+  );
+  return assignRoundCourts({ index: roundIndex, matches, sittingOut }, courts, courtUsage);
 }
 
 /**

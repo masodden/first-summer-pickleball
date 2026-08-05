@@ -8,6 +8,32 @@ export const APP_VERSION = '0.1.0';
 /** Контакт для обратной связи: сюда игроки пишут про баги. */
 export const FEEDBACK_TELEGRAM = 'masodden';
 
+/**
+ * Как подписан корт на площадке.
+ *
+ * В клубе корты почти никогда не нумеруются с единицы: вечер занимает корты
+ * 4, 5 и 6, а иногда у них и вовсе есть названия. Позиция корта при этом
+ * остаётся позицией: в mexicano первый корт — главный, независимо от подписи.
+ */
+export function courtLabel(court: number, names?: readonly string[] | null): string {
+  const name = names?.[court - 1]?.trim();
+  return name ? name : String(court);
+}
+
+/**
+ * Приводит введённые названия к тому, что можно хранить: по одному значению на
+ * корт, лишние отбрасываются, недостающие добавляются пустыми. Если не подписан
+ * ни один корт, названий нет вовсе — нумеруем от единицы.
+ */
+export function normalizeCourtNames(
+  names: readonly (string | null | undefined)[] | null | undefined,
+  courts: number,
+): string[] | null {
+  if (!names) return null;
+  const trimmed = Array.from({ length: courts }, (_, index) => (names[index] ?? '').trim());
+  return trimmed.some((name) => name.length > 0) ? trimmed : null;
+}
+
 /** Роли. `spectator` не хранится в базе: это просто отсутствие аккаунта. */
 export const ROLES = ['admin', 'moderator', 'user'] as const;
 export type Role = (typeof ROLES)[number];

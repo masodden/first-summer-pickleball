@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, asc, count, desc, eq, isNull, max, sql } from 'drizzle-orm';
 import {
+  normalizeCourtNames,
   type CreateTournamentInput,
   type ParticipantDto,
   type StandingsSortKey,
@@ -83,6 +84,7 @@ export function toSummaryDto(row: TournamentRow, counts: TournamentCounts): Tour
     startsAt: row.startsAt.toISOString(),
     venueName: row.venueName,
     courts: row.courts,
+    courtNames: row.courtNames,
     maxPlayers: row.maxPlayers,
     participantCount: counts.participantCount,
     confirmedCount: counts.confirmedCount,
@@ -200,6 +202,7 @@ export async function createTournament(
       format: input.format,
       startsAt: new Date(input.startsAt),
       courts: input.courts,
+      courtNames: normalizeCourtNames(input.courtNames, input.courts),
       maxPlayers: input.maxPlayers,
       pointsToWin: input.pointsToWin,
       matchDurationMin: input.matchDurationMin ?? null,
@@ -271,6 +274,15 @@ export async function updateTournament(
   assign('venueAddress', input.venueAddress);
   assign('venueMapUrl', input.venueMapUrl);
   if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
+
+  // Названия хранятся по одному на корт, поэтому при смене их количества список
+  // подрезается или дополняется — иначе подписи разъехались бы с кортами.
+  const courts = input.courts ?? current.courts;
+  if (input.courtNames !== undefined) {
+    patch.courtNames = normalizeCourtNames(input.courtNames, courts);
+  } else if (input.courts !== undefined && current.courtNames) {
+    patch.courtNames = normalizeCourtNames(current.courtNames, courts);
+  }
 
   // Формат нельзя менять, когда уже созданы игры: расписание станет несогласованным.
   if (

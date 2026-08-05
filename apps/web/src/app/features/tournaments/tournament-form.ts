@@ -142,6 +142,27 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </label>
         </div>
 
+        @if (courtSlots().length > 0) {
+          <div class="field">
+            <span class="field__label">{{ t()('tournament.courtNames') }}</span>
+            <div class="courts">
+              @for (slot of courtSlots(); track slot) {
+                <label class="court-slot">
+                  <span class="tiny faint">{{ courtSlotLabel(slot) }}</span>
+                  <input
+                    class="input compact"
+                    maxlength="24"
+                    [value]="courtName(slot)"
+                    [placeholder]="(slot + 1).toString()"
+                    (input)="setCourtName(slot, text($event))"
+                  />
+                </label>
+              }
+            </div>
+            <span class="field__hint">{{ t()('tournament.courtNamesHint') }}</span>
+          </div>
+        }
+
         <div class="row row--wrap">
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.matchDuration') }}</span>
@@ -302,6 +323,18 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
     .chip {
       cursor: pointer;
     }
+
+    .courts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .court-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
   `,
 })
 export class TournamentFormPage {
@@ -338,12 +371,19 @@ export class TournamentFormPage {
   protected readonly description = signal('');
   protected readonly formatDescription = signal('');
   protected readonly saving = signal(false);
+  /** Названия кортов по позициям; пустое значение — корт остаётся под номером. */
+  protected readonly courtNames = signal<string[]>([]);
 
   protected readonly isEdit = computed(() => Boolean(this.id()));
 
   protected readonly courts = computed(() => toNumberOrNull(this.courtsText()) ?? 0);
   protected readonly maxPlayers = computed(() => toNumberOrNull(this.maxPlayersText()) ?? 0);
   protected readonly pointsToWin = computed(() => toNumberOrNull(this.pointsToWinText()) ?? 0);
+
+  /** Поля для подписей появляются и исчезают вслед за количеством кортов. */
+  protected readonly courtSlots = computed(() =>
+    Array.from({ length: Math.min(Math.max(this.courts(), 0), 20) }, (_, index) => index),
+  );
 
   protected readonly venues = resource({
     loader: () => this.api.listVenues().then((response) => response.venues),
@@ -395,6 +435,24 @@ export class TournamentFormPage {
       this.venueMapUrl.set(tournament.venueMapUrl ?? '');
       this.description.set(tournament.description ?? '');
       this.formatDescription.set(tournament.formatDescription ?? '');
+      this.courtNames.set([...(tournament.courtNames ?? [])]);
+    });
+  }
+
+  protected courtName(slot: number): string {
+    return this.courtNames()[slot] ?? '';
+  }
+
+  protected courtSlotLabel(slot: number): string {
+    return this.i18n.translate('tournament.courtSlot', { number: slot + 1 });
+  }
+
+  protected setCourtName(slot: number, value: string): void {
+    this.courtNames.update((names) => {
+      const next = [...names];
+      while (next.length <= slot) next.push('');
+      next[slot] = value;
+      return next;
     });
   }
 
@@ -469,6 +527,7 @@ export class TournamentFormPage {
       format: this.format(),
       startsAt: new Date(this.startsAt()).toISOString(),
       courts: this.courts(),
+      courtNames: this.courtSlots().map((slot) => this.courtName(slot).trim()),
       maxPlayers: this.maxPlayers(),
       pointsToWin: this.pointsToWin(),
       matchDurationMin: toNumberOrNull(this.matchDuration()),

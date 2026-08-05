@@ -25,7 +25,7 @@ import {
 import { ApiError, forbidden, wrongStatus } from '../lib/errors.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
 import { getTournamentRow } from './tournaments.js';
-import { computeTournamentStandings, loadMatchResults } from './state.js';
+import { computeTournamentStandings, loadCourtHistory } from './state.js';
 import { recordAudit } from './audit.js';
 
 /** Сколько раундов создавать, если организатор выбрал «до остановки». */
@@ -339,10 +339,13 @@ export async function appendRound(
       toScheduleError(error);
     }
   } else {
-    const results = await loadMatchResults(db, tournamentId);
-    const playedMatches = results.map((result) => ({
-      teamA: [result.teamA[0] as string, result.teamA[1] as string] as Team,
-      teamB: [result.teamB[0] as string, result.teamB[1] as string] as Team,
+    // Берём все созданные матчи, а не только со счётом: пара уже сыграла вместе
+    // и корт уже был занят, даже если счёт не внесли.
+    const history = await loadCourtHistory(db, tournamentId);
+    const playedMatches = history.map((match) => ({
+      court: match.court,
+      teamA: [match.teamA[0] as string, match.teamA[1] as string] as Team,
+      teamB: [match.teamB[0] as string, match.teamB[1] as string] as Team,
     }));
     try {
       plan = nextAmericanoRound({

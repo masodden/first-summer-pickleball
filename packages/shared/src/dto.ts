@@ -90,6 +90,8 @@ export interface TournamentSummaryDto {
   startsAt: string;
   venueName: string | null;
   courts: number;
+  /** Названия кортов по порядку; null — нумерация от 1. */
+  courtNames: string[] | null;
   maxPlayers: number;
   participantCount: number;
   confirmedCount: number;
@@ -125,7 +127,10 @@ export interface MatchTeamDto {
 export interface MatchDto {
   id: string;
   roundIndex: number;
+  /** Позиция корта, начиная с 1: в mexicano это ещё и уровень игры. */
   court: number;
+  /** Как корт подписан на площадке: номер или название. */
+  courtName: string;
   status: MatchStatus;
   teamA: MatchTeamDto;
   teamB: MatchTeamDto;

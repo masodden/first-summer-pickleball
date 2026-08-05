@@ -73,12 +73,19 @@ export const mergeGuestSchema = z.object({
 
 export const standingsSortSchema = z.array(z.enum(STANDINGS_SORT_KEYS)).min(1).max(6);
 
+/**
+ * Названия кортов по порядку. Пустые значения допускаются: организатор мог
+ * подписать только часть кортов, остальные останутся под своими номерами.
+ */
+export const courtNamesSchema = z.array(z.string().trim().max(24)).max(20).nullable().optional();
+
 export const createTournamentSchema = z.object({
   title: z.string().trim().min(2).max(120),
   category: z.string().trim().max(60).nullable().optional(),
   format: z.enum(TOURNAMENT_FORMATS),
   startsAt: z.string().datetime({ offset: true }),
   courts: z.number().int().min(1).max(20),
+  courtNames: courtNamesSchema,
   maxPlayers: z.number().int().min(4).max(200),
   pointsToWin: z.number().int().min(1).max(99),
   matchDurationMin: z.number().int().min(1).max(180).nullable().optional(),

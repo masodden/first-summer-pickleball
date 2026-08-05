@@ -1,5 +1,6 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { computeStandings, resolveMedals, type MatchResult } from '@fsp/engine';
+import { courtLabel } from '@fsp/shared';
 import type {
   MatchDto,
   PlayerDto,
@@ -29,11 +30,13 @@ function toMatchDto(
   teamA: PlayerDto[],
   teamB: PlayerDto[],
   durationMs: number | null,
+  courtNames: string[] | null,
 ): MatchDto {
   return {
     id: row.id,
     roundIndex: row.roundIndex,
     court: row.court,
+    courtName: courtLabel(row.court, courtNames),
     status: row.status,
     teamA: { players: teamA, score: row.scoreA },
     teamB: { players: teamB, score: row.scoreB },
@@ -97,7 +100,7 @@ export async function loadRounds(db: Database, tournament: TournamentRow): Promi
       .filter((match) => match.roundId === round.id)
       .map((match) => {
         const lineup = lineupByMatch.get(match.id) ?? { A: [], B: [] };
-        return toMatchDto(match, lineup.A, lineup.B, durationMs);
+        return toMatchDto(match, lineup.A, lineup.B, durationMs, tournament.courtNames);
       });
 
     return {
@@ -140,6 +143,31 @@ export async function loadMatchResults(db: Database, tournamentId: string): Prom
     });
   }
   return results;
+}
+
+/**
+ * Кто на каких кортах уже играл. Счёт неважен: корт был занят и в незавершённом
+ * матче, а движку это нужно, чтобы следующий раунд поставить ровнее.
+ */
+export async function loadCourtHistory(
+  db: Database,
+  tournamentId: string,
+): Promise<{ court: number; teamA: string[]; teamB: string[] }[]> {
+  const rows = await db
+    .select({ match: matches, lineup: matchPlayers })
+    .from(matches)
+    .innerJoin(matchPlayers, eq(matchPlayers.matchId, matches.id))
+    .where(eq(matches.tournamentId, tournamentId));
+
+  const grouped = new Map<string, { court: number; teamA: string[]; teamB: string[] }>();
+  for (const row of rows) {
+    const entry = grouped.get(row.match.id) ?? { court: row.match.court, teamA: [], teamB: [] };
+    if (row.lineup.team === 'A') entry.teamA.push(row.lineup.playerId);
+    else entry.teamB.push(row.lineup.playerId);
+    grouped.set(row.match.id, entry);
+  }
+
+  return [...grouped.values()];
 }
 
 export async function computeTournamentStandings(

@@ -96,6 +96,10 @@ export const en: Record<TranslationKey, string> = {
   'tournament.format': 'Format',
   'tournament.startsAt': 'Date and time',
   'tournament.courts': 'Number of courts',
+  'tournament.courtNames': 'Court names',
+  'tournament.courtNamesHint':
+    'How the courts are labelled at the venue: 4, 5, 6 or “Centre court”. Empty ones keep their numbers. The first court in the list is the top one: in mexicano the leaders play there.',
+  'tournament.courtSlot': 'Court #{{number}}',
   'tournament.maxPlayers': 'Number of players',
   'tournament.pointsToWin': 'Maximum score',
   'tournament.matchDuration': 'Match duration, minutes',

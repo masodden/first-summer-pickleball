@@ -173,6 +173,11 @@ export const tournaments = pgTable(
     status: tournamentStatusEnum().notNull().default('registration'),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     courts: integer().notNull(),
+    /**
+     * Как корты называются на площадке: «4», «5», «Центральный».
+     * null — нумеруем от 1 до количества кортов.
+     */
+    courtNames: jsonb().$type<string[]>(),
     maxPlayers: integer().notNull(),
     pointsToWin: integer().notNull().default(11),
     matchDurationMin: integer(),

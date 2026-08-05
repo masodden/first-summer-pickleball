@@ -165,7 +165,12 @@ async function createTournament(
 
 const state = (id: string, token?: string) =>
   request<{
-    tournament: { status: string; roundsGenerated: number };
+    tournament: {
+      status: string;
+      roundsGenerated: number;
+      courts: number;
+      courtNames: string[] | null;
+    };
     participants: { player: { id: string }; confirmedAndPaid: boolean; status: string }[];
     rounds: RoundDto[];
     standings: StandingRowDto[];
@@ -209,6 +214,21 @@ function partnerKey(a: string, b: string): string {
   return [a, b].sort().join('|');
 }
 
+/** Сколько игр каждый провёл на каждом корте: ключ — игрок, индекс — позиция корта. */
+function courtUsage(rounds: readonly RoundDto[], courts: number): Map<string, number[]> {
+  const usage = new Map<string, number[]>();
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      for (const player of [...match.teamA.players, ...match.teamB.players]) {
+        const row = usage.get(player.id) ?? Array.from({ length: courts }, () => 0);
+        row[match.court - 1] = (row[match.court - 1] ?? 0) + 1;
+        usage.set(player.id, row);
+      }
+    }
+  }
+  return usage;
+}
+
 async function main(): Promise<void> {
   section('Вход организаторов');
   const admin = await login('admin', 'e2e-admin', 'Организатор клуба');
@@ -235,6 +255,8 @@ async function main(): Promise<void> {
     format: 'americano',
     startsAt,
     courts: 3,
+    // В клубе этот вечер занимает корты 4, 5 и 6 — так они и подписаны.
+    courtNames: ['4', '5', '6'],
     maxPlayers: 12,
     pointsToWin: 11,
     matchDurationMin: 15,
@@ -256,8 +278,46 @@ async function main(): Promise<void> {
     ...shared,
     title: 'Вечер пиклбола — Intermediate',
     category: 'intermediate',
+    // Вторая половина клуба играет на кортах без подписей: там обычная нумерация.
+    courtNames: null,
   });
   check(advanced.id !== intermediate.id, 'два турнира созданы независимо');
+
+  section('Названия кортов');
+  const advancedInfo = await state(advanced.id, admin.token);
+  check(
+    JSON.stringify(advancedInfo.tournament.courtNames) === JSON.stringify(['4', '5', '6']),
+    'названия кортов сохранены в том порядке, в котором их задали',
+  );
+  check(
+    (await state(intermediate.id, moderator.token)).tournament.courtNames === null,
+    'без названий турнир остаётся с обычной нумерацией',
+  );
+
+  await request('PATCH', `/api/tournaments/${intermediate.id}`, {
+    token: moderator.token,
+    body: { courtNames: ['1', '2', 'Дальний'] },
+  });
+  check(
+    JSON.stringify((await state(intermediate.id, moderator.token)).tournament.courtNames) ===
+      JSON.stringify(['1', '2', 'Дальний']),
+    'названия можно задать и после создания турнира',
+  );
+
+  // Урезали площадку до двух кортов — лишняя подпись уходит вместе с кортом.
+  await request('PATCH', `/api/tournaments/${intermediate.id}`, {
+    token: moderator.token,
+    body: { courts: 2 },
+  });
+  check(
+    JSON.stringify((await state(intermediate.id, moderator.token)).tournament.courtNames) ===
+      JSON.stringify(['1', '2']),
+    'при уменьшении числа кортов лишние названия отбрасываются',
+  );
+  await request('PATCH', `/api/tournaments/${intermediate.id}`, {
+    token: moderator.token,
+    body: { courts: 3, courtNames: null },
+  });
 
   const list = await request<{ items: { id: string }[] }>('GET', '/api/tournaments');
   check(
@@ -368,6 +428,24 @@ async function main(): Promise<void> {
   check(
     started.rounds.every((round) => round.sittingOut.length === 0),
     '12 игроков на 3 кортах играют без отдыхающих',
+  );
+  check(
+    started.rounds.every((round) =>
+      round.matches.every((match) => match.courtName === ['4', '5', '6'][match.court - 1]),
+    ),
+    'у каждого матча стоит подпись корта: 4, 5 и 6',
+  );
+
+  // Корты неравноценны, поэтому за вечер каждый должен побывать на всех трёх.
+  const usage = courtUsage(started.rounds, 3);
+  check(usage.size === 12, 'статистика по кортам собрана по всем игрокам');
+  check(
+    [...usage.values()].every((row) => row.every((games) => games > 0)),
+    'никто не застревает на одном корте: каждый играет на 4, 5 и 6',
+  );
+  check(
+    [...usage.values()].every((row) => Math.max(...row) - Math.min(...row) <= 3),
+    'игры распределены по кортам примерно ровно',
   );
 
   const partners = new Set<string>();
@@ -505,6 +583,8 @@ async function main(): Promise<void> {
     format: 'mexicano',
     startsAt,
     courts: 2,
+    // Названия могут быть и словами: позиция корта от подписи не зависит.
+    courtNames: ['Центральный', 'Дальний'],
     maxPlayers: 8,
     pointsToWin: 11,
     roundsPlanned: null,
@@ -555,11 +635,24 @@ async function main(): Promise<void> {
   mex = await state(mexicano.id, admin.token);
   check(mex.rounds.length === 3, 'в mexicano три сыгранных раунда');
   const leader = mex.standings[0]!;
+  const topCourt = mex.rounds[2]!.matches[0]!;
   check(
-    mex.rounds[2]!.matches[0]!.teamA.players.concat(mex.rounds[2]!.matches[0]!.teamB.players).some(
-      (player) => player.id === leader.player.id,
-    ),
+    topCourt.teamA.players
+      .concat(topCourt.teamB.players)
+      .some((player) => player.id === leader.player.id),
     'лидер таблицы играет на первом корте',
+  );
+  check(
+    topCourt.court === 1 && topCourt.courtName === 'Центральный',
+    'первый корт mexicano подписан своим названием, а позиция осталась первой',
+  );
+  check(
+    mex.rounds.every((round) =>
+      round.matches.every(
+        (match) => match.courtName === ['Центральный', 'Дальний'][match.court - 1],
+      ),
+    ),
+    'подписи кортов в mexicano не перемешиваются между раундами',
   );
 
   await request('POST', `/api/tournaments/${mexicano.id}/finish`, { token: admin.token });
@@ -567,6 +660,39 @@ async function main(): Promise<void> {
     (await state(mexicano.id, admin.token)).tournament.status === 'finished',
     'mexicano можно завершить в любой момент',
   );
+
+  section('Корты без названий');
+  const plain = await createTournament(admin.token, {
+    title: 'Вечер пиклбола — один корт',
+    format: 'americano',
+    startsAt,
+    courts: 1,
+    maxPlayers: 4,
+    pointsToWin: 11,
+    roundsPlanned: 3,
+    ratingBalance: true,
+  });
+  for (const player of intermediatePlayers.slice(8, 12)) {
+    await request('POST', `/api/tournaments/${plain.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+    await request('PUT', `/api/tournaments/${plain.id}/participants/${player.id}/paid`, {
+      token: admin.token,
+      body: { confirmedAndPaid: true },
+    });
+  }
+  await request('POST', `/api/tournaments/${plain.id}/start`, {
+    token: admin.token,
+    body: { seed: 5 },
+  });
+  const plainState = await state(plain.id, admin.token);
+  check(plainState.tournament.courtNames === null, 'названий у турнира нет');
+  check(
+    plainState.rounds.every((round) => round.matches.every((match) => match.courtName === '1')),
+    'без названий корт подписан своим номером',
+  );
+  await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
 
   section('Права и удаление');
   await expectError('forbidden', 'модератор не удаляет турниры', () =>

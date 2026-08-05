@@ -66,7 +66,7 @@ export async function buildResultsCsv(db: Database, tournament: TournamentRow): 
       lines.push(
         toRow([
           round.index + 1,
-          match.court,
+          match.courtName,
           match.teamA.players.map((player) => player.fullName).join(' / '),
           match.teamA.score,
           match.teamB.score,

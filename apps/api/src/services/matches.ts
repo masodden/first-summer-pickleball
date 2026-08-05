@@ -1,5 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
-import type { MatchDto, MatchStatus } from '@fsp/shared';
+import { courtLabel, type MatchDto, type MatchStatus } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
   matchPlayers,
@@ -41,6 +41,7 @@ export async function loadMatchDto(db: Database, matchId: string): Promise<Match
     id: row.match.id,
     roundIndex: row.match.roundIndex,
     court: row.match.court,
+    courtName: courtLabel(row.match.court, row.tournament.courtNames),
     status: row.match.status,
     teamA: { players: teamA, score: row.match.scoreA },
     teamB: { players: teamB, score: row.match.scoreB },

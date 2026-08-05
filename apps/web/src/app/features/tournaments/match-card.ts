@@ -32,7 +32,7 @@ import { RatingChip } from '../../ui/rating-chip';
   template: `
     <div class="glass card--tight court" [class.court--finished]="match().status === 'finished'">
       <div class="row row--between">
-        <span class="court__label">{{ t()('match.court', { number: match().court }) }}</span>
+        <span class="court__label">{{ courtLabel() }}</span>
 
         <div class="row court__status">
           @if (timeLimit() !== null) {
@@ -346,6 +346,7 @@ export class MatchCard {
   protected readonly draftB = signal(0);
 
   protected readonly canManage = this.store.canManage;
+  protected readonly courtLabel = computed(() => this.i18n.court(this.match().courtName));
   protected readonly busy = computed(() => this.store.isBusy(`match:${this.match().id}`));
   protected readonly hasScore = computed(
     () => this.match().teamA.score !== null && this.match().teamB.score !== null,
