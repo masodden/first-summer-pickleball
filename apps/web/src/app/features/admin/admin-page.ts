@@ -8,9 +8,8 @@ import { PlayerLine } from '../../ui/player-line';
 /**
  * Администрирование.
  *
- * Три задачи: назначать модераторов, разбирать заявки на привязку DUPR и
- * обновлять справочник игроков из выгрузки. Администраторы клуба зашиты в
- * конфигурацию, поэтому их роль изменить нельзя.
+ * Заявки на DUPR, список аккаунтов (модератор/игрок) и импорт справочника.
+ * Admin только у PZQZKM и P5ML0M — назначить его здесь нельзя.
  */
 @Component({
   selector: 'app-admin',
@@ -88,7 +87,7 @@ import { PlayerLine } from '../../ui/player-line';
             </div>
 
             @if (account.isBootstrapAdmin) {
-              <span class="chip chip--accent">{{ t()('role.admin') }}</span>
+              <span class="chip chip--accent">{{ t()('player.roleClubAdmin') }}</span>
             } @else {
               <select
                 class="select compact"
@@ -197,6 +196,7 @@ export class AdminPage {
       this.toast.success(this.i18n.translate('role.changed'));
     } catch (error) {
       this.toast.failure(error, () => void this.setRole(account, event));
+      this.accounts.reload();
     }
   }
 

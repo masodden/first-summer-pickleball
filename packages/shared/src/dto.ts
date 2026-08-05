@@ -32,6 +32,8 @@ export interface PlayerDto {
   pendingImportRating: number | null;
   avatarUrl: string | null;
   telegramUsername: string | null;
+  /** Роль в клубе на этой карточке (DUPR), не на Telegram-аккаунте. */
+  clubRole: Role;
   isGuest: boolean;
   isClaimed: boolean;
   createdAt: string;
@@ -67,6 +69,10 @@ export interface PlayerProfileDto {
   canEdit: boolean;
   /** Показывать ли DUPR ID: только владельцу профиля и организаторам. */
   canSeeDuprId: boolean;
+  /** Один из двух зашитых админов клуба — роль снять нельзя. */
+  isBootstrapAdmin: boolean;
+  /** Текущий админ может менять clubRole на этой карточке. */
+  canManageRole: boolean;
 }
 
 export interface ParticipantDto {

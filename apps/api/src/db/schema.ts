@@ -60,6 +60,11 @@ export const players = pgTable(
     pendingImportRating: numeric({ precision: 4, scale: 3, mode: 'number' }),
     avatarUrl: text(),
     telegramUsername: text(),
+    /**
+     * Роль в клубе привязана к карточке (DUPR ID), а не к Telegram.
+     * При входе аккаунт подхватывает это значение.
+     */
+    clubRole: roleEnum().notNull().default('user'),
     isGuest: boolean().notNull().default(false),
     nameSource: fieldSourceEnum().notNull().default('import'),
     avatarSource: fieldSourceEnum(),
@@ -71,6 +76,7 @@ export const players = pgTable(
   (table) => [
     uniqueIndex('players_dupr_id_key').on(table.duprId),
     index('players_last_name_idx').on(table.lastName),
+    index('players_club_role_idx').on(table.clubRole),
   ],
 );
 

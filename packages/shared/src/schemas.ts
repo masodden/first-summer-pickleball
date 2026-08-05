@@ -133,6 +133,7 @@ export const matchActionSchema = z.object({
   version: z.number().int().min(0),
 });
 
+/** Роль клуба на карточке игрока (DUPR). Зашитых админов понизить нельзя. */
 export const setRoleSchema = z.object({
   role: z.enum(['admin', 'moderator', 'user']),
 });

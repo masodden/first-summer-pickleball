@@ -215,6 +215,7 @@ export async function computeTournamentStandings(
             pendingImportRating: null,
             avatarUrl: null,
             telegramUsername: null,
+            clubRole: 'user',
             isGuest: true,
             isClaimed: false,
             createdAt: new Date(0).toISOString(),

@@ -78,7 +78,11 @@ export type ParticipantStatus = (typeof PARTICIPANT_STATUSES)[number];
 export const CLAIM_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 
-/** Зашитые администраторы клуба. */
+/**
+ * Единственные администраторы клуба по умолчанию.
+ * Роль admin выдаётся только при привязке этих DUPR ID (с кодом в проде);
+ * назначить admin через UI/API нельзя.
+ */
 export const BOOTSTRAP_ADMIN_DUPR_IDS = ['PZQZKM', 'P5ML0M'] as const;
 
 /** DUPR ID — шесть символов из заглавных латинских букв и цифр. */

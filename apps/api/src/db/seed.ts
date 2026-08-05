@@ -1,22 +1,5 @@
-import { BOOTSTRAP_ADMIN_DUPR_IDS } from '@fsp/shared';
 import { createDatabase, type Database } from './index.js';
 import { players, venues } from './schema.js';
-
-/** Заводит карточки зашитых администраторов, если их ещё нет. */
-export async function seedAdminPlayers(db: Database): Promise<void> {
-  for (const duprId of BOOTSTRAP_ADMIN_DUPR_IDS) {
-    await db
-      .insert(players)
-      .values({
-        id: duprId,
-        duprId,
-        firstName: 'Администратор',
-        lastName: duprId,
-        nameSource: 'import',
-      })
-      .onConflictDoNothing({ target: players.id });
-  }
-}
 
 export async function seedVenues(db: Database): Promise<void> {
   // Upsert: адрес и карта иногда правятся в коде — при повторном посеве
@@ -112,9 +95,8 @@ async function main(): Promise<void> {
   const withDemo = process.argv.includes('--demo');
   const { client, db } = createDatabase();
   try {
-    await seedAdminPlayers(db);
     await seedVenues(db);
-    console.log(`Карточки администраторов готовы: ${BOOTSTRAP_ADMIN_DUPR_IDS.join(', ')}`);
+    console.log('Площадки готовы');
 
     if (withDemo) {
       const created = await seedDemoPlayers(db);

@@ -30,6 +30,7 @@ export function toPlayerDto(row: PlayerRow, options: { isClaimed?: boolean } = {
     pendingImportRating: row.pendingImportRating,
     avatarUrl: row.avatarUrl,
     telegramUsername: row.telegramUsername,
+    clubRole: row.clubRole,
     isGuest: row.isGuest,
     isClaimed: options.isClaimed ?? false,
     createdAt: row.createdAt.toISOString(),

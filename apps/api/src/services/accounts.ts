@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   BOOTSTRAP_ADMIN_DUPR_IDS,
   normalizeDuprId,
@@ -25,6 +25,7 @@ import { toPlayerDto } from './mappers.js';
 import type { Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
 import type { VerifiedInitData } from '../auth/telegram.js';
+import { getPlayerRow } from './players.js';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -53,6 +54,13 @@ export function viewerFromAccount(account: AccountRow): Viewer {
   };
 }
 
+/** Роль сессии берётся с карточки DUPR, если она привязана. */
+export function effectiveRole(account: AccountRow, player: PlayerRow | null): Role {
+  if (!player) return account.role;
+  if (isBootstrapAdmin(player.duprId)) return 'admin';
+  return player.clubRole;
+}
+
 export async function buildSession(db: Database, account: AccountRow): Promise<SessionDto> {
   let player: PlayerRow | null = null;
   if (account.playerId) {
@@ -68,9 +76,11 @@ export async function buildSession(db: Database, account: AccountRow): Promise<S
     .orderBy(desc(claims.createdAt))
     .limit(1);
 
+  const role = effectiveRole(account, player);
+
   return {
     accountId: account.id,
-    role: account.role,
+    role,
     locale: account.locale,
     notificationsEnabled: account.notificationsEnabled,
     reducedMotion: account.reducedMotion,
@@ -81,7 +91,7 @@ export async function buildSession(db: Database, account: AccountRow): Promise<S
       : null,
     // Аккаунт заявил админский ID, но кода не ввёл: показываем экран с кодом.
     needsBootstrapCode:
-      account.role !== 'admin' &&
+      role !== 'admin' &&
       claim !== undefined &&
       claim.claim.status === 'pending' &&
       isBootstrapAdmin(claim.player.duprId),
@@ -240,7 +250,27 @@ export async function claimDuprId(
     throw new ApiError('dupr_id_already_claimed', 'Этот DUPR ID уже привязан к другому аккаунту');
   }
 
-  const role: Role = isBootstrapAdmin(duprId) ? 'admin' : account.role;
+  // Роль живёт на карточке DUPR; при входе аккаунт её подхватывает.
+  if (isBootstrapAdmin(duprId) && player.clubRole !== 'admin') {
+    await db
+      .update(players)
+      .set({ clubRole: 'admin', updatedAt: new Date() })
+      .where(eq(players.id, player.id));
+  }
+  const role: Role = isBootstrapAdmin(duprId) ? 'admin' : player.clubRole;
+
+  // Старая карточка не должна выглядеть «привязанной» по залипшему @username.
+  if (account.playerId && account.playerId !== player.id && account.telegramUsername) {
+    await db
+      .update(players)
+      .set({ telegramUsername: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(players.id, account.playerId),
+          eq(players.telegramUsername, account.telegramUsername),
+        ),
+      );
+  }
 
   const [updated] = await db
     .update(accounts)
@@ -264,7 +294,7 @@ export async function claimDuprId(
     decidedAt: isBootstrapAdmin(duprId) ? new Date() : null,
   });
 
-  if (player.telegramUsername === null && account.telegramUsername) {
+  if (account.telegramUsername) {
     await db
       .update(players)
       .set({ telegramUsername: account.telegramUsername, updatedAt: new Date() })
@@ -323,10 +353,26 @@ export async function decideClaim(
 
   if (!approve) {
     // Отклонили — снимаем привязку, чтобы ID освободился.
+    const [account] = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, row.accountId))
+      .limit(1);
     await db
       .update(accounts)
       .set({ playerId: null, updatedAt: new Date() })
       .where(and(eq(accounts.id, row.accountId), eq(accounts.playerId, row.playerId)));
+    if (account?.telegramUsername) {
+      await db
+        .update(players)
+        .set({ telegramUsername: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(players.id, row.playerId),
+            eq(players.telegramUsername, account.telegramUsername),
+          ),
+        );
+    }
   }
 
   await recordAudit(db, actor, {
@@ -400,9 +446,12 @@ export async function useInvite(
     throw new ApiError('dupr_id_already_claimed', 'Эта карточка уже привязана к другому аккаунту');
   }
 
+  const player = await getPlayerRow(db, invite.playerId);
+  const role = effectiveRole(account, player);
+
   const [updated] = await db
     .update(accounts)
-    .set({ playerId: invite.playerId, updatedAt: new Date() })
+    .set({ playerId: invite.playerId, role, updatedAt: new Date() })
     .where(eq(accounts.id, account.id))
     .returning();
 
@@ -435,28 +484,72 @@ export interface AccountSummary {
   lastSeenAt: string;
 }
 
+/** В списке админки — только админы и модераторы; обычные игроки скрыты. */
 export async function listAccounts(db: Database): Promise<AccountSummary[]> {
   const rows = await db
     .select({ account: accounts, player: players })
     .from(accounts)
     .leftJoin(players, eq(players.id, accounts.playerId))
+    .where(inArray(accounts.role, ['admin', 'moderator']))
     .orderBy(desc(accounts.lastSeenAt));
 
-  return rows.map((row) => ({
-    id: row.account.id,
-    role: row.account.role,
-    displayName:
-      [row.account.telegramFirstName, row.account.telegramLastName].filter(Boolean).join(' ') ||
-      row.account.telegramUsername ||
-      'Пользователь',
-    telegramUsername: row.account.telegramUsername,
-    playerName: row.player ? `${row.player.firstName} ${row.player.lastName}`.trim() : null,
-    duprId: row.player?.duprId ?? null,
-    isBootstrapAdmin: isBootstrapAdmin(row.player?.duprId ?? null),
-    lastSeenAt: row.account.lastSeenAt.toISOString(),
-  }));
+  return rows.map((row) => {
+    const role = effectiveRole(row.account, row.player);
+    return {
+      id: row.account.id,
+      role,
+      displayName:
+        [row.account.telegramFirstName, row.account.telegramLastName].filter(Boolean).join(' ') ||
+        row.account.telegramUsername ||
+        'Пользователь',
+      telegramUsername: row.account.telegramUsername,
+      playerName: row.player ? `${row.player.firstName} ${row.player.lastName}`.trim() : null,
+      duprId: row.player?.duprId ?? null,
+      isBootstrapAdmin: isBootstrapAdmin(row.player?.duprId ?? null),
+      lastSeenAt: row.account.lastSeenAt.toISOString(),
+    };
+  });
 }
 
+/**
+ * Роль клуба на карточке игрока (DUPR ID).
+ * Telegram не нужен: привязанный аккаунт, если есть, синхронизируется.
+ */
+export async function setPlayerClubRole(
+  db: Database,
+  playerId: string,
+  role: Role,
+  actor: Viewer,
+): Promise<void> {
+  const player = await getPlayerRow(db, playerId);
+
+  if (isBootstrapAdmin(player.duprId) && role !== 'admin') {
+    throw forbidden('Администраторы клуба заданы в конфигурации и не могут быть понижены');
+  }
+  if (actor.playerId === playerId && role === 'user') {
+    throw forbidden('Нельзя снять права с самого себя');
+  }
+
+  await db
+    .update(players)
+    .set({ clubRole: role, updatedAt: new Date() })
+    .where(eq(players.id, playerId));
+
+  // Синхронизируем вошедший аккаунт, чтобы права и список админки совпали сразу.
+  await db
+    .update(accounts)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(accounts.playerId, playerId));
+
+  await recordAudit(db, actor, {
+    action: 'player.role_changed',
+    entityType: 'player',
+    entityId: playerId,
+    payload: { role, duprId: player.duprId },
+  });
+}
+
+/** Смена роли из списка аккаунтов: если есть карточка — пишем на DUPR. */
 export async function setAccountRole(
   db: Database,
   accountId: string,
@@ -471,12 +564,13 @@ export async function setAccountRole(
     .limit(1);
   if (!row) throw notFound('Аккаунт не найден');
 
-  // Администраторы клуба зашиты в код: понизить их нельзя даже по ошибке.
-  if (isBootstrapAdmin(row.player?.duprId ?? null) && role !== 'admin') {
-    throw forbidden('Этот администратор задан в конфигурации приложения');
-  }
-  if (row.account.id === actor.accountId && role !== 'admin') {
+  if (row.account.id === actor.accountId && role === 'user') {
     throw forbidden('Нельзя снять права с самого себя');
+  }
+
+  if (row.player) {
+    await setPlayerClubRole(db, row.player.id, role, actor);
+    return;
   }
 
   await db.update(accounts).set({ role, updatedAt: new Date() }).where(eq(accounts.id, accountId));

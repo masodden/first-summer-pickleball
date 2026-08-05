@@ -179,6 +179,10 @@ export class TournamentApi {
     return this.api.patch(`/api/players/${id}`, input, { queueLabel: 'Изменение профиля' });
   }
 
+  deletePlayer(id: string): Promise<{ ok: true }> {
+    return this.api.delete(`/api/players/${id}`);
+  }
+
   setRating(id: string, doublesRating: number | null): Promise<{ player: PlayerDto }> {
     return this.api.put(
       `/api/players/${id}/rating`,
@@ -229,6 +233,10 @@ export class TournamentApi {
 
   setAccountRole(id: string, role: Role): Promise<void> {
     return this.api.put(`/api/admin/accounts/${id}/role`, { role });
+  }
+
+  setPlayerRole(playerId: string, role: Role): Promise<void> {
+    return this.api.put(`/api/players/${playerId}/role`, { role });
   }
 
   getPublicBoard(slug: string): Promise<PublicBoardDto> {

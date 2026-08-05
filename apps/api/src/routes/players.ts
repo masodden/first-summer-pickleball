@@ -4,6 +4,7 @@ import {
   createPlayerSchema,
   importPlayersSchema,
   mergeGuestSchema,
+  setRoleSchema,
   updatePlayerSchema,
   updateRatingSchema,
 } from '@fsp/shared';
@@ -11,6 +12,7 @@ import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
 import {
   createPlayer,
+  deletePlayer,
   mergeGuestIntoDupr,
   resolveRatingConflict,
   searchPlayers,
@@ -18,7 +20,7 @@ import {
   updatePlayer,
 } from '../services/players.js';
 import { getPlayerProfile } from '../services/stats.js';
-import { createInvite } from '../services/accounts.js';
+import { createInvite, setPlayerClubRole } from '../services/accounts.js';
 import { importDirectory, parseDirectory } from '../services/directory-import.js';
 import type { AppContext } from './context.js';
 
@@ -61,6 +63,20 @@ export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): voi
     const body = parse(updatePlayerSchema, request.body ?? {});
     const player = await updatePlayer(db, request.params.id, body, viewer);
     return { player };
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/players/:id', async (request) => {
+    const viewer = requireRole(request, 'admin');
+    await deletePlayer(db, request.params.id, viewer);
+    return { ok: true };
+  });
+
+  /** Роль клуба на карточке DUPR — Telegram не обязателен. */
+  app.put<{ Params: { id: string } }>('/api/players/:id/role', async (request) => {
+    const viewer = requireRole(request, 'admin');
+    const body = parse(setRoleSchema, request.body);
+    await setPlayerClubRole(db, request.params.id, body.role, viewer);
+    return { ok: true };
   });
 
   /**

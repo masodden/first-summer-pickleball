@@ -1,11 +1,16 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import type { PlayerProfileDto, PlayerStatsDto } from '@fsp/shared';
+import { BOOTSTRAP_ADMIN_DUPR_IDS, type PlayerProfileDto, type PlayerStatsDto } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import { accounts, tournaments } from '../db/schema.js';
 import { toPlayerDto } from './mappers.js';
 import { canEditPlayer, getPlayerRow, getPlayerStats, getRatingHistory } from './players.js';
 import { computeTournamentStandings } from './state.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
+
+function isBootstrapAdmin(duprId: string | null): boolean {
+  if (!duprId) return false;
+  return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(duprId);
+}
 
 /**
  * Личная статистика игрока по всем турнирам.
@@ -67,23 +72,26 @@ export async function getPlayerProfile(
   };
 
   const isOwner = viewer?.playerId === playerId;
+  const bootstrap = isBootstrapAdmin(player.duprId);
+  const claimed = await isClaimed(db, playerId);
 
   return {
-    player: toPlayerDto(player, { isClaimed: await isClaimed(db, playerId) }),
+    player: toPlayerDto(player, { isClaimed: claimed }),
     stats,
     ratingHistory: await getRatingHistory(db, playerId),
     canEdit: canEditPlayer(viewer, playerId),
     // DUPR ID — личные данные: его видит владелец профиля и организаторы.
     canSeeDuprId: isOwner || canManageTournaments(viewer),
+    isBootstrapAdmin: bootstrap,
+    canManageRole: viewer?.role === 'admin' && !bootstrap,
   };
 }
 
-/** Привязана ли карточка к аккаунту Telegram. */
 async function isClaimed(db: Database, playerId: string): Promise<boolean> {
-  const rows = await db
+  const [row] = await db
     .select({ id: accounts.id })
     .from(accounts)
     .where(eq(accounts.playerId, playerId))
     .limit(1);
-  return rows.length > 0;
+  return row !== undefined;
 }

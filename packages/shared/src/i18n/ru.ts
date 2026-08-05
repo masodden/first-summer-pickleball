@@ -255,6 +255,7 @@ export const ru = {
   'player.avatar': 'Аватар',
   'player.avatarUrl': 'Ссылка на аватар',
   'player.telegram': 'Telegram',
+  'player.telegramHint': 'Username без @, например ivan_pickle',
   'player.telegramLink': 'Привязать Telegram',
   'player.telegramLinked': 'Telegram привязан',
   'player.duprId': 'DUPR ID',
@@ -273,6 +274,14 @@ export const ru = {
   'player.mergeGuestHint':
     'Введите настоящий DUPR ID гостя. Его игры и статистика перенесутся в карточку с этим ID.',
   'player.merged': 'Карточки объединены',
+  'player.delete': 'Удалить из базы',
+  'player.deleteConfirm':
+    'Удалить {{name}} из базы? Привязка Telegram сбросится, привязаться можно будет заново. История матчей этого игрока тоже исчезнет.',
+  'player.deleted': 'Игрок удалён из базы',
+  'player.role': 'Роль в клубе',
+  'player.roleHint': 'Роль привязана к DUPR ID этой карточки. Telegram не обязателен.',
+  'player.roleClubAdmin': 'Администратор клуба',
+  'player.roleUpdated': 'Роль обновлена',
 
   'rating.doubles': 'DUPR парный',
   'rating.singles': 'DUPR одиночный',
@@ -324,7 +333,8 @@ export const ru = {
   'admin.addModerator': 'Назначить модератора',
   'admin.removeModerator': 'Снять модератора',
   'admin.auditLog': 'Журнал действий',
-  'admin.bootstrapHint': 'Администраторы клуба зашиты в конфигурацию и не могут быть понижены.',
+  'admin.bootstrapHint':
+    'Здесь только администраторы и модераторы. Роль пишется на DUPR ID; PZQZKM и P5ML0M понизить нельзя.',
 
   'errors.unauthorized': 'Нужно войти в приложение',
   'errors.forbidden': 'Недостаточно прав для этого действия',

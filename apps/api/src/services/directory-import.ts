@@ -41,6 +41,8 @@ function normalizeHeader(header: string): string {
   return header
     .trim()
     .toLowerCase()
+    // Апострофы: заголовок "Player's Name" должен совпасть с playersname.
+    .replace(/[''`´]/g, '')
     .replace(/[\s_-]+/g, '');
 }
 
@@ -89,7 +91,8 @@ function parseCsv(content: string): DirectoryEntry[] {
     headers.findIndex((header) => candidates.includes(header));
 
   const duprColumn = columnOf('duprid', 'dupr', 'id');
-  const nameColumn = columnOf('name', 'playersname', 'fullname', 'runame', 'имяигрока');
+  // Оригинальное имя из DUPR (Player's Name), не русский перевод.
+  const nameColumn = columnOf('name', 'playersname', 'fullname', 'имяигрока', 'runame');
   const firstColumn = columnOf('firstname', 'first', 'имя');
   const lastColumn = columnOf('lastname', 'last', 'surname', 'фамилия');
   const doublesColumn = columnOf('doubles', 'doublesrating', 'dupdoubles', 'парный');
@@ -155,8 +158,8 @@ function parseJsonPlayers(raw: unknown): DirectoryEntry[] {
     let firstName = player.firstName ?? '';
     let lastName = player.lastName ?? '';
     if (!firstName && !lastName) {
-      // Русское написание приоритетнее: интерфейс по умолчанию на русском.
-      const display = player['ru-name'] ?? player.ruName ?? player.name ?? '';
+      // Как в DUPR: колонка Player's Name / name, русский перевод — только запасной.
+      const display = player.name ?? player['ru-name'] ?? player.ruName ?? '';
       const split = splitName(display);
       firstName = split.firstName;
       lastName = split.lastName;

@@ -262,21 +262,129 @@ async function main(): Promise<void> {
   check(moderator.session.role === 'moderator', 'модератор вошёл');
 
   section('Первый вход администратора клуба');
-  // Локально кода из .env нет, и требовать его — значит не дать администратору
-  // привязать свой DUPR на собственной машине.
+  // Карточки админов не сидим заранее. Если прошлый прогон оставил привязку —
+  // снимаем её удалением карточки (аккаунт отвяжется, ID снова свободен).
+  for (const id of ['PZQZKM', 'P5ML0M'] as const) {
+    try {
+      await request('DELETE', `/api/players/${id}`, { token: admin.token });
+    } catch {
+      // карточки ещё не было — нормально
+    }
+  }
+
+  // Локально кода из .env нет: ALLOW_DEV_LOGIN снимает проверку BOOTSTRAP_ADMIN_CODE.
   const clubAdmin = await login('user', 'e2e-club-admin', 'Админ клуба');
-  const bootstrapClaim = await request<{ session: { role: string } }>('POST', '/api/auth/claim', {
-    token: clubAdmin.token,
-    body: { duprId: 'PZQZKM' },
-  });
+  const bootstrapClaim = await request<{ session: { role: string; accountId: string } }>(
+    'POST',
+    '/api/auth/claim',
+    {
+      token: clubAdmin.token,
+      body: { duprId: 'PZQZKM', firstName: 'Club', lastName: 'AdminOne' },
+    },
+  );
   check(
     bootstrapClaim.session.role === 'admin',
-    'админский DUPR привязывается без кода при ALLOW_DEV_LOGIN',
+    'админский DUPR PZQZKM привязывается без кода при ALLOW_DEV_LOGIN',
   );
+
+  await expectError('forbidden', 'зашитого админа нельзя понизить', () =>
+    request('PUT', `/api/players/PZQZKM/role`, {
+      token: admin.token,
+      body: { role: 'user' },
+    }),
+  );
+
+  const secondBootstrap = await login('user', 'e2e-club-admin-2', 'Второй админ клуба');
+  const secondClaim = await request<{ session: { role: string } }>('POST', '/api/auth/claim', {
+    token: secondBootstrap.token,
+    body: { duprId: 'P5ML0M', firstName: 'Club', lastName: 'AdminTwo' },
+  });
+  check(secondClaim.session.role === 'admin', 'второй зашитый DUPR P5ML0M тоже становится admin');
+
+  // Роль на DUPR без Telegram: навесили модератора, потом вошёл — подхватил.
+  const staffPlayer = await request<{ player: { id: string; duprId: string; clubRole: string } }>(
+    'POST',
+    '/api/players',
+    {
+      token: admin.token,
+      body: {
+        firstName: 'Судья',
+        lastName: 'Смены',
+        duprId: `MD${RUN_TAG}99`,
+        doublesRating: 3.5,
+      },
+    },
+  );
+  await request('PUT', `/api/players/${staffPlayer.player.id}/role`, {
+    token: admin.token,
+    body: { role: 'moderator' },
+  });
+  const staffCard = await request<{
+    canManageRole: boolean;
+    isBootstrapAdmin: boolean;
+    player: { clubRole: string };
+  }>('GET', `/api/players/${staffPlayer.player.id}`, { token: admin.token });
+  check(staffCard.canManageRole === true, 'роль на карточке можно менять без Telegram');
+  check(staffCard.player.clubRole === 'moderator', 'роль модератора записана на DUPR');
+  check(staffCard.isBootstrapAdmin === false, 'обычный игрок не помечен как bootstrap-admin');
+
+  await request('PUT', `/api/players/${staffPlayer.player.id}/role`, {
+    token: admin.token,
+    body: { role: 'admin' },
+  });
+  const promoted = await request<{ player: { clubRole: string } }>(
+    'GET',
+    `/api/players/${staffPlayer.player.id}`,
+    { token: admin.token },
+  );
+  check(promoted.player.clubRole === 'admin', 'из модератора можно сделать администратора');
+
+  const staffUser = await login('user', 'e2e-staff-role', 'Будущий модератор');
+  const staffClaim = await request<{ session: { role: string } }>('POST', '/api/auth/claim', {
+    token: staffUser.token,
+    body: { duprId: staffPlayer.player.duprId },
+  });
+  check(
+    staffClaim.session.role === 'admin',
+    'при входе аккаунт подхватывает роль с карточки DUPR',
+  );
+
+  await request('PUT', `/api/players/${staffPlayer.player.id}/role`, {
+    token: admin.token,
+    body: { role: 'moderator' },
+  });
+  const staffAccounts = await request<{ accounts: { id: string; role: string }[] }>(
+    'GET',
+    '/api/admin/accounts',
+    { token: admin.token },
+  );
+  check(
+    staffAccounts.accounts.some((row) => row.id === staffUser.session.accountId),
+    'модератор виден в таблице админки',
+  );
+
+  await request('PUT', `/api/players/${staffPlayer.player.id}/role`, {
+    token: admin.token,
+    body: { role: 'user' },
+  });
+  const afterDemote = await request<{ accounts: { id: string }[] }>(
+    'GET',
+    '/api/admin/accounts',
+    { token: admin.token },
+  );
+  check(
+    !afterDemote.accounts.some((row) => row.id === staffUser.session.accountId),
+    'после понижения до игрока строка пропадает из таблицы админки',
+  );
+
   // Возвращаем ID клубу: в этой же базе потом заходит живой администратор.
   await request('POST', '/api/auth/claim', {
     token: clubAdmin.token,
     body: { duprId: `ZZ${RUN_TAG}01`, firstName: 'Тест', lastName: 'Прогонов' },
+  });
+  await request('POST', '/api/auth/claim', {
+    token: secondBootstrap.token,
+    body: { duprId: `ZZ${RUN_TAG}02`, firstName: 'Тест', lastName: 'Второй' },
   });
 
   section('Справочник игроков');

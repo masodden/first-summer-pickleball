@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { isRoleAtLeast, type Locale, type Role } from '@fsp/shared';
-import { accounts } from '../db/schema.js';
+import { accounts, players } from '../db/schema.js';
 import type { Database } from '../db/index.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
+import { effectiveRole } from '../services/accounts.js';
 
 /** Кто выполняет запрос. Наблюдатель без входа — это просто `null`. */
 export interface Viewer {
@@ -40,9 +41,19 @@ export function registerViewerContext(app: FastifyInstance, db: Database): void 
         .limit(1);
       if (!account) return;
 
+      let player = null;
+      if (account.playerId) {
+        const [row] = await db
+          .select()
+          .from(players)
+          .where(eq(players.id, account.playerId))
+          .limit(1);
+        player = row ?? null;
+      }
+
       request.viewer = {
         accountId: account.id,
-        role: account.role,
+        role: effectiveRole(account, player),
         playerId: account.playerId,
         locale: account.locale,
         displayName:

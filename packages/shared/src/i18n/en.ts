@@ -258,6 +258,7 @@ export const en: Record<TranslationKey, string> = {
   'player.avatar': 'Avatar',
   'player.avatarUrl': 'Avatar link',
   'player.telegram': 'Telegram',
+  'player.telegramHint': 'Username without @, e.g. ivan_pickle',
   'player.telegramLink': 'Link Telegram',
   'player.telegramLinked': 'Telegram linked',
   'player.duprId': 'DUPR ID',
@@ -276,6 +277,14 @@ export const en: Record<TranslationKey, string> = {
   'player.mergeGuestHint':
     "Enter the guest's real DUPR ID. Their games and statistics will move to the profile with that ID.",
   'player.merged': 'Profiles merged',
+  'player.delete': 'Remove from database',
+  'player.deleteConfirm':
+    "Remove {{name}} from the database? Their Telegram link will be cleared and they can claim again. This player's match history will also be removed.",
+  'player.deleted': 'Player removed from the database',
+  'player.role': 'Club role',
+  'player.roleHint': 'The role is attached to this card’s DUPR ID. Telegram is not required.',
+  'player.roleClubAdmin': 'Club administrator',
+  'player.roleUpdated': 'Role updated',
 
   'rating.doubles': 'DUPR doubles',
   'rating.singles': 'DUPR singles',
@@ -328,7 +337,7 @@ export const en: Record<TranslationKey, string> = {
   'admin.removeModerator': 'Remove moderator',
   'admin.auditLog': 'Activity log',
   'admin.bootstrapHint':
-    'Club administrators are hard-coded in the configuration and cannot be demoted.',
+    'Only administrators and moderators are listed. Roles are stored on the DUPR ID; PZQZKM and P5ML0M cannot be demoted.',
 
   'errors.unauthorized': 'You need to sign in',
   'errors.forbidden': 'Not enough permissions for this action',

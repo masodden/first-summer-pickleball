@@ -7,6 +7,8 @@ import {
   resource,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
+import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
@@ -146,6 +148,20 @@ import { RatingChip } from '../../ui/rating-chip';
               </label>
             </div>
 
+            <label class="field">
+              <span class="field__label">{{ t()('player.telegram') }}</span>
+              <input
+                class="input"
+                autocapitalize="off"
+                autocomplete="off"
+                spellcheck="false"
+                [placeholder]="t()('player.telegramHint')"
+                [value]="telegramUsername()"
+                (input)="telegramUsername.set(text($event))"
+              />
+              <span class="field__hint">{{ t()('player.telegramHint') }}</span>
+            </label>
+
             <button
               type="button"
               class="btn btn--glass btn--block"
@@ -176,6 +192,40 @@ import { RatingChip } from '../../ui/rating-chip';
                   </button>
                 </div>
               </div>
+            }
+
+            @if (session.isAdmin()) {
+              <button
+                type="button"
+                class="btn btn--danger btn--block"
+                [disabled]="saving()"
+                (click)="remove()"
+              >
+                {{ t()('player.delete') }}
+              </button>
+            }
+          </section>
+        }
+
+        @if (session.isAdmin()) {
+          <section class="glass card--tight stack stack--3">
+            <h3>{{ t()('player.role') }}</h3>
+            @if (data.isBootstrapAdmin) {
+              <span class="chip chip--accent">{{ t()('player.roleClubAdmin') }}</span>
+              <p class="tiny faint">{{ t()('admin.bootstrapHint') }}</p>
+            } @else {
+              <p class="tiny faint">{{ t()('player.roleHint') }}</p>
+              <select
+                class="select"
+                [value]="data.player.clubRole"
+                [attr.aria-label]="t()('player.role')"
+                [disabled]="saving() || !data.canManageRole"
+                (change)="setRole($event)"
+              >
+                <option value="user">{{ t()('role.user') }}</option>
+                <option value="moderator">{{ t()('role.moderator') }}</option>
+                <option value="admin">{{ t()('role.admin') }}</option>
+              </select>
             }
           </section>
         }
@@ -312,6 +362,8 @@ export class PlayerProfilePage {
   private readonly api = inject(TournamentApi);
   private readonly toast = inject(ToastService);
   private readonly telegram = inject(TelegramService);
+  private readonly confirm = inject(ConfirmService);
+  private readonly router = inject(Router);
 
   protected readonly session = inject(SessionStore);
   protected readonly i18n = inject(I18nService);
@@ -320,14 +372,20 @@ export class PlayerProfilePage {
   readonly id = input.required<string>();
 
   protected readonly profile = resource({
-    params: () => this.id(),
-    loader: ({ params }) => this.api.getPlayer(params),
+    // Ждём сессию: иначе первый запрос уходит без токена и canManageRole=false.
+    params: () => ({
+      id: this.id(),
+      ready: this.session.ready(),
+      accountId: this.session.session()?.accountId ?? null,
+    }),
+    loader: ({ params }) => this.api.getPlayer(params.id),
   });
 
   protected readonly rating = signal('');
   protected readonly avatarUrl = signal('');
   protected readonly firstName = signal('');
   protected readonly lastName = signal('');
+  protected readonly telegramUsername = signal('');
   protected readonly mergeId = signal('');
   protected readonly saving = signal(false);
 
@@ -342,6 +400,7 @@ export class PlayerProfilePage {
       this.avatarUrl.set(data.player.avatarUrl ?? '');
       this.firstName.set(data.player.firstName);
       this.lastName.set(data.player.lastName);
+      this.telegramUsername.set(data.player.telegramUsername ?? '');
     });
   }
 
@@ -396,16 +455,56 @@ export class PlayerProfilePage {
   protected async saveProfile(): Promise<void> {
     this.saving.set(true);
     try {
+      const telegram = this.telegramUsername().trim().replace(/^@+/, '');
       await this.api.updatePlayer(this.id(), {
         firstName: this.firstName().trim(),
         lastName: this.lastName().trim(),
         avatarUrl: this.avatarUrl().trim() || null,
+        telegramUsername: telegram === '' ? null : telegram,
       });
       this.profile.reload();
       await this.session.refresh();
       this.toast.success(this.i18n.translate('player.updated'));
     } catch (error) {
       this.toast.failure(error, () => void this.saveProfile());
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async setRole(event: Event): Promise<void> {
+    const role = (event.target as HTMLSelectElement).value as 'admin' | 'moderator' | 'user';
+    this.saving.set(true);
+    try {
+      await this.api.setPlayerRole(this.id(), role);
+      this.profile.reload();
+      this.toast.success(this.i18n.translate('player.roleUpdated'));
+    } catch (error) {
+      this.toast.failure(error, () => void this.setRole(event));
+      this.profile.reload();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async remove(): Promise<void> {
+    const data = this.profile.value();
+    if (!data) return;
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('player.delete'),
+      message: this.i18n.translate('player.deleteConfirm', { name: data.player.fullName }),
+      confirmLabel: this.i18n.translate('common.delete'),
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    this.saving.set(true);
+    try {
+      await this.api.deletePlayer(data.player.id);
+      this.toast.success(this.i18n.translate('player.deleted'));
+      await this.router.navigate(['/players']);
+    } catch (error) {
+      this.toast.failure(error, () => void this.remove());
     } finally {
       this.saving.set(false);
     }

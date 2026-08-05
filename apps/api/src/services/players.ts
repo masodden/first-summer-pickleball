@@ -19,8 +19,16 @@ import {
   type PlayerRow,
 } from '../db/schema.js';
 import { ApiError, forbidden, notFound } from '../lib/errors.js';
+import { recordAudit } from './audit.js';
 import { toPlayerDto, toRatingHistoryDto } from './mappers.js';
 import type { Viewer } from '../auth/context.js';
+
+/** Убираем @ и пустые строки: в карточке храним только username. */
+function normalizeTelegramUsername(value: string | null): string | null {
+  if (value === null) return null;
+  const cleaned = value.trim().replace(/^@+/, '');
+  return cleaned === '' ? null : cleaned;
+}
 
 /** Гостевые карточки живут в том же пространстве ключей, но с явным префиксом. */
 function createGuestId(): string {
@@ -172,7 +180,7 @@ export async function updatePlayer(
     patch.avatarSource = input.avatarUrl === null ? null : isSelf ? 'self' : 'manual';
   }
   if (input.telegramUsername !== undefined) {
-    patch.telegramUsername = input.telegramUsername;
+    patch.telegramUsername = normalizeTelegramUsername(input.telegramUsername);
   }
   if (input.singlesRating !== undefined) {
     patch.singlesRating = input.singlesRating;
@@ -384,6 +392,41 @@ export async function mergeGuestIntoDupr(
       .where(eq(players.id, guestId));
 
     return toPlayerDto(target);
+  });
+}
+
+/**
+ * Полное удаление карточки из нашей базы.
+ *
+ * Аккаунт Telegram отвязывается (SET NULL), заявки и история участия уходят
+ * каскадом. После повторного импорта или создания карточки с тем же DUPR ID
+ * можно привязаться заново — как будто игрока не было.
+ */
+export async function deletePlayer(
+  db: Database,
+  playerId: string,
+  actor: Viewer,
+): Promise<void> {
+  const current = await getPlayerRow(db, playerId);
+
+  await db.transaction(async (tx) => {
+    // Гости, слитые в эту карточку, иначе останутся с битой ссылкой.
+    await tx
+      .update(players)
+      .set({ mergedIntoId: null, updatedAt: new Date() })
+      .where(eq(players.mergedIntoId, playerId));
+
+    await tx.delete(players).where(eq(players.id, playerId));
+  });
+
+  await recordAudit(db, actor, {
+    action: 'player.delete',
+    entityType: 'player',
+    entityId: playerId,
+    payload: {
+      duprId: current.duprId,
+      fullName: `${current.firstName} ${current.lastName}`.trim(),
+    },
   });
 }
 
