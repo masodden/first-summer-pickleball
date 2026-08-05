@@ -47,7 +47,8 @@ export const updateSettingsSchema = z.object({
 });
 
 export const createPlayerSchema = z.object({
-  duprId: duprIdSchema,
+  /** null / пусто — гостевая карточка без DUPR; позже можно слить с настоящим ID. */
+  duprId: duprIdSchema.nullable().optional(),
   firstName: z.string().trim().min(1).max(60),
   lastName: z.string().trim().min(1).max(60),
   doublesRating: ratingSchema.optional(),

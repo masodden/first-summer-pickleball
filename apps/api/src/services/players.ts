@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   isValidDuprId,
@@ -10,6 +11,7 @@ import {
 import type { Database } from '../db/index.js';
 import {
   accounts,
+  claims,
   matchPlayers,
   matches,
   playerRatingHistory,
@@ -27,6 +29,11 @@ function normalizeTelegramUsername(value: string | null): string | null {
   if (value === null) return null;
   const cleaned = value.trim().replace(/^@+/, '');
   return cleaned === '' ? null : cleaned;
+}
+
+/** Гостевые карточки живут в том же пространстве ключей, но с явным префиксом. */
+function createGuestId(): string {
+  return `G-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
 async function claimedPlayerIds(db: Database, ids: readonly string[]): Promise<Set<string>> {
@@ -96,32 +103,35 @@ export async function createPlayer(
   input: CreatePlayerInput,
   actor: Viewer,
 ): Promise<PlayerDto> {
-  const duprId = normalizeDuprId(input.duprId);
-  if (!isValidDuprId(duprId)) {
+  const rawDupr = input.duprId?.trim() ? normalizeDuprId(input.duprId) : null;
+  if (rawDupr && !isValidDuprId(rawDupr)) {
     throw new ApiError('validation_failed', 'DUPR ID указан неверно');
   }
 
-  const [existing] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
-  if (existing) {
-    throw new ApiError('duplicate_dupr_id', 'Игрок с таким DUPR ID уже есть в базе', {
-      playerId: existing.id,
-    });
+  if (rawDupr) {
+    const [existing] = await db.select().from(players).where(eq(players.id, rawDupr)).limit(1);
+    if (existing) {
+      throw new ApiError('duplicate_dupr_id', 'Игрок с таким DUPR ID уже есть в базе', {
+        playerId: existing.id,
+      });
+    }
   }
 
+  const id = rawDupr ?? createGuestId();
   const rating = input.doublesRating ?? null;
 
   const [row] = await db
     .insert(players)
     .values({
-      id: duprId,
-      duprId,
+      id,
+      duprId: rawDupr,
       firstName: input.firstName,
       lastName: input.lastName,
       doublesRating: rating,
       singlesRating: input.singlesRating ?? null,
       ratingUpdatedAt: rating === null ? null : new Date(),
       ratingSource: rating === null ? null : 'moderator',
-      isGuest: false,
+      isGuest: rawDupr === null,
       nameSource: 'manual',
     })
     .returning();
@@ -376,6 +386,10 @@ export async function mergeGuestIntoDupr(
       .update(playerRatingHistory)
       .set({ playerId: target.id })
       .where(eq(playerRatingHistory.playerId, guestId));
+
+    // Telegram и заявки на привязку переезжают на карточку с настоящим DUPR.
+    await tx.update(accounts).set({ playerId: target.id }).where(eq(accounts.playerId, guestId));
+    await tx.update(claims).set({ playerId: target.id }).where(eq(claims.playerId, guestId));
 
     await tx
       .update(players)

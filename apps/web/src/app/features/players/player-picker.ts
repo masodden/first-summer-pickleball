@@ -20,8 +20,8 @@ import { PlayerLine } from '../../ui/player-line';
 /**
  * Выбор игрока из базы или создание карточки на месте.
  *
- * На площадке постоянно появляется кто-то, кого нет в базе. Поиск и создание
- * живут в одном окне; для новой карточки нужен DUPR ID.
+ * На площадке постоянно появляется кто-то без DUPR: приходит с другом.
+ * Карточку можно завести гостевой — ID добавят позже и сольют с настоящей.
  */
 @Component({
   selector: 'app-player-picker',
@@ -101,7 +101,9 @@ import { PlayerLine } from '../../ui/player-line';
             </div>
 
             <label class="field">
-              <span class="field__label">{{ t()('claim.duprId') }}</span>
+              <span class="field__label">
+                {{ t()('claim.duprId') }} · {{ t()('common.optional') }}
+              </span>
               <input
                 class="input"
                 autocapitalize="characters"
@@ -110,7 +112,7 @@ import { PlayerLine } from '../../ui/player-line';
                 [value]="duprId()"
                 (input)="duprId.set(value($event).toUpperCase())"
               />
-              <span class="field__hint">{{ t()('claim.duprIdHint') }}</span>
+              <span class="field__hint">{{ t()('participant.guestHint') }}</span>
             </label>
 
             <label class="field">
@@ -263,7 +265,7 @@ export class PlayerPicker {
     () =>
       this.firstName().trim().length > 0 &&
       this.lastName().trim().length > 0 &&
-      isValidDuprId(this.duprId()),
+      !this.duprInvalid(),
   );
 
   private timer: number | null = null;
@@ -299,7 +301,7 @@ export class PlayerPicker {
       const { player } = await this.api.createPlayer({
         firstName: this.firstName().trim(),
         lastName: this.lastName().trim(),
-        duprId: this.duprId().trim(),
+        duprId: this.duprId().trim() ? this.duprId().trim() : null,
         doublesRating: parseRatingInput(this.rating()),
       });
       this.toast.success(this.i18n.translate('player.created'));

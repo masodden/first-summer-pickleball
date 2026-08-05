@@ -1,23 +1,39 @@
 import { createDatabase, type Database } from './index.js';
 import { players, venues } from './schema.js';
 
+const SEED_VENUES = [
+  {
+    name: 'First Summer Club, ВДНХ',
+    address: 'Москва, ВДНХ',
+    mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
+  },
+  {
+    name: 'Пиклбол Гераклион',
+    address: 'Москва, Лодочная ул., 15, стр. 1А',
+    mapUrl: 'https://yandex.ru/maps/-/CTGZFGMw',
+  },
+  {
+    name: 'Центр Пиклбола',
+    address: 'Красногорск, Советская ул., 14',
+    mapUrl: 'https://yandex.ru/maps/-/CTGZFWPy',
+  },
+] as const;
+
 export async function seedVenues(db: Database): Promise<void> {
   // Upsert: адрес и карта иногда правятся в коде — при повторном посеве
   // обновляем уже существующую площадку, а не оставляем старую ссылку.
-  await db
-    .insert(venues)
-    .values({
-      name: 'First Summer Club, ВДНХ',
-      address: 'Москва, ВДНХ',
-      mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
-    })
-    .onConflictDoUpdate({
-      target: venues.name,
-      set: {
-        address: 'Москва, ВДНХ',
-        mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
-      },
-    });
+  for (const venue of SEED_VENUES) {
+    await db
+      .insert(venues)
+      .values(venue)
+      .onConflictDoUpdate({
+        target: venues.name,
+        set: {
+          address: venue.address,
+          mapUrl: venue.mapUrl,
+        },
+      });
+  }
 }
 
 const DEMO_FIRST_NAMES = [

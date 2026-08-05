@@ -215,6 +215,9 @@ export interface ImportOptions {
  * Сопоставление идёт по DUPR ID, поэтому дубликаты невозможны. Ручные правки
  * защищены: если рейтинг ставили руками и в выгрузке другое значение, оно
  * попадает в `pendingImportRating` и ждёт решения модератора.
+ *
+ * Уже существующие карточки: имена не перетираем (в т.ч. если правили у нас).
+ * Обновляем только рейтинг. Telegram-привязки не трогаем.
  */
 export async function importDirectory(
   db: Database,
@@ -275,16 +278,6 @@ export async function importDirectory(
 
       const patch: Partial<typeof players.$inferInsert> = {};
       let touched = false;
-
-      // Имя обновляем только если его не правили руками.
-      if (
-        current.nameSource === 'import' &&
-        (current.firstName !== entry.firstName || current.lastName !== entry.lastName)
-      ) {
-        patch.firstName = entry.firstName;
-        patch.lastName = entry.lastName;
-        touched = true;
-      }
 
       if (entry.singlesRating !== null && current.singlesRating !== entry.singlesRating) {
         patch.singlesRating = entry.singlesRating;
