@@ -23,7 +23,7 @@
     "db:import": "pnpm --filter @fsp/api db:import",
     "docker:dev": "docker compose -f infra/docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f infra/docker-compose.dev.yml down",
-    "docker:prod": "docker compose -f infra/docker-compose.yml up -d --build"
+    "docker:prod": "docker compose --env-file .env -f infra/docker-compose.yml up -d --build"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

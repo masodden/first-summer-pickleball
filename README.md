@@ -209,19 +209,20 @@ TELEGRAM_WEBHOOK_SECRET=<из третьей команды>
 
 ```bash
 pnpm docker:prod
-# или без pnpm на сервере:
-docker compose -f infra/docker-compose.yml up -d --build
+# или без pnpm на сервере (важно: --env-file .env — иначе Compose
+# ищет переменные рядом с infra/docker-compose.yml и не видит корневой .env):
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
 Первая сборка занимает 5–10 минут. Что происходит: собираются образы API и фронтенда,
-поднимается PostgreSQL, применяются миграции, создаются карточки двух администраторов,
-Caddy получает сертификат Let's Encrypt и включает HTTPS.
+поднимается PostgreSQL, применяются миграции, Caddy получает сертификат Let's Encrypt
+и включает HTTPS. База сначала пустая — игроков импортируете сами.
 
 Проверьте:
 
 ```bash
-docker compose -f infra/docker-compose.yml ps        # все сервисы healthy/running
-docker compose -f infra/docker-compose.yml logs -f api
+docker compose --env-file .env -f infra/docker-compose.yml ps        # все сервисы healthy/running
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
 curl https://pickleball.example.com/api/tournaments  # должен вернуть {"items":[],"total":0}
 ```
 
@@ -241,7 +242,7 @@ curl https://pickleball.example.com/api/tournaments  # должен вернут
 4. Перезапустите приложение, чтобы бот увидел токен:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
 5. Проверьте вебхук:
@@ -370,7 +371,7 @@ DUPR ID можно не указывать — получится гостева
 ```bash
 cd ~/first-summer-pickleball
 git pull
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
 Миграции базы применяются автоматически при старте контейнера API. Данные лежат в docker-томе
@@ -422,7 +423,7 @@ gunzip -c infra/backups/fsp-2026-07-01_04-00.sql.gz | \
 перезапущено после его добавления. Проверьте `docker compose logs api | grep -i telegram`.
 
 **«На сервере не задан TELEGRAM_BOT_TOKEN».** То же самое: добавьте токен в `.env` и выполните
-`docker compose -f infra/docker-compose.yml up -d`.
+`docker compose --env-file .env -f infra/docker-compose.yml up -d`.
 
 **Бот не отвечает на `/start`.** Посмотрите `getWebhookInfo` (см. раздел про бота). Если там
 `last_error_message`, значит Telegram не может достучаться до домена — обычно это HTTPS или

@@ -1,4 +1,6 @@
 # Продакшен на VPS: pnpm docker:prod
+# .env лежит в корне репозитория — всегда передавайте --env-file .env
+# (Compose сам ищет .env только рядом с этим файлом, в infra/).
 # Caddy получает HTTPS-сертификат сам и проксирует /api и /ws в контейнер api.
 name: fsp
 
