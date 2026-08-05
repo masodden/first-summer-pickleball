@@ -239,13 +239,21 @@ curl https://first-summer-pickleball.ru/api/tournaments  # должен верн
    `TELEGRAM_BOT_USERNAME` (без `@`).
 3. Там же у BotFather: `/setmenubutton` → выберите бота → пришлите
    `https://first-summer-pickleball.ru` и подпись кнопки, например «Турниры».
-4. Перезапустите приложение, чтобы бот увидел токен:
+4. **Прямые ссылки на турнир** (`Ссылка на турнир в боте`) по умолчанию идут как
+   `t.me/<бот>?start=t_<id>`: бот отвечает кнопкой «Открыть приложение» сразу на турнир.
+   Чтобы ссылка открывала Mini App **одним тапом** без сообщения бота:
+   - BotFather → `/newapp` → выберите бота → задайте title и **short name** (например `app`)
+   - Web App URL: тот же `https://your-domain`
+   - в `.env` добавьте `TELEGRAM_MINI_APP_SHORT_NAME=app` (тот же short name)
+   - либо BotFather → Bot Settings → Configure Mini App (Main Mini App) с тем же URL;
+     тогда можно использовать и `t.me/<бот>?startapp=…`, но short name надёжнее.
+5. Перезапустите приложение, чтобы бот увидел токен:
 
 ```bash
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
-5. Проверьте вебхук:
+6. Проверьте вебхук:
 
 ```bash
 curl "https://api.telegram.org/bot<ТОКЕН>/getWebhookInfo"
@@ -255,7 +263,7 @@ curl "https://api.telegram.org/bot<ТОКЕН>/getWebhookInfo"
 при старте, если задан `TELEGRAM_WEBHOOK_SECRET`. Если секрет пустой, бот работает опросом
 (long polling) — годится для локальной разработки, для сервера лучше вебхук.
 
-6. Откройте бота в Telegram, нажмите кнопку меню — приложение откроется внутри мессенджера, вход
+7. Откройте бота в Telegram, нажмите кнопку меню — приложение откроется внутри мессенджера, вход
    произойдёт автоматически по подписи Telegram.
 
 Что умеет бот: открывает Mini App, обрабатывает ссылки-приглашения (`/start invite_...`) и
@@ -482,7 +490,8 @@ scripts/     сквозной прогон целевого сценария п�
 | `JWT_SECRET`                                 | да          | подпись токенов сессии, минимум 16 символов       |
 | `BOOTSTRAP_ADMIN_CODE`                       | да (прод)   | код первого входа администраторов клуба           |
 | `TELEGRAM_BOT_TOKEN`                         | для бота    | токен из BotFather                                |
-| `TELEGRAM_BOT_USERNAME`                      | для бота    | username бота без `@`, нужен ссылкам-приглашениям |
+| `TELEGRAM_BOT_USERNAME`                      | для бота    | username бота без `@`, нужен ссылкам на турниры   |
+| `TELEGRAM_MINI_APP_SHORT_NAME`               | нет         | short name из `/newapp` — ссылки одним тапом      |
 | `TELEGRAM_WEBHOOK_SECRET`                    | нет         | если задан — вебхук, если пуст — long polling     |
 | `DATABASE_URL`                               | локально    | строка подключения к PostgreSQL                   |
 | `ALLOW_DEV_LOGIN`                            | нет         | вход без Telegram; в продакшене запрещён          |

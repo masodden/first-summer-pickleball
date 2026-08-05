@@ -408,8 +408,9 @@ export async function createInvite(
     expiresAt,
   });
 
+  // start= надёжнее startapp: не требует Main Mini App в BotFather.
   const url = botUsername
-    ? `https://t.me/${botUsername}?startapp=invite_${token}`
+    ? `https://t.me/${botUsername}?start=invite_${token}`
     : `${webUrl.replace(/\/$/, '')}/invite/${token}`;
 
   await recordAudit(db, actor, {

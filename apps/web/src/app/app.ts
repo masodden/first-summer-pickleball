@@ -1,10 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
+import { filter, take } from 'rxjs';
 import { ApiClient } from './core/api';
+import { readTournamentDeepLink } from './core/deep-link';
 import { I18nService } from './core/i18n';
 import { PreferencesService } from './core/preferences';
 import { RealtimeService } from './core/realtime';
 import { SessionStore } from './core/session';
+import { TelegramService } from './core/telegram';
 import { ToastService } from './core/toast';
 import { Ball } from './ui/ball';
 import { ConfirmHost } from './ui/confirm-host';
@@ -241,6 +251,8 @@ export class App {
   private readonly realtime = inject(RealtimeService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  private readonly router = inject(Router);
+  private readonly telegram = inject(TelegramService);
 
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
@@ -248,6 +260,20 @@ export class App {
   constructor() {
     // Тема применяется к documentElement сразу при старте.
     inject(PreferencesService);
+
+    // t.me/bot/play?startapp=t_<uuid> → открыть карточку турнира, а не список.
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        take(1),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        const tournamentId = readTournamentDeepLink(this.telegram.startParam);
+        if (!tournamentId) return;
+        if (this.router.url.startsWith(`/tournaments/${tournamentId}`)) return;
+        void this.router.navigate(['/tournaments', tournamentId], { replaceUrl: true });
+      });
   }
 
   protected readonly offline = computed(() => !this.api.online());

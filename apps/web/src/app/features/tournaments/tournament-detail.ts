@@ -357,9 +357,11 @@ export class TournamentDetailPage {
     if (!current) return;
 
     let botUsername: string | null = null;
+    let shortName: string | null = null;
     try {
       const health = await this.api.getHealth();
       botUsername = health.telegramBotUsername;
+      shortName = health.telegramMiniAppShortName;
     } catch {
       botUsername = null;
     }
@@ -369,7 +371,7 @@ export class TournamentDetailPage {
       return;
     }
 
-    const url = tournamentMiniAppLink(botUsername, current.id);
+    const url = tournamentMiniAppLink(botUsername, current.id, { shortName });
     try {
       await navigator.clipboard.writeText(url);
       this.telegram.tap();

@@ -26,6 +26,7 @@ export interface PublicConfigDto {
   ok: boolean;
   telegram: boolean;
   telegramBotUsername: string | null;
+  telegramMiniAppShortName: string | null;
   devLogin: boolean;
 }
 

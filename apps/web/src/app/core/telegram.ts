@@ -50,9 +50,36 @@ export class TelegramService {
     return this.app?.initDataUnsafe?.user?.language_code ?? null;
   }
 
-  /** Параметр из deep-link: используется для ссылок-приглашений. */
+  /**
+   * Параметр из deep-link (`startapp` / `startattach`).
+   * Telegram кладёт его в initDataUnsafe, в initData и иногда в tgWebAppStartParam.
+   */
   get startParam(): string | null {
-    return this.app?.initDataUnsafe?.start_param ?? null;
+    const fromUnsafe = this.app?.initDataUnsafe?.start_param;
+    if (fromUnsafe) return fromUnsafe;
+
+    if (this.app?.initData) {
+      try {
+        const fromInit = new URLSearchParams(this.app.initData).get('start_param');
+        if (fromInit) return fromInit;
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      const fromQuery = new URLSearchParams(window.location.search).get('tgWebAppStartParam');
+      if (fromQuery) return fromQuery;
+      const hash = window.location.hash.replace(/^#/, '');
+      if (hash) {
+        const fromHash = new URLSearchParams(hash).get('tgWebAppStartParam');
+        if (fromHash) return fromHash;
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
   }
 
   get platform(): string {

@@ -1085,6 +1085,20 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
+/**
+ * Оболочка таблицы: скролл внутри, скругление снаружи.
+ * Иначе в Telegram/Safari при горизонтальном скролле «плывёт» правый край glass.
+ */
+.table-shell {
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+.table-shell .scroll-x {
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+}
+
 .scroll-x::-webkit-scrollbar {
   height: 6px;
 }

@@ -20,6 +20,16 @@ const schema = z.object({
   /** Токен бота из BotFather. Без него вход через Telegram недоступен. */
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_BOT_USERNAME: z.string().optional(),
+  /**
+   * Short name Mini App из BotFather (/newapp), например `app`.
+   * Если задан — ссылки на турнир открывают Mini App сразу (startapp).
+   * Если пуст — ссылки идут через /start и кнопку «Открыть приложение».
+   */
+  TELEGRAM_MINI_APP_SHORT_NAME: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
   /** Секрет вебхука Telegram; если пуст, бот работает в режиме long polling. */
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
 

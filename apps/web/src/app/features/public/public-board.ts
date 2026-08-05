@@ -83,47 +83,49 @@ import { StatusBadge } from '../../ui/status-badge';
               {{ t()('standings.empty') }}
             </div>
           } @else {
-            <div class="glass card--tight scroll-x">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th scope="col">{{ t()('standings.rank') }}</th>
-                    <th scope="col">{{ t()('standings.player') }}</th>
-                    <th scope="col">{{ t()('standings.points') }}</th>
-                    <th scope="col">{{ t()('standings.wins') }}</th>
-                    @if (data.tournament.tieRule === 'draw') {
-                      <th scope="col">{{ t()('standings.draws') }}</th>
-                    }
-                    <th scope="col">{{ t()('standings.diff') }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of data.standings; track row.player.id) {
+            <div class="glass card--tight table-shell">
+              <div class="scroll-x">
+                <table class="table">
+                  <thead>
                     <tr>
-                      <td>
-                        @if (row.medal) {
-                          <span class="medal" [class]="'medal--' + row.medal">{{ row.rank }}</span>
-                        } @else {
-                          <span class="numeric muted">{{ row.rank }}</span>
-                        }
-                      </td>
-                      <td>
-                        <span class="player">
-                          <app-avatar [player]="row.player" [size]="26" />
-                          <span class="truncate">{{ row.player.fullName }}</span>
-                          <app-rating-chip [player]="row.player" [showLabel]="false" />
-                        </span>
-                      </td>
-                      <td class="numeric strong">{{ row.pointsFor }}</td>
-                      <td class="numeric">{{ row.wins }}</td>
+                      <th scope="col">{{ t()('standings.rank') }}</th>
+                      <th scope="col">{{ t()('standings.player') }}</th>
+                      <th scope="col">{{ t()('standings.points') }}</th>
+                      <th scope="col">{{ t()('standings.wins') }}</th>
                       @if (data.tournament.tieRule === 'draw') {
-                        <td class="numeric">{{ row.draws }}</td>
+                        <th scope="col">{{ t()('standings.draws') }}</th>
                       }
-                      <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
+                      <th scope="col">{{ t()('standings.diff') }}</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (row of data.standings; track row.player.id) {
+                      <tr>
+                        <td>
+                          @if (row.medal) {
+                            <span class="medal" [class]="'medal--' + row.medal">{{ row.rank }}</span>
+                          } @else {
+                            <span class="numeric muted">{{ row.rank }}</span>
+                          }
+                        </td>
+                        <td>
+                          <span class="player">
+                            <app-avatar [player]="row.player" [size]="26" />
+                            <span class="truncate">{{ row.player.fullName }}</span>
+                            <app-rating-chip [player]="row.player" [showLabel]="false" />
+                          </span>
+                        </td>
+                        <td class="numeric strong">{{ row.pointsFor }}</td>
+                        <td class="numeric">{{ row.wins }}</td>
+                        @if (data.tournament.tieRule === 'draw') {
+                          <td class="numeric">{{ row.draws }}</td>
+                        }
+                        <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           }
         </section>

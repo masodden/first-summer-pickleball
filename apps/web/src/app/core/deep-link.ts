@@ -1,4 +1,4 @@
-/** UUID турнира в deep-link Telegram (`startapp=t_<uuid>`). */
+/** UUID турнира в deep-link Telegram (`t_<uuid>`). */
 const TOURNAMENT_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,8 +26,27 @@ export function readTournamentDeepLink(startParam: string | null): string | null
   return null;
 }
 
-/** Ссылка, которая открывает Mini App сразу на нужном турнире. */
-export function tournamentMiniAppLink(botUsername: string, tournamentId: string): string {
+export interface TournamentLinkOptions {
+  /**
+   * Short name Mini App из BotFather (`/newapp`).
+   * Тогда ссылка вида t.me/bot/app?startapp=… открывает приложение сразу.
+   * Без него используем t.me/bot?start=… — бот пришлёт кнопку «Открыть».
+   */
+  shortName?: string | null;
+}
+
+/** Ссылка, которая приводит игрока к выбранному турниру в боте. */
+export function tournamentMiniAppLink(
+  botUsername: string,
+  tournamentId: string,
+  options: TournamentLinkOptions = {},
+): string {
   const user = botUsername.replace(/^@/, '');
-  return `https://t.me/${user}?startapp=t_${tournamentId}`;
+  const payload = `t_${tournamentId}`;
+  const short = options.shortName?.replace(/^\/+|\/+$/g, '');
+  if (short) {
+    return `https://t.me/${user}/${short}?startapp=${payload}`;
+  }
+  // startapp без Main Mini App /newapp часто просто открывает чат бота без приложения.
+  return `https://t.me/${user}?start=${payload}`;
 }

@@ -38,66 +38,72 @@ interface Column {
           <p>{{ t()('standings.empty') }}</p>
         </div>
       } @else {
-        <div class="glass card--tight scroll-x">
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col">{{ t()('standings.rank') }}</th>
-                <th scope="col">{{ t()('standings.player') }}</th>
-                @for (column of columns(); track column.key) {
-                  <th
-                    scope="col"
-                    class="th--sortable"
-                    [attr.aria-sort]="
-                      sortKey() === column.key
-                        ? direction() === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : null
-                    "
-                    [title]="t()('standings.sortHint')"
-                    (click)="sortBy(column.key)"
-                  >
-                    {{ column.label }}
-                    <span class="arrow" [class.arrow--active]="sortKey() === column.key">
-                      {{ sortKey() === column.key && direction() === 'asc' ? '↑' : '↓' }}
-                    </span>
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of rows(); track row.player.id) {
+        <div class="glass card--tight table-shell">
+          <div class="scroll-x">
+            <table class="table">
+              <thead>
                 <tr>
-                  <td>
-                    @if (row.medal) {
-                      <span class="medal" [class]="'medal--' + row.medal" [title]="medalLabel(row)">
-                        {{ row.rank }}
-                      </span>
-                    } @else {
-                      <span class="numeric muted">{{ row.rank }}</span>
-                    }
-                  </td>
-                  <td>
-                    <!-- Рейтинг здесь не показываем: строка узкая, DUPR виден в карточке игрока. -->
-                    <a class="player" [routerLink]="['/players', row.player.id]">
-                      <app-avatar [player]="row.player" [size]="28" />
-                      <span class="truncate">{{ row.player.fullName }}</span>
-                    </a>
-                  </td>
+                  <th scope="col">{{ t()('standings.rank') }}</th>
+                  <th scope="col">{{ t()('standings.player') }}</th>
                   @for (column of columns(); track column.key) {
-                    <td
-                      class="numeric"
-                      [class.cell--sorted]="sortKey() === column.key"
-                      [class.strong]="column.key === 'points'"
+                    <th
+                      scope="col"
+                      class="th--sortable"
+                      [attr.aria-sort]="
+                        sortKey() === column.key
+                          ? direction() === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : null
+                      "
+                      [title]="t()('standings.sortHint')"
+                      (click)="sortBy(column.key)"
                     >
-                      {{ format(column, row) }}
-                    </td>
+                      {{ column.label }}
+                      <span class="arrow" [class.arrow--active]="sortKey() === column.key">
+                        {{ sortKey() === column.key && direction() === 'asc' ? '↑' : '↓' }}
+                      </span>
+                    </th>
                   }
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (row of rows(); track row.player.id) {
+                  <tr>
+                    <td>
+                      @if (row.medal) {
+                        <span
+                          class="medal"
+                          [class]="'medal--' + row.medal"
+                          [title]="medalLabel(row)"
+                        >
+                          {{ row.rank }}
+                        </span>
+                      } @else {
+                        <span class="numeric muted">{{ row.rank }}</span>
+                      }
+                    </td>
+                    <td>
+                      <!-- Рейтинг здесь не показываем: строка узкая, DUPR виден в карточке игрока. -->
+                      <a class="player" [routerLink]="['/players', row.player.id]">
+                        <app-avatar [player]="row.player" [size]="28" />
+                        <span class="truncate">{{ row.player.fullName }}</span>
+                      </a>
+                    </td>
+                    @for (column of columns(); track column.key) {
+                      <td
+                        class="numeric"
+                        [class.cell--sorted]="sortKey() === column.key"
+                        [class.strong]="column.key === 'points'"
+                      >
+                        {{ format(column, row) }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <p class="tiny faint center">
