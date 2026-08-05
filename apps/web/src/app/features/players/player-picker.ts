@@ -20,9 +20,8 @@ import { PlayerLine } from '../../ui/player-line';
 /**
  * Выбор игрока из базы или создание карточки на месте.
  *
- * На площадке постоянно появляется кто-то, кого нет в базе: приходит с другом
- * без DUPR ID. Поэтому поиск и создание живут в одном окне, а карточку можно
- * завести гостевой — DUPR ID добавят позже, и карточки сольются.
+ * На площадке постоянно появляется кто-то, кого нет в базе. Поиск и создание
+ * живут в одном окне; для новой карточки нужен DUPR ID.
  */
 @Component({
   selector: 'app-player-picker',
@@ -102,17 +101,16 @@ import { PlayerLine } from '../../ui/player-line';
             </div>
 
             <label class="field">
-              <span class="field__label">
-                {{ t()('claim.duprId') }} · {{ t()('common.optional') }}
-              </span>
+              <span class="field__label">{{ t()('claim.duprId') }}</span>
               <input
                 class="input"
                 autocapitalize="characters"
+                maxlength="6"
                 [class.input--invalid]="duprInvalid()"
                 [value]="duprId()"
                 (input)="duprId.set(value($event).toUpperCase())"
               />
-              <span class="field__hint">{{ t()('participant.guestHint') }}</span>
+              <span class="field__hint">{{ t()('claim.duprIdHint') }}</span>
             </label>
 
             <label class="field">
@@ -265,7 +263,7 @@ export class PlayerPicker {
     () =>
       this.firstName().trim().length > 0 &&
       this.lastName().trim().length > 0 &&
-      !this.duprInvalid(),
+      isValidDuprId(this.duprId()),
   );
 
   private timer: number | null = null;
@@ -301,7 +299,7 @@ export class PlayerPicker {
       const { player } = await this.api.createPlayer({
         firstName: this.firstName().trim(),
         lastName: this.lastName().trim(),
-        duprId: this.duprId().trim() ? this.duprId().trim() : null,
+        duprId: this.duprId().trim(),
         doublesRating: parseRatingInput(this.rating()),
       });
       this.toast.success(this.i18n.translate('player.created'));

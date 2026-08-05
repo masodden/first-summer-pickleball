@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   isValidDuprId,
@@ -28,11 +27,6 @@ function normalizeTelegramUsername(value: string | null): string | null {
   if (value === null) return null;
   const cleaned = value.trim().replace(/^@+/, '');
   return cleaned === '' ? null : cleaned;
-}
-
-/** Гостевые карточки живут в том же пространстве ключей, но с явным префиксом. */
-function createGuestId(): string {
-  return `G-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
 async function claimedPlayerIds(db: Database, ids: readonly string[]): Promise<Set<string>> {
@@ -102,27 +96,24 @@ export async function createPlayer(
   input: CreatePlayerInput,
   actor: Viewer,
 ): Promise<PlayerDto> {
-  const duprId = input.duprId ? normalizeDuprId(input.duprId) : null;
-  if (duprId && !isValidDuprId(duprId)) {
+  const duprId = normalizeDuprId(input.duprId);
+  if (!isValidDuprId(duprId)) {
     throw new ApiError('validation_failed', 'DUPR ID указан неверно');
   }
 
-  if (duprId) {
-    const [existing] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
-    if (existing) {
-      throw new ApiError('duplicate_dupr_id', 'Игрок с таким DUPR ID уже есть в базе', {
-        playerId: existing.id,
-      });
-    }
+  const [existing] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
+  if (existing) {
+    throw new ApiError('duplicate_dupr_id', 'Игрок с таким DUPR ID уже есть в базе', {
+      playerId: existing.id,
+    });
   }
 
-  const id = duprId ?? createGuestId();
   const rating = input.doublesRating ?? null;
 
   const [row] = await db
     .insert(players)
     .values({
-      id,
+      id: duprId,
       duprId,
       firstName: input.firstName,
       lastName: input.lastName,
@@ -130,7 +121,7 @@ export async function createPlayer(
       singlesRating: input.singlesRating ?? null,
       ratingUpdatedAt: rating === null ? null : new Date(),
       ratingSource: rating === null ? null : 'moderator',
-      isGuest: duprId === null,
+      isGuest: false,
       nameSource: 'manual',
     })
     .returning();

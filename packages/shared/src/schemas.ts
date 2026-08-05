@@ -47,7 +47,7 @@ export const updateSettingsSchema = z.object({
 });
 
 export const createPlayerSchema = z.object({
-  duprId: duprIdSchema.nullable().optional(),
+  duprId: duprIdSchema,
   firstName: z.string().trim().min(1).max(60),
   lastName: z.string().trim().min(1).max(60),
   doublesRating: ratingSchema.optional(),
