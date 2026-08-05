@@ -449,6 +449,12 @@ export async function removeParticipant(
     .limit(1);
   if (!existing) return;
 
+  // Сам игрок может сняться, пока модератор не подтвердил участие
+  // (и для самостоятельной заявки, и если добавили организатором).
+  if (options.bySelf && existing.confirmedAndPaid) {
+    throw wrongStatus('Участие уже подтверждено, обратитесь к организатору');
+  }
+
   await db.delete(tournamentPlayers).where(eq(tournamentPlayers.id, existing.id));
 
   // Освободилось место — поднимаем первого из листа ожидания.

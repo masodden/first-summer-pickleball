@@ -220,8 +220,17 @@ export class TournamentInfoTab {
     ),
   );
 
-  /** Снять заявку можно, пока турнир не начался. */
-  protected readonly canLeave = computed(() => this.tournament()?.status === 'registration');
+  /**
+   * Снять заявку можно в период регистрации, пока модератор не подтвердил
+   * участие — неважно, заявился сам или добавили организатором.
+   */
+  protected readonly canLeave = computed(() => {
+    const tournament = this.tournament();
+    const mine = this.participation();
+    return (
+      tournament?.status === 'registration' && mine !== null && !mine.confirmedAndPaid
+    );
+  });
 
   protected openMap(url: string): void {
     this.telegram.openExternal(url);
