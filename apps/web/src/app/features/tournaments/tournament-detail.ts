@@ -284,14 +284,14 @@ export class TournamentDetailPage {
     });
 
     // Запоминаем открытую вкладку, чтобы следующий турнир открылся на ней же.
+    // В конструкторе child-route ещё может не быть — ждём NavigationEnd.
     this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
       if (event instanceof NavigationEnd) this.rememberTab();
     });
-    this.rememberTab();
   }
 
   private rememberTab(): void {
-    const tab = this.route.firstChild?.snapshot.routeConfig?.path;
+    const tab = this.route.firstChild?.snapshot?.routeConfig?.path;
     if (tab) this.viewState.setLastTab(tab);
   }
 

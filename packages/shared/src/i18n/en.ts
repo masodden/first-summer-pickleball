@@ -194,6 +194,7 @@ export const en: Record<TranslationKey, string> = {
   'match.startRound': 'Start round',
   'match.finishRound': 'Finish round',
   'match.roundNotStarted': 'The round has not started yet',
+  'match.scoreAfterFinish': 'Enter the score after finishing the round',
   'match.pause': 'Pause',
   'match.resume': 'Resume',
   'match.finish': 'Finish game',

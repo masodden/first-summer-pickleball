@@ -19,14 +19,22 @@ export async function seedAdminPlayers(db: Database): Promise<void> {
 }
 
 export async function seedVenues(db: Database): Promise<void> {
+  // Upsert: адрес и карта иногда правятся в коде — при повторном посеве
+  // обновляем уже существующую площадку, а не оставляем старую ссылку.
   await db
     .insert(venues)
     .values({
       name: 'First Summer Club, ВДНХ',
-      address: 'Москва, ВДНХ, павильон № 27',
-      mapUrl: 'https://yandex.ru/maps/?text=ВДНХ павильон 27 Физкультуры и спорта',
+      address: 'Москва, ВДНХ',
+      mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
     })
-    .onConflictDoNothing({ target: venues.name });
+    .onConflictDoUpdate({
+      target: venues.name,
+      set: {
+        address: 'Москва, ВДНХ',
+        mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
+      },
+    });
 }
 
 const DEMO_FIRST_NAMES = [

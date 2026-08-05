@@ -65,11 +65,19 @@ services:
     volumes:
       - ../:/app
       - web-node-modules:/app/node_modules
-    command: >
-      sh -c "corepack enable &&
-             pnpm install --frozen-lockfile --filter '@fsp/web...' &&
-             pnpm --filter @fsp/shared build &&
-             pnpm --filter @fsp/web start:docker"
+    # Важно: `cmd1 && cmd2 & cmd3` в sh уводит в фон всю цепочку до `&`,
+    # включая corepack — тогда `pnpm` ещё не в PATH. Shared watch стартуем
+    # отдельной командой после установки.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        corepack enable
+        pnpm install --frozen-lockfile --filter '@fsp/web...'
+        pnpm --filter @fsp/shared build
+        pnpm --filter @fsp/shared dev &
+        pnpm --filter @fsp/web start:docker
 
 volumes:
   db-data:

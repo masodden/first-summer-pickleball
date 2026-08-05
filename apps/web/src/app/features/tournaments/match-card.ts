@@ -17,9 +17,8 @@ import { RatingChip } from '../../ui/rating-chip';
 /**
  * Карточка корта.
  *
- * Все корты раунда видны сразу: кто играет, какой рейтинг, какой счёт. Старт,
- * пауза и завершение живут в шапке раунда — на площадке свисток один на все
- * корты. Счёт же вводится по каждому корту отдельно: заканчивают они вразнобой.
+ * Пока раунд идёт — только состав, счёт не трогаем. После общей кнопки
+ * «Завершить раунд» под каждым матчем открываются пресеты, ±1 и «Сохранить».
  */
 @Component({
   selector: 'app-match-card',
@@ -62,7 +61,7 @@ import { RatingChip } from '../../ui/rating-chip';
               }
             </div>
 
-            @if (editing()) {
+            @if (scoreEntry()) {
               <div class="score-editor">
                 <button
                   type="button"
@@ -91,48 +90,47 @@ import { RatingChip } from '../../ui/rating-chip';
         }
       </div>
 
-      @if (editing()) {
-        <div class="stack stack--2">
-          <div class="row row--wrap presets">
-            @for (preset of presets(); track preset[0] + ':' + preset[1]) {
-              <button type="button" class="chip" (click)="setDraft(preset[0], preset[1])">
-                {{ preset[0] }}:{{ preset[1] }}
-              </button>
-            }
-          </div>
-          <div class="row">
+      @if (scoreEntry()) {
+        <div class="row row--wrap presets">
+          @for (preset of presets; track preset[0] + ':' + preset[1]) {
+            <button
+              type="button"
+              class="preset"
+              [disabled]="busy()"
+              (click)="applyPreset(preset[0], preset[1])"
+            >
+              {{ preset[0] }}:{{ preset[1] }}
+            </button>
+          }
+        </div>
+        <div class="row">
+          @if (hasScore() && editing()) {
             <button type="button" class="btn btn--sm btn--glass grow" (click)="cancelEditing()">
               {{ t()('common.cancel') }}
             </button>
-            <button
-              type="button"
-              class="btn btn--sm btn--primary grow"
-              [disabled]="!scoreValid() || busy()"
-              (click)="save()"
-            >
-              {{ t()('score.save') }}
-            </button>
-          </div>
-          @if (!scoreValid()) {
-            <p class="tiny center" style="color: var(--danger)">{{ t()('score.tieNotAllowed') }}</p>
           }
+          <button
+            type="button"
+            class="btn btn--sm btn--primary grow"
+            [disabled]="!scoreValid() || busy()"
+            (click)="save()"
+          >
+            {{ t()('score.save') }}
+          </button>
         </div>
-      } @else if (canManage()) {
-        <!-- Старт и завершение — на весь раунд, здесь только счёт этого корта. -->
-        <div class="row row--wrap actions">
-          @if (match().status === 'scheduled') {
-            <p class="tiny center muted grow">{{ t()('match.roundNotStarted') }}</p>
-          } @else {
-            <button
-              type="button"
-              class="btn btn--sm btn--glass grow"
-              [disabled]="busy()"
-              (click)="startEditing()"
-            >
-              {{ hasScore() ? t()('score.edit') : t()('match.enterScore') }}
-            </button>
-          }
-        </div>
+        @if (!scoreValid()) {
+          <p class="tiny center" style="color: var(--danger)">{{ t()('score.tieNotAllowed') }}</p>
+        }
+      } @else if (canManage() && match().status === 'scheduled') {
+        <p class="tiny center muted">{{ t()('match.roundNotStarted') }}</p>
+      } @else if (canManage() && match().status === 'running') {
+        <p class="tiny center muted">{{ t()('match.scoreAfterFinish') }}</p>
+      } @else if (canManage() && match().status === 'paused') {
+        <p class="tiny center muted">{{ t()('match.scoreAfterFinish') }}</p>
+      } @else if (canManage() && match().status === 'finished' && hasScore()) {
+        <button type="button" class="btn btn--sm btn--glass btn--block" (click)="startEditing()">
+          {{ t()('score.edit') }}
+        </button>
       }
     </div>
   `,
@@ -148,7 +146,7 @@ import { RatingChip } from '../../ui/rating-chip';
     }
 
     .court--finished {
-      opacity: 0.92;
+      opacity: 0.98;
     }
 
     .court__label {
@@ -250,12 +248,30 @@ import { RatingChip } from '../../ui/rating-chip';
       justify-content: center;
     }
 
-    .presets .chip {
+    .preset {
+      min-width: 54px;
+      min-height: 36px;
+      padding: 6px 12px;
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-full);
+      background: var(--control-bg);
+      color: var(--text-strong);
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
       cursor: pointer;
     }
 
-    .actions {
-      gap: var(--space-2);
+    .preset:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .preset:active:not(:disabled) {
+      transform: scale(0.96);
+      background: var(--accent-soft);
+      border-color: transparent;
+      color: var(--accent-strong);
     }
   `,
 })
@@ -280,18 +296,25 @@ export class MatchCard {
   );
 
   /**
-   * Частые исходы игры до N очков: одно касание вместо десяти нажатий «плюс».
-   * Порядок — от крупной победы хозяев к такой же победе гостей, чтобы палец
-   * шёл по ряду в одну сторону.
+   * Ввод счёта только после «Завершить раунд»: статус матча finished.
+   * Пока раунд идёт — пресетов и полей нет.
    */
-  protected readonly presets = computed<[number, number][]>(() => {
-    const target = this.store.tournament()?.pointsToWin ?? 11;
-    const margins = [5, 4, 3].filter((margin) => target - margin >= 0);
-    return [
-      ...margins.map<[number, number]>((margin) => [target, target - margin]),
-      ...[...margins].reverse().map<[number, number]>((margin) => [target - margin, target]),
-    ];
-  });
+  protected readonly scoreEntry = computed(
+    () =>
+      this.canManage() &&
+      this.match().status === 'finished' &&
+      (this.editing() || !this.hasScore()),
+  );
+
+  /** Фиксированный набор: не зависит от pointsToWin в шаблоне — всегда на виду. */
+  protected readonly presets: readonly [number, number][] = [
+    [11, 9],
+    [11, 8],
+    [11, 7],
+    [7, 11],
+    [8, 11],
+    [9, 11],
+  ];
 
   protected readonly scoreValid = computed(() => {
     const tieAllowed = this.store.tournament()?.tieRule === 'draw';
@@ -300,10 +323,14 @@ export class MatchCard {
   });
 
   constructor() {
-    // Пока идёт правка счёта, чужие обновления матча не сбрасывают черновик.
     effect(() => {
       const match = this.match();
       if (this.editing()) return;
+      if (match.status === 'finished' && match.teamA.score === null) {
+        this.draftA.set(11);
+        this.draftB.set(0);
+        return;
+      }
       this.draftA.set(match.teamA.score ?? 0);
       this.draftB.set(match.teamB.score ?? 0);
     });
@@ -317,13 +344,15 @@ export class MatchCard {
 
   protected startEditing(): void {
     const match = this.match();
-    const target = this.store.tournament()?.pointsToWin ?? 11;
-    this.draftA.set(match.teamA.score ?? target);
+    this.draftA.set(match.teamA.score ?? 11);
     this.draftB.set(match.teamB.score ?? 0);
     this.editing.set(true);
   }
 
   protected cancelEditing(): void {
+    const match = this.match();
+    this.draftA.set(match.teamA.score ?? 0);
+    this.draftB.set(match.teamB.score ?? 0);
     this.editing.set(false);
   }
 
@@ -331,12 +360,14 @@ export class MatchCard {
     this.telegram.tap();
     const target = first ? this.draftA : this.draftB;
     target.update((value) => Math.max(0, Math.min(200, value + delta)));
+    this.editing.set(true);
   }
 
-  protected setDraft(a: number, b: number): void {
+  protected applyPreset(a: number, b: number): void {
     this.telegram.tap();
     this.draftA.set(a);
     this.draftB.set(b);
+    this.editing.set(true);
   }
 
   protected async save(): Promise<void> {

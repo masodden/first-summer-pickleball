@@ -8,9 +8,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev": "pnpm --parallel --filter @fsp/shared --filter @fsp/engine --filter \"./apps/*\" dev",
     "dev:api": "pnpm --filter @fsp/api dev",
-    "dev:web": "pnpm --filter @fsp/web start",
+    "dev:web": "pnpm --parallel --filter @fsp/shared --filter @fsp/web dev",
     "build": "pnpm --filter @fsp/shared build && pnpm --filter @fsp/engine build && pnpm --filter @fsp/api build && pnpm --filter @fsp/web build",
     "test": "pnpm --filter @fsp/engine test",
     "e2e:scenario": "pnpm --filter @fsp/api exec tsx ../../scripts/e2e-scenario.ts",

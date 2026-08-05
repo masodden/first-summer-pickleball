@@ -191,6 +191,7 @@ export const ru = {
   'match.startRound': 'Начать раунд',
   'match.finishRound': 'Завершить раунд',
   'match.roundNotStarted': 'Раунд ещё не начали',
+  'match.scoreAfterFinish': 'Счёт можно ввести после завершения раунда',
   'match.pause': 'Пауза',
   'match.resume': 'Продолжить',
   'match.finish': 'Завершить игру',
