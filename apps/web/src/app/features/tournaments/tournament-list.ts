@@ -1,0 +1,237 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  resource,
+  signal,
+} from '@angular/core';
+import { RouterLink } from '@angular/router';
+import type { TournamentSummaryDto } from '@fsp/shared';
+import { I18nService } from '../../core/i18n';
+import { SessionStore } from '../../core/session';
+import { TournamentApi } from '../../core/tournament-api';
+import { Ball, Racket } from '../../ui/ball';
+import { StatusBadge } from '../../ui/status-badge';
+
+type Filter = 'active' | 'finished';
+
+/**
+ * Главный экран: список турниров.
+ *
+ * Турниры одного дня часто идут параллельно (advanced и intermediate), поэтому
+ * они группируются по дате: организатору видно, что играется прямо сейчас, и он
+ * переключается между своими турнирами одним касанием.
+ */
+@Component({
+  selector: 'app-tournament-list',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink, StatusBadge, Ball, Racket],
+  template: `
+    <div class="stack stack--4">
+      <div class="row row--between">
+        <h1>{{ t()('tournament.list') }}</h1>
+        @if (session.isModerator()) {
+          <a class="btn btn--primary btn--sm" routerLink="/tournaments/new">
+            {{ t()('tournament.create') }}
+          </a>
+        }
+      </div>
+
+      <div class="row row--wrap">
+        <button
+          type="button"
+          class="chip"
+          [class.chip--accent]="filter() === 'active'"
+          (click)="filter.set('active')"
+        >
+          {{ t()('status.running') }} · {{ t()('status.registration') }}
+        </button>
+        <button
+          type="button"
+          class="chip"
+          [class.chip--accent]="filter() === 'finished'"
+          (click)="filter.set('finished')"
+        >
+          {{ t()('status.finished') }}
+        </button>
+      </div>
+
+      @if (tournaments.isLoading()) {
+        <div class="stack stack--3">
+          @for (item of [1, 2, 3]; track item) {
+            <div class="skeleton" style="height: 104px"></div>
+          }
+        </div>
+      } @else if (tournaments.error()) {
+        <div class="glass card center stack stack--3">
+          <p class="muted">{{ t()('errors.network') }}</p>
+          <button type="button" class="btn btn--glass" (click)="tournaments.reload()">
+            {{ t()('common.retry') }}
+          </button>
+        </div>
+      } @else if (groups().length === 0) {
+        <div class="glass card empty-state">
+          <app-racket [size]="56" [swing]="true" />
+          <h3>{{ t()('tournament.empty') }}</h3>
+          @if (session.isModerator()) {
+            <p class="small">{{ t()('tournament.emptyHint') }}</p>
+            <a class="btn btn--primary" routerLink="/tournaments/new">
+              {{ t()('tournament.create') }}
+            </a>
+          }
+        </div>
+      } @else {
+        @for (group of groups(); track group.day) {
+          <section class="stack stack--3">
+            <div class="row">
+              <h2 class="grow">{{ group.day }}</h2>
+              @if (group.items.length > 1) {
+                <span class="chip chip--pink">{{ t()('tournament.parallel') }}</span>
+              }
+            </div>
+
+            <div class="stack stack--3 stagger">
+              @for (item of group.items; track item.id) {
+                <a class="glass card--tight tile" [routerLink]="['/tournaments', item.id]">
+                  <div class="row row--between">
+                    <app-status-badge [status]="item.status" />
+                    <span class="tiny faint numeric">{{ time(item.startsAt) }}</span>
+                  </div>
+
+                  <div class="row">
+                    <div class="grow stack stack--1">
+                      <h3 class="truncate">{{ item.title }}</h3>
+                      <div class="row row--wrap tile__meta">
+                        @if (item.category) {
+                          <span class="chip chip--accent">{{ item.category }}</span>
+                        }
+                        <span class="chip">{{ format(item.format) }}</span>
+                        <span class="chip">{{ i18n.courts(item.courts) }}</span>
+                        @if (item.roundsPlanned) {
+                          <span class="chip">{{ i18n.games(item.roundsPlanned) }}</span>
+                        } @else {
+                          <span class="chip">{{ t()('tournament.roundsInfinite') }}</span>
+                        }
+                      </div>
+                    </div>
+
+                    @if (item.status === 'running') {
+                      <app-ball [size]="26" motion="bounce" />
+                    }
+                  </div>
+
+                  <div class="stack stack--1">
+                    <div class="row tiny muted">
+                      <span class="grow truncate">
+                        {{ item.venueName ?? t()('common.notSet') }}
+                      </span>
+                      <span class="numeric">
+                        {{
+                          t()('tournament.participantsCount', {
+                            count: item.participantCount,
+                            max: item.maxPlayers,
+                          })
+                        }}
+                      </span>
+                    </div>
+                    <div
+                      class="progress"
+                      role="progressbar"
+                      [attr.aria-valuenow]="item.participantCount"
+                      [attr.aria-valuemax]="item.maxPlayers"
+                    >
+                      <span [style.width.%]="fill(item)"></span>
+                    </div>
+                  </div>
+                </a>
+              }
+            </div>
+          </section>
+        }
+      }
+    </div>
+  `,
+  styles: `
+    .tile {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      color: inherit;
+      transition:
+        transform var(--duration-base) var(--ease-spring),
+        box-shadow var(--duration-base) ease;
+    }
+
+    .tile:hover {
+      text-decoration: none;
+      transform: translateY(-2px);
+      box-shadow: var(--glass-shadow-lg);
+    }
+
+    .tile__meta {
+      gap: var(--space-2);
+    }
+
+    .progress {
+      height: 5px;
+      border-radius: var(--radius-full);
+      background: var(--glass-bg-subtle);
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--lime-400), var(--clay-400));
+      transition: width var(--duration-slow) var(--ease-out);
+    }
+  `,
+})
+export class TournamentListPage {
+  private readonly api = inject(TournamentApi);
+  protected readonly i18n = inject(I18nService);
+  protected readonly session = inject(SessionStore);
+  protected readonly t = this.i18n.t;
+
+  protected readonly filter = signal<Filter>('active');
+
+  protected readonly tournaments = resource({
+    loader: () => this.api.listTournaments().then((response) => response.items),
+    defaultValue: [] as TournamentSummaryDto[],
+  });
+
+  private readonly visible = computed(() => {
+    const finished = this.filter() === 'finished';
+    return this.tournaments.value().filter((item) => (item.status === 'finished') === finished);
+  });
+
+  /** Турниры одного дня показываются вместе: это и есть параллельные потоки. */
+  protected readonly groups = computed(() => {
+    const byDay = new Map<string, TournamentSummaryDto[]>();
+    for (const item of this.visible()) {
+      const day = this.i18n.formatDay(item.startsAt);
+      const bucket = byDay.get(day);
+      if (bucket) bucket.push(item);
+      else byDay.set(day, [item]);
+    }
+    return [...byDay.entries()].map(([day, items]) => ({
+      day,
+      items: items.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    }));
+  });
+
+  protected time(value: string): string {
+    return this.i18n.formatDate(value, { day: undefined, month: undefined });
+  }
+
+  protected format(value: TournamentSummaryDto['format']): string {
+    return this.i18n.translate(value === 'americano' ? 'format.americano' : 'format.mexicano');
+  }
+
+  protected fill(item: TournamentSummaryDto): number {
+    if (item.maxPlayers === 0) return 0;
+    return Math.min(100, Math.round((item.participantCount / item.maxPlayers) * 100));
+  }
+}

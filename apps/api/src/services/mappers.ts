@@ -1,0 +1,60 @@
+import {
+  RATING_STALE_AFTER_DAYS,
+  type ParticipantDto,
+  type PlayerDto,
+  type PlayerRatingHistoryEntryDto,
+} from '@fsp/shared';
+import type { PlayerRow, RatingHistoryRow, TournamentPlayerRow } from '../db/schema.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Рейтинг, который давно не обновляли, показывается приглушённым. */
+export function isRatingStale(updatedAt: Date | null): boolean {
+  if (!updatedAt) return false;
+  return Date.now() - updatedAt.getTime() > RATING_STALE_AFTER_DAYS * DAY_MS;
+}
+
+export function toPlayerDto(row: PlayerRow, options: { isClaimed?: boolean } = {}): PlayerDto {
+  const fullName = [row.firstName, row.lastName].filter(Boolean).join(' ');
+  return {
+    id: row.id,
+    duprId: row.duprId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    fullName,
+    doublesRating: row.doublesRating,
+    singlesRating: row.singlesRating,
+    ratingUpdatedAt: row.ratingUpdatedAt?.toISOString() ?? null,
+    ratingSource: row.ratingSource,
+    ratingStale: isRatingStale(row.ratingUpdatedAt),
+    pendingImportRating: row.pendingImportRating,
+    avatarUrl: row.avatarUrl,
+    telegramUsername: row.telegramUsername,
+    isGuest: row.isGuest,
+    isClaimed: options.isClaimed ?? false,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toParticipantDto(row: TournamentPlayerRow, player: PlayerDto): ParticipantDto {
+  return {
+    id: row.id,
+    player,
+    status: row.status,
+    confirmedAndPaid: row.confirmedAndPaid,
+    waitlistPosition: row.waitlistPosition,
+    addedBySelf: row.addedBySelf,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toRatingHistoryDto(row: RatingHistoryRow): PlayerRatingHistoryEntryDto {
+  return {
+    id: row.id,
+    previousRating: row.previousRating,
+    rating: row.rating,
+    source: row.source,
+    changedByName: row.changedByName,
+    createdAt: row.createdAt.toISOString(),
+  };
+}

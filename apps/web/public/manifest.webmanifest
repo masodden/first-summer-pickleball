@@ -1,0 +1,18 @@
+{
+  "name": "FIRST SUMMER PICKLEBALL",
+  "short_name": "FS Pickleball",
+  "description": "Турниры по пиклболу: регистрация, счёт на кортах и живая таблица",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf7f2",
+  "theme_color": "#c75b39",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,595 @@
+/**
+ * Сквозной прогон целевого сценария по живому API.
+ *
+ * Проверяется именно тот вечер, ради которого написано приложение: две
+ * категории по 12 человек, шесть кортов, 11 игр americano, оплата на входе,
+ * счёт по ходу и медали в конце. Дополнительно прогоняется mexicano и
+ * несколько ошибочных путей — их обработка на площадке важнее, чем счастливый
+ * сценарий.
+ *
+ * Запуск: pnpm e2e:scenario (нужны поднятая база и API с ALLOW_DEV_LOGIN=true)
+ */
+
+import { WS_PATH, type MatchDto, type RoundDto, type StandingRowDto } from '@fsp/shared';
+
+const BASE = process.env['E2E_BASE_URL'] ?? 'http://localhost:3010';
+
+let failures = 0;
+let checks = 0;
+
+function check(condition: boolean, description: string): void {
+  checks += 1;
+  if (condition) {
+    console.log(`  ✓ ${description}`);
+  } else {
+    failures += 1;
+    console.error(`  ✗ ${description}`);
+  }
+}
+
+function section(title: string): void {
+  console.log(`\n${title}`);
+}
+
+class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  options: { body?: unknown; token?: string } = {},
+): Promise<T> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (options.token) headers['authorization'] = `Bearer ${options.token}`;
+  if (options.body !== undefined) headers['content-type'] = 'application/json';
+
+  const response = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+  });
+
+  const text = await response.text();
+  const payload: unknown = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    const error = (payload as { error?: { code?: string; message?: string } } | null)?.error;
+    throw new ApiError(
+      response.status,
+      error?.code ?? 'unknown',
+      error?.message ?? `${method} ${path} → ${response.status}`,
+    );
+  }
+  return payload as T;
+}
+
+async function expectError(
+  code: string,
+  description: string,
+  action: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await action();
+    check(false, `${description} (ожидали ошибку ${code}, запрос прошёл)`);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      check(error.code === code, `${description} → ${error.code}`);
+    } else {
+      check(false, `${description} (неожиданная ошибка: ${String(error)})`);
+    }
+  }
+}
+
+interface Session {
+  token: string;
+  session: { accountId: string; role: string; player: { id: string } | null };
+}
+
+const login = (role: 'admin' | 'moderator' | 'user', telegramId: string, name: string) =>
+  request<Session>('POST', '/api/auth/dev', { body: { role, telegramId, name } });
+
+const RU_NAMES: [string, string][] = [
+  ['Артём', 'Соколов'],
+  ['Мария', 'Иванова'],
+  ['Дмитрий', 'Петров'],
+  ['Анна', 'Кузнецова'],
+  ['Сергей', 'Смирнов'],
+  ['Ольга', 'Попова'],
+  ['Иван', 'Волков'],
+  ['Екатерина', 'Морозова'],
+  ['Павел', 'Новиков'],
+  ['Наталья', 'Фёдорова'],
+  ['Никита', 'Егоров'],
+  ['Юлия', 'Зайцева'],
+];
+
+interface PlayerRef {
+  id: string;
+  duprId: string;
+  fullName: string;
+  rating: number | null;
+}
+
+/**
+ * Метка прогона: DUPR ID уникален в базе, поэтому сценарий должен каждый раз брать новые.
+ * Так его можно гонять по одной и той же базе сколько угодно раз.
+ */
+const RUN_TAG = Math.floor(Math.random() * 36 ** 2)
+  .toString(36)
+  .padStart(2, '0')
+  .toUpperCase();
+
+async function createPlayers(
+  token: string,
+  prefix: string,
+  ratingBase: number,
+): Promise<PlayerRef[]> {
+  const players: PlayerRef[] = [];
+  for (const [index, [firstName, lastName]] of RU_NAMES.entries()) {
+    // DUPR ID — ровно шесть символов: две буквы категории, метка прогона и номер игрока.
+    const duprId = `${prefix}${RUN_TAG}${String(index + 10).padStart(2, '0')}`.toUpperCase();
+    const rating = Number((ratingBase + index * 0.08).toFixed(3));
+    const { player } = await request<{ player: { id: string; fullName: string } }>(
+      'POST',
+      '/api/players',
+      { token, body: { firstName, lastName: `${lastName}`, duprId, doublesRating: rating } },
+    );
+    players.push({ id: player.id, duprId, fullName: player.fullName, rating });
+  }
+  return players;
+}
+
+interface TournamentRef {
+  id: string;
+  publicSlug: string;
+  title: string;
+}
+
+async function createTournament(
+  token: string,
+  input: Record<string, unknown>,
+): Promise<TournamentRef> {
+  const { tournament } = await request<{ tournament: TournamentRef }>('POST', '/api/tournaments', {
+    token,
+    body: input,
+  });
+  return tournament;
+}
+
+const state = (id: string, token?: string) =>
+  request<{
+    tournament: { status: string; roundsGenerated: number };
+    participants: { player: { id: string }; confirmedAndPaid: boolean; status: string }[];
+    rounds: RoundDto[];
+    standings: StandingRowDto[];
+  }>('GET', `/api/tournaments/${id}/state`, token ? { token } : {});
+
+/** Разыгрывает матч так, как это делает организатор: старт, пауза, финиш, счёт. */
+async function playMatch(
+  token: string,
+  match: MatchDto,
+  score: [number, number],
+  options: { withPause?: boolean } = {},
+): Promise<MatchDto> {
+  let current = await request<{ match: MatchDto }>('POST', `/api/matches/${match.id}/start`, {
+    token,
+    body: { version: match.version },
+  }).then((response) => response.match);
+
+  if (options.withPause) {
+    current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/pause`, {
+      token,
+      body: { version: current.version },
+    }).then((response) => response.match);
+    current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/start`, {
+      token,
+      body: { version: current.version },
+    }).then((response) => response.match);
+  }
+
+  current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/finish`, {
+    token,
+    body: { version: current.version },
+  }).then((response) => response.match);
+
+  return request<{ match: MatchDto }>('PUT', `/api/matches/${current.id}/score`, {
+    token,
+    body: { scoreA: score[0], scoreB: score[1], version: current.version },
+  }).then((response) => response.match);
+}
+
+function partnerKey(a: string, b: string): string {
+  return [a, b].sort().join('|');
+}
+
+async function main(): Promise<void> {
+  section('Вход организаторов');
+  const admin = await login('admin', 'e2e-admin', 'Организатор клуба');
+  const moderator = await login('moderator', 'e2e-moderator', 'Второй судья');
+  check(admin.session.role === 'admin', 'администратор вошёл');
+  check(moderator.session.role === 'moderator', 'модератор вошёл');
+
+  section('Справочник игроков');
+  const advancedPlayers = await createPlayers(admin.token, 'AD', 4.2);
+  const intermediatePlayers = await createPlayers(admin.token, 'IN', 3.1);
+  check(advancedPlayers.length === 12, 'создано 12 игроков категории advanced');
+  check(intermediatePlayers.length === 12, 'создано 12 игроков категории intermediate');
+
+  await expectError('duplicate_dupr_id', 'повторный DUPR ID отклоняется', () =>
+    request('POST', '/api/players', {
+      token: admin.token,
+      body: { firstName: 'Дубль', lastName: 'Дублёв', duprId: advancedPlayers[0]!.duprId },
+    }),
+  );
+
+  section('Два параллельных турнира на шести кортах');
+  const startsAt = new Date(Date.now() + 3_600_000).toISOString();
+  const shared = {
+    format: 'americano',
+    startsAt,
+    courts: 3,
+    maxPlayers: 12,
+    pointsToWin: 11,
+    matchDurationMin: 15,
+    roundsPlanned: 11,
+    tieRule: 'draw',
+    standingsSort: ['points', 'diff'],
+    ratingBalance: true,
+    entryFee: 1000,
+    venueName: 'First Summer Club',
+    venueAddress: 'Корты клуба, 6 кортов',
+  };
+
+  const advanced = await createTournament(admin.token, {
+    ...shared,
+    title: 'Вечер пиклбола — Advanced',
+    category: 'advanced',
+  });
+  const intermediate = await createTournament(moderator.token, {
+    ...shared,
+    title: 'Вечер пиклбола — Intermediate',
+    category: 'intermediate',
+  });
+  check(advanced.id !== intermediate.id, 'два турнира созданы независимо');
+
+  const list = await request<{ items: { id: string }[] }>('GET', '/api/tournaments');
+  check(
+    list.items.some((item) => item.id === advanced.id) &&
+      list.items.some((item) => item.id === intermediate.id),
+    'оба турнира видны в общем списке без авторизации',
+  );
+
+  section('Заявки: организатор добавляет, игрок заявляется сам');
+  for (const player of advancedPlayers.slice(0, 11)) {
+    await request('POST', `/api/tournaments/${advanced.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+  }
+  for (const player of intermediatePlayers) {
+    await request('POST', `/api/tournaments/${intermediate.id}/participants`, {
+      token: moderator.token,
+      body: { playerId: player.id },
+    });
+  }
+
+  // Двенадцатый участник заявляется сам: Telegram-аккаунт + привязка DUPR.
+  const selfPlayer = advancedPlayers[11]!;
+  const guest = await login('user', `e2e-self-${RUN_TAG}`, 'Игрок с телефона');
+  await expectError('forbidden', 'без привязки DUPR заявиться нельзя', () =>
+    request('POST', `/api/tournaments/${advanced.id}/join`, { token: guest.token }),
+  );
+
+  const claimed = await request<{ session: { claim: { status: string } | null } }>(
+    'POST',
+    '/api/auth/claim',
+    { token: guest.token, body: { duprId: selfPlayer.duprId } },
+  );
+  check(claimed.session.claim?.status === 'pending', 'заявка на привязку DUPR ждёт организатора');
+
+  const pending = await request<{ claims: { id: string; player: { id: string } }[] }>(
+    'GET',
+    '/api/claims',
+    { token: admin.token },
+  );
+  const ourClaim = pending.claims.find((claim) => claim.player.id === selfPlayer.id);
+  check(ourClaim !== undefined, 'организатор видит заявку на привязку');
+  await request('POST', `/api/claims/${ourClaim!.id}/decision`, {
+    token: admin.token,
+    body: { approve: true },
+  });
+
+  const joined = await request<{ waitlisted: boolean }>(
+    'POST',
+    `/api/tournaments/${advanced.id}/join`,
+    { token: guest.token },
+  );
+  check(!joined.waitlisted, 'игрок заявился сам и попал в основной состав');
+
+  const afterJoin = await state(advanced.id, admin.token);
+  check(afterJoin.participants.length === 12, 'в advanced 12 участников');
+  check(
+    afterJoin.participants.some((item) => item.player.id === selfPlayer.id),
+    'самостоятельная заявка привязана к карточке игрока с этим DUPR ID',
+  );
+
+  section('Приём участников и оплата');
+  await expectError('not_all_confirmed', 'без подтверждения оплаты турнир не стартует', () =>
+    request('POST', `/api/tournaments/${advanced.id}/start`, { token: admin.token, body: {} }),
+  );
+
+  for (const participant of afterJoin.participants) {
+    await request(
+      'PUT',
+      `/api/tournaments/${advanced.id}/participants/${participant.player.id}/paid`,
+      {
+        token: admin.token,
+        body: { confirmedAndPaid: true },
+      },
+    );
+  }
+  const confirmed = await state(advanced.id, admin.token);
+  check(
+    confirmed.participants.every((item) => item.confirmedAndPaid),
+    'все 12 участников подтверждены и оплатили',
+  );
+
+  section('Расписание americano на 11 игр');
+  const events: string[] = [];
+  const socket = new WebSocket(`${BASE.replace('http', 'ws')}${WS_PATH}`);
+  await new Promise<void>((resolve) => {
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'subscribe', tournamentId: advanced.id }));
+      resolve();
+    });
+  });
+  socket.addEventListener('message', (event: MessageEvent<string>) => {
+    events.push((JSON.parse(event.data) as { type: string }).type);
+  });
+
+  await request('POST', `/api/tournaments/${advanced.id}/start`, {
+    token: admin.token,
+    body: { seed: 7 },
+  });
+  const started = await state(advanced.id, admin.token);
+  check(started.tournament.status === 'running', 'турнир перешёл в статус «идёт»');
+  check(started.rounds.length === 11, 'создано 11 раундов сразу после старта');
+  check(
+    started.rounds.every((round) => round.matches.length === 3),
+    'в каждом раунде три корта — по три матча',
+  );
+  check(
+    started.rounds.every((round) => round.sittingOut.length === 0),
+    '12 игроков на 3 кортах играют без отдыхающих',
+  );
+
+  const partners = new Set<string>();
+  let duplicatePartners = 0;
+  for (const round of started.rounds) {
+    for (const match of round.matches) {
+      for (const team of [match.teamA, match.teamB]) {
+        const key = partnerKey(team.players[0]!.id, team.players[1]!.id);
+        if (partners.has(key)) duplicatePartners += 1;
+        partners.add(key);
+      }
+    }
+  }
+  check(duplicatePartners === 0, 'каждый играет в паре с каждым ровно один раз');
+  check(partners.size === 66, 'всего 66 уникальных пар — полный круг');
+
+  // Перемешивание до первого матча: расписание пересобирается.
+  const reshuffled = await request<{ rounds: RoundDto[] }>(
+    'POST',
+    `/api/tournaments/${advanced.id}/reshuffle`,
+    { token: admin.token, body: { seed: 21 } },
+  );
+  check(reshuffled.rounds.length === 11, 'после перемешивания снова 11 раундов');
+
+  section('Игры: старт, пауза, счёт');
+  let played = 0;
+  let current = await state(advanced.id, admin.token);
+  for (const round of current.rounds) {
+    for (const [index, match] of round.matches.entries()) {
+      const score: [number, number] = index === 0 ? [11, 6] : index === 1 ? [11, 9] : [8, 11];
+      await playMatch(admin.token, match, score, { withPause: round.index === 0 && index === 0 });
+      played += 1;
+    }
+
+    if (round.index === 0) {
+      const afterFirst = await state(advanced.id, admin.token);
+      check(afterFirst.rounds[0]!.allScored, 'первый раунд закрыт со счётом');
+      check(afterFirst.standings.length === 12, 'таблица считается в прямом эфире');
+      check(
+        afterFirst.standings[0]!.pointsFor >= afterFirst.standings[11]!.pointsFor,
+        'таблица отсортирована по очкам',
+      );
+
+      await expectError('conflict_version', 'устаревшая версия счёта отклоняется', () =>
+        request('PUT', `/api/matches/${round.matches[0]!.id}/score`, {
+          token: admin.token,
+          body: { scoreA: 5, scoreB: 5, version: 0 },
+        }),
+      );
+    }
+  }
+  check(played === 33, 'разыграно 33 матча: 11 раундов по три корта');
+
+  section('Правка счёта и завершение');
+  const beforeEdit = await state(advanced.id, admin.token);
+  const lastMatch = beforeEdit.rounds[10]!.matches[0]!;
+  const edited = await request<{ match: MatchDto }>('PUT', `/api/matches/${lastMatch.id}/score`, {
+    token: admin.token,
+    body: { scoreA: 11, scoreB: 2, version: lastMatch.version },
+  });
+  check(
+    edited.match.teamA.score === 11 && edited.match.teamB.score === 2,
+    'счёт исправлен до завершения турнира',
+  );
+
+  await request('POST', `/api/tournaments/${advanced.id}/finish`, { token: admin.token });
+  const finished = await state(advanced.id, admin.token);
+  check(finished.tournament.status === 'finished', 'турнир завершён');
+
+  const medals = finished.standings.filter((row) => row.medal);
+  check(medals.length === 3, 'медали получили трое');
+  check(
+    medals[0]!.medal === 'gold' && medals[1]!.medal === 'silver' && medals[2]!.medal === 'bronze',
+    'медали распределены по порядку',
+  );
+
+  // Каждое очко матча достаётся двум игрокам команды, поэтому сумма таблицы — двойная.
+  const scoredPoints = finished.rounds.reduce(
+    (sum, round) =>
+      sum +
+      round.matches.reduce(
+        (matchSum, match) => matchSum + 2 * ((match.teamA.score ?? 0) + (match.teamB.score ?? 0)),
+        0,
+      ),
+    0,
+  );
+  const totalPoints = finished.standings.reduce((sum, row) => sum + row.pointsFor, 0);
+  check(totalPoints === scoredPoints, 'сумма очков в таблице совпадает со счётом матчей');
+  check(
+    finished.standings.every((row) => row.played === 11),
+    'каждый игрок провёл 11 игр',
+  );
+
+  await expectError('tournament_wrong_status', 'после завершения счёт не меняется', () =>
+    request('PUT', `/api/matches/${lastMatch.id}/score`, {
+      token: admin.token,
+      body: { scoreA: 1, scoreB: 0, version: edited.match.version },
+    }),
+  );
+
+  section('Сортировка таблицы по любому столбцу');
+  const byWins = await request<{ standings: StandingRowDto[] }>(
+    'GET',
+    `/api/tournaments/${advanced.id}/standings?sort=wins,diff`,
+  );
+  check(
+    byWins.standings.every(
+      (row, index) => index === 0 || byWins.standings[index - 1]!.wins >= row.wins,
+    ),
+    'сортировка по победам работает',
+  );
+
+  section('Публичное табло и экспорт');
+  const board = await request<{ standings: StandingRowDto[]; participants: unknown[] }>(
+    'GET',
+    `/api/public/${advanced.publicSlug}`,
+  );
+  check(board.standings.length === 12, 'табло доступно без авторизации');
+
+  const csv = await fetch(`${BASE}/api/tournaments/${advanced.id}/export.csv`);
+  const csvText = await csv.text();
+  check(csv.ok && csvText.split('\n').length > 12, 'CSV с результатами выгружается');
+
+  section('Живые обновления');
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  check(events.includes('subscribed'), 'клиент подписался на комнату турнира');
+  check(events.includes('match.updated'), 'обновления матчей приходят по WebSocket');
+  check(events.includes('standings.updated'), 'таблица приходит по WebSocket');
+  socket.close();
+
+  section('Mexicano: раунды по ходу игры');
+  const mexicano = await createTournament(admin.token, {
+    title: 'Вечер пиклбола — Mexicano',
+    category: 'mexicano',
+    format: 'mexicano',
+    startsAt,
+    courts: 2,
+    maxPlayers: 8,
+    pointsToWin: 11,
+    roundsPlanned: null,
+    tieRule: 'draw',
+    standingsSort: ['points'],
+    ratingBalance: true,
+  });
+
+  for (const player of intermediatePlayers.slice(0, 8)) {
+    await request('POST', `/api/tournaments/${mexicano.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+    await request('PUT', `/api/tournaments/${mexicano.id}/participants/${player.id}/paid`, {
+      token: admin.token,
+      body: { confirmedAndPaid: true },
+    });
+  }
+
+  await request('POST', `/api/tournaments/${mexicano.id}/start`, {
+    token: admin.token,
+    body: { seed: 3 },
+  });
+  let mex = await state(mexicano.id, admin.token);
+  check(mex.rounds.length === 1, 'mexicano начинается с одного раунда');
+  check(mex.rounds[0]!.matches.length === 2, 'два корта — два матча');
+
+  await expectError('round_not_finished', 'следующий раунд ждёт счёт предыдущего', () =>
+    request('POST', `/api/tournaments/${mexicano.id}/rounds`, { token: admin.token }),
+  );
+
+  for (let roundIndex = 0; roundIndex < 3; roundIndex += 1) {
+    mex = await state(mexicano.id, admin.token);
+    const round = mex.rounds[roundIndex]!;
+    for (const [index, match] of round.matches.entries()) {
+      await playMatch(admin.token, match, index === 0 ? [11, 7] : [9, 11]);
+    }
+    if (roundIndex < 2) {
+      const next = await request<{ roundIndex: number }>(
+        'POST',
+        `/api/tournaments/${mexicano.id}/rounds`,
+        { token: admin.token },
+      );
+      check(next.roundIndex === roundIndex + 1, `создан раунд ${roundIndex + 2} по ходу турнира`);
+    }
+  }
+
+  mex = await state(mexicano.id, admin.token);
+  check(mex.rounds.length === 3, 'в mexicano три сыгранных раунда');
+  const leader = mex.standings[0]!;
+  check(
+    mex.rounds[2]!.matches[0]!.teamA.players.concat(mex.rounds[2]!.matches[0]!.teamB.players).some(
+      (player) => player.id === leader.player.id,
+    ),
+    'лидер таблицы играет на первом корте',
+  );
+
+  await request('POST', `/api/tournaments/${mexicano.id}/finish`, { token: admin.token });
+  check(
+    (await state(mexicano.id, admin.token)).tournament.status === 'finished',
+    'mexicano можно завершить в любой момент',
+  );
+
+  section('Права и удаление');
+  await expectError('forbidden', 'модератор не удаляет турниры', () =>
+    request('DELETE', `/api/tournaments/${mexicano.id}`, { token: moderator.token }),
+  );
+  await expectError('unauthorized', 'наблюдатель не может править счёт', () =>
+    request('PUT', `/api/matches/${lastMatch.id}/score`, {
+      body: { scoreA: 1, scoreB: 2, version: 0 },
+    }),
+  );
+  await request('DELETE', `/api/tournaments/${mexicano.id}`, { token: admin.token });
+  await expectError('not_found', 'удалённый турнир недоступен', () =>
+    request('GET', `/api/tournaments/${mexicano.id}`),
+  );
+
+  await request('DELETE', `/api/tournaments/${advanced.id}`, { token: admin.token });
+  await request('DELETE', `/api/tournaments/${intermediate.id}`, { token: admin.token });
+
+  console.log(`\nПроверок: ${checks}, ошибок: ${failures}`);
+  if (failures > 0) process.exitCode = 1;
+}
+
+main().catch((error: unknown) => {
+  console.error('\nСценарий упал:', error);
+  process.exitCode = 1;
+});

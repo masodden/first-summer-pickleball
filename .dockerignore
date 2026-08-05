@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.tooling
+.git
+.angular
+**/dist
+coverage
+infra/backups
+infra/caddy-data
+infra/caddy-config
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

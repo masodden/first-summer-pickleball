@@ -1,0 +1,35 @@
+# Caddy сам получает и продлевает сертификат Let's Encrypt для APP_DOMAIN.
+# Если домена нет, поставьте APP_DOMAIN=:80 — тогда сайт откроется по IP без HTTPS,
+# но Telegram Mini App требует HTTPS, поэтому для бота домен обязателен.
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# API и WebSocket живут на том же домене: это избавляет от настройки CORS
+	# и от отдельного поддомена.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle /ws {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+
+		# Хэшированные файлы сборки можно кэшировать надолго.
+		@immutable path_regexp \-[A-Z0-9]{8}\.(js|css|woff2)$
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+		header /index.html Cache-Control "no-cache"
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

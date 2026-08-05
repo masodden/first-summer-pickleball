@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 92" role="img" aria-label="FIRST SUMMER PICKLEBALL">
+  <defs>
+    <linearGradient id="logo-ball" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#d2ef62"/>
+      <stop offset="1" stop-color="#a8cc19"/>
+    </linearGradient>
+  </defs>
+
+  <g>
+    <circle cx="34" cy="46" r="30" fill="url(#logo-ball)"/>
+    <g fill="#7fa010" opacity="0.72">
+      <circle cx="34" cy="28" r="3.6"/>
+      <circle cx="49" cy="37" r="3.6"/>
+      <circle cx="49" cy="55" r="3.6"/>
+      <circle cx="34" cy="64" r="3.6"/>
+      <circle cx="19" cy="55" r="3.6"/>
+      <circle cx="19" cy="37" r="3.6"/>
+      <circle cx="34" cy="46" r="3.6"/>
+    </g>
+  </g>
+
+  <text x="80" y="38"
+        font-family="Inter Tight, Inter, system-ui, sans-serif"
+        font-size="21" font-weight="700" letter-spacing="3.4" fill="#c75b39">FIRST SUMMER</text>
+  <text x="80" y="70"
+        font-family="Inter Tight, Inter, system-ui, sans-serif"
+        font-size="27" font-weight="800" letter-spacing="1.6" fill="currentColor">PICKLEBALL</text>
+</svg>

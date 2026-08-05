@@ -1,0 +1,68 @@
+# Продакшен на VPS: pnpm docker:prod
+# Caddy получает HTTPS-сертификат сам и проксирует /api и /ws в контейнер api.
+name: fsp
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fsp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-fsp}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-fsp} -d ${POSTGRES_DB:-fsp}']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-fsp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fsp}
+      JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+      BOOTSTRAP_ADMIN_CODE: ${BOOTSTRAP_ADMIN_CODE:?Задайте BOOTSTRAP_ADMIN_CODE в .env}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PUBLIC_WEB_URL: https://${APP_DOMAIN:?Задайте APP_DOMAIN в .env}
+      CORS_ORIGIN: https://${APP_DOMAIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Миграции применяются при каждом запуске: обновление сводится к одной команде.
+    command: >
+      sh -c "node apps/api/dist/db/migrate.js &&
+             node apps/api/dist/db/seed.js &&
+             node apps/api/dist/server.js"
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

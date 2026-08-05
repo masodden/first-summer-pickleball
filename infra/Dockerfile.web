@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+
+FROM node:24-alpine AS build
+RUN corepack enable
+WORKDIR /app
+ENV CI=true
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/engine/package.json packages/engine/
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+RUN pnpm install --frozen-lockfile --filter "@fsp/web..."
+
+COPY packages ./packages
+COPY apps/web ./apps/web
+RUN pnpm --filter @fsp/shared build && pnpm --filter @fsp/web build
+
+# Статику отдаёт Caddy: он же держит HTTPS и проксирует запросы к API.
+FROM caddy:2-alpine AS runtime
+COPY --from=build /app/apps/web/dist/web/browser /srv
+COPY infra/Caddyfile /etc/caddy/Caddyfile
+EXPOSE 80 443

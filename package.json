@@ -1,0 +1,32 @@
+{
+  "name": "first-summer-pickleball",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FIRST SUMMER PICKLEBALL — приложение для проведения локальных турниров по пиклболу",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:api": "pnpm --filter @fsp/api dev",
+    "dev:web": "pnpm --filter @fsp/web start",
+    "build": "pnpm --filter @fsp/shared build && pnpm --filter @fsp/engine build && pnpm --filter @fsp/api build && pnpm --filter @fsp/web build",
+    "test": "pnpm --filter @fsp/engine test",
+    "e2e:scenario": "pnpm --filter @fsp/api exec tsx ../../scripts/e2e-scenario.ts",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @fsp/api db:generate",
+    "db:migrate": "pnpm --filter @fsp/api db:migrate",
+    "db:seed": "pnpm --filter @fsp/api db:seed",
+    "db:import": "pnpm --filter @fsp/api db:import",
+    "docker:dev": "docker compose -f infra/docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "docker:prod": "docker compose -f infra/docker-compose.yml up -d --build"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.2"
+  }
+}

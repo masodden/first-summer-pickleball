@@ -1,0 +1,76 @@
+# Локальный запуск одной командой: pnpm docker:dev
+# Поднимает базу, API с автоперезагрузкой и фронтенд на ng serve.
+name: fsp-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fsp
+      POSTGRES_PASSWORD: fsp
+      POSTGRES_DB: fsp
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fsp -d fsp']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: node:24-alpine
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://fsp:fsp@db:5432/fsp
+      JWT_SECRET: dev-secret-change-me-please
+      BOOTSTRAP_ADMIN_CODE: first-summer-admin
+      PUBLIC_WEB_URL: http://localhost:4200
+      CORS_ORIGIN: '*'
+      # Локальный вход без Telegram: удобно проверять роли с одного компьютера.
+      ALLOW_DEV_LOGIN: 'true'
+      LOG_LEVEL: debug
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+    ports:
+      - '3000:3000'
+    volumes:
+      - ../:/app
+      - api-node-modules:/app/node_modules
+    command: >
+      sh -c "corepack enable &&
+             pnpm install --frozen-lockfile --filter '@fsp/api...' &&
+             pnpm --filter @fsp/shared build &&
+             pnpm --filter @fsp/engine build &&
+             pnpm --filter @fsp/api db:migrate &&
+             pnpm --filter @fsp/api db:seed -- --demo &&
+             pnpm --filter @fsp/api dev"
+
+  web:
+    image: node:24-alpine
+    working_dir: /app
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: development
+    ports:
+      - '4200:4200'
+    volumes:
+      - ../:/app
+      - web-node-modules:/app/node_modules
+    command: >
+      sh -c "corepack enable &&
+             pnpm install --frozen-lockfile --filter '@fsp/web...' &&
+             pnpm --filter @fsp/shared build &&
+             pnpm --filter @fsp/web start -- --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json"
+
+volumes:
+  db-data:
+  api-node-modules:
+  web-node-modules:
