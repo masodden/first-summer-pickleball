@@ -89,6 +89,7 @@ export function toSummaryDto(row: TournamentRow, counts: TournamentCounts): Tour
     participantCount: counts.participantCount,
     confirmedCount: counts.confirmedCount,
     roundsPlanned: row.roundsPlanned,
+    tieRule: row.tieRule,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -107,7 +108,6 @@ export function toTournamentDto(
     venueMapUrl: row.venueMapUrl,
     pointsToWin: row.pointsToWin,
     matchDurationMin: row.matchDurationMin,
-    tieRule: row.tieRule,
     standingsSort: row.standingsSort as StandingsSortKey[],
     ratingBalance: row.ratingBalance,
     entryFee: row.entryFee,

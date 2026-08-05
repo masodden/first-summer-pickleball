@@ -103,6 +103,7 @@ export interface TournamentSummaryDto {
   confirmedCount: number;
   /** null означает «играем, пока не остановят». */
   roundsPlanned: number | null;
+  tieRule: TieRule;
   createdAt: string;
 }
 
@@ -113,7 +114,6 @@ export interface TournamentDto extends TournamentSummaryDto {
   venueMapUrl: string | null;
   pointsToWin: number;
   matchDurationMin: number | null;
-  tieRule: TieRule;
   standingsSort: StandingsSortKey[];
   ratingBalance: boolean;
   entryFee: number | null;
