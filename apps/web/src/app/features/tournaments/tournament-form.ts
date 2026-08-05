@@ -99,7 +99,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
                 type="button"
                 class="chip"
                 [class.chip--accent]="maxPlayers() === preset"
-                (click)="maxPlayers.set(preset)"
+                (click)="maxPlayersText.set(preset.toString())"
               >
                 {{ preset }}
               </button>
@@ -109,8 +109,8 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
               type="number"
               min="4"
               max="200"
-              [value]="maxPlayers()"
-              (input)="maxPlayers.set(number($event, 12))"
+              [value]="maxPlayersText()"
+              (input)="maxPlayersText.set(text($event))"
             />
           </div>
         </div>
@@ -123,8 +123,8 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
               type="number"
               min="1"
               max="20"
-              [value]="courts()"
-              (input)="courts.set(number($event, 3))"
+              [value]="courtsText()"
+              (input)="courtsText.set(text($event))"
             />
             <span class="field__hint">{{ courtsHint() }}</span>
           </label>
@@ -136,8 +136,8 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
               type="number"
               min="1"
               max="99"
-              [value]="pointsToWin()"
-              (input)="pointsToWin.set(number($event, 11))"
+              [value]="pointsToWinText()"
+              (input)="pointsToWinText.set(text($event))"
             />
           </label>
         </div>
@@ -321,9 +321,11 @@ export class TournamentFormPage {
   protected readonly category = signal('');
   protected readonly format = signal<TournamentFormat>('americano');
   protected readonly startsAt = signal(defaultStart());
-  protected readonly courts = signal(3);
-  protected readonly maxPlayers = signal(12);
-  protected readonly pointsToWin = signal(11);
+  // Числовые поля храним строкой: в поле остаётся ровно то, что набрал организатор,
+  // а не подставленное вместо пустоты значение по умолчанию.
+  protected readonly courtsText = signal('3');
+  protected readonly maxPlayersText = signal('12');
+  protected readonly pointsToWinText = signal('11');
   protected readonly matchDuration = signal('');
   protected readonly rounds = signal('');
   protected readonly tieRule = signal<TieRule>('draw');
@@ -338,6 +340,10 @@ export class TournamentFormPage {
   protected readonly saving = signal(false);
 
   protected readonly isEdit = computed(() => Boolean(this.id()));
+
+  protected readonly courts = computed(() => toNumberOrNull(this.courtsText()) ?? 0);
+  protected readonly maxPlayers = computed(() => toNumberOrNull(this.maxPlayersText()) ?? 0);
+  protected readonly pointsToWin = computed(() => toNumberOrNull(this.pointsToWinText()) ?? 0);
 
   protected readonly venues = resource({
     loader: () => this.api.listVenues().then((response) => response.venues),
@@ -363,7 +369,8 @@ export class TournamentFormPage {
       this.title().trim().length >= 2 &&
       this.startsAt().length > 0 &&
       this.courts() >= 1 &&
-      this.maxPlayers() >= 4,
+      this.maxPlayers() >= 4 &&
+      this.pointsToWin() >= 1,
   );
 
   constructor() {
@@ -374,9 +381,9 @@ export class TournamentFormPage {
       this.category.set(tournament.category ?? '');
       this.format.set(tournament.format);
       this.startsAt.set(toLocalInput(tournament.startsAt));
-      this.courts.set(tournament.courts);
-      this.maxPlayers.set(tournament.maxPlayers);
-      this.pointsToWin.set(tournament.pointsToWin);
+      this.courtsText.set(tournament.courts.toString());
+      this.maxPlayersText.set(tournament.maxPlayers.toString());
+      this.pointsToWinText.set(tournament.pointsToWin.toString());
       this.matchDuration.set(tournament.matchDurationMin?.toString() ?? '');
       this.rounds.set(tournament.roundsPlanned?.toString() ?? '');
       this.tieRule.set(tournament.tieRule);
@@ -400,7 +407,7 @@ export class TournamentFormPage {
 
   protected courtsHint(): string {
     // На корте четверо: подсказка помогает не поставить лишний корт.
-    const playing = this.courts() * 4;
+    const playing = Math.max(0, this.courts()) * 4;
     const sitting = Math.max(0, this.maxPlayers() - playing);
     return sitting > 0
       ? `${this.i18n.players(playing)} · ${this.i18n.translate('match.sittingOut')}: ${sitting}`
@@ -409,11 +416,6 @@ export class TournamentFormPage {
 
   protected text(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
-  }
-
-  protected number(event: Event, fallback: number): number {
-    const parsed = Number.parseInt((event.target as HTMLInputElement).value, 10);
-    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   protected checked(event: Event): boolean {
