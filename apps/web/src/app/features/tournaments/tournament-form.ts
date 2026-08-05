@@ -43,7 +43,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           <input class="input" [value]="title()" (input)="title.set(text($event))" />
         </label>
 
-        <div class="row row--wrap">
+        <div class="row row--wrap row--fields">
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.category') }}</span>
             <input
@@ -115,7 +115,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </div>
         </div>
 
-        <div class="row row--wrap">
+        <div class="row row--wrap row--fields">
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.courts') }}</span>
             <input
@@ -163,7 +163,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </div>
         }
 
-        <div class="row row--wrap">
+        <div class="row row--wrap row--fields">
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.matchDuration') }}</span>
             <input
@@ -194,7 +194,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </label>
         </div>
 
-        <div class="row row--wrap">
+        <div class="row row--wrap row--fields">
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.tieRule') }}</span>
             <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">

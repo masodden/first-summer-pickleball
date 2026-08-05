@@ -2,14 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   effect,
   inject,
   input,
   signal,
 } from '@angular/core';
 import type { MatchDto } from '@fsp/shared';
-import { ClockService, elapsedMs, formatClock } from '../../core/clock';
 import { I18nService } from '../../core/i18n';
 import { TelegramService } from '../../core/telegram';
 import { TournamentStore } from '../../core/tournament-store';
@@ -19,10 +17,9 @@ import { RatingChip } from '../../ui/rating-chip';
 /**
  * Карточка корта.
  *
- * Всё, что нужно на площадке, — на одном экране без переходов: кто играет,
- * сколько идёт игра, кнопки старта и паузы, ввод счёта. Таймер считается от
- * серверного времени старта, поэтому на всех устройствах он одинаковый, а
- * закончить игру можно только вручную — свисток даёт человек, а не секундомер.
+ * Все корты раунда видны сразу: кто играет, какой рейтинг, какой счёт. Старт,
+ * пауза и завершение живут в шапке раунда — на площадке свисток один на все
+ * корты. Счёт же вводится по каждому корту отдельно: заканчивают они вразнобой.
  */
 @Component({
   selector: 'app-match-card',
@@ -35,16 +32,6 @@ import { RatingChip } from '../../ui/rating-chip';
         <span class="court__label">{{ courtLabel() }}</span>
 
         <div class="row court__status">
-          @if (timeLimit() !== null) {
-            <span
-              class="timer numeric"
-              [class.timer--over]="overtime()"
-              [class.timer--running]="match().status === 'running'"
-            >
-              {{ clockLabel() }}
-            </span>
-          }
-
           @switch (match().status) {
             @case ('running') {
               <span class="chip chip--go">{{ t()('match.started') }}</span>
@@ -70,7 +57,7 @@ import { RatingChip } from '../../ui/rating-chip';
                 <div class="team__player">
                   <app-avatar [player]="player" [size]="30" />
                   <span class="truncate">{{ player.fullName }}</span>
-                  <app-rating-chip [player]="player" [showLabel]="false" />
+                  <app-rating-chip [player]="player" [showLabel]="false" [compact]="true" />
                 </div>
               }
             </div>
@@ -131,65 +118,21 @@ import { RatingChip } from '../../ui/rating-chip';
           }
         </div>
       } @else if (canManage()) {
+        <!-- Старт и завершение — на весь раунд, здесь только счёт этого корта. -->
         <div class="row row--wrap actions">
-          @switch (match().status) {
-            @case ('scheduled') {
-              <button
-                type="button"
-                class="btn btn--sm btn--go grow"
-                [disabled]="busy()"
-                (click)="start()"
-              >
-                {{ t()('match.start') }}
-              </button>
-            }
-            @case ('running') {
-              <button
-                type="button"
-                class="btn btn--sm btn--glass"
-                [disabled]="busy()"
-                (click)="store.pauseMatch(match())"
-              >
-                {{ t()('match.pause') }}
-              </button>
-              <button
-                type="button"
-                class="btn btn--sm btn--primary grow"
-                [disabled]="busy()"
-                (click)="finish()"
-              >
-                {{ t()('match.finish') }}
-              </button>
-            }
-            @case ('paused') {
-              <button
-                type="button"
-                class="btn btn--sm btn--go"
-                [disabled]="busy()"
-                (click)="store.startMatch(match())"
-              >
-                {{ t()('match.resume') }}
-              </button>
-              <button
-                type="button"
-                class="btn btn--sm btn--primary grow"
-                [disabled]="busy()"
-                (click)="finish()"
-              >
-                {{ t()('match.finish') }}
-              </button>
-            }
-            @case ('finished') {
-              <button type="button" class="btn btn--sm btn--glass grow" (click)="startEditing()">
-                {{ hasScore() ? t()('score.edit') : t()('match.enterScore') }}
-              </button>
-            }
+          @if (match().status === 'scheduled') {
+            <p class="tiny center muted grow">{{ t()('match.roundNotStarted') }}</p>
+          } @else {
+            <button
+              type="button"
+              class="btn btn--sm btn--glass grow"
+              [disabled]="busy()"
+              (click)="startEditing()"
+            >
+              {{ hasScore() ? t()('score.edit') : t()('match.enterScore') }}
+            </button>
           }
         </div>
-      }
-
-      @if (overtime() && match().status === 'running') {
-        <p class="tiny center muted">{{ t()('match.timeUpHint') }}</p>
       }
     </div>
   `,
@@ -219,21 +162,6 @@ import { RatingChip } from '../../ui/rating-chip';
 
     .court__status {
       gap: var(--space-2);
-    }
-
-    .timer {
-      font-family: var(--font-mono);
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .timer--running {
-      color: var(--text-strong);
-    }
-
-    .timer--over {
-      color: var(--danger);
     }
 
     .teams {
@@ -303,9 +231,9 @@ import { RatingChip } from '../../ui/rating-chip';
       width: 34px;
       height: 34px;
       flex: 0 0 auto;
-      border: 1px solid var(--glass-border-strong);
+      border: 1px solid var(--control-border);
       border-radius: 50%;
-      background: var(--surface-input);
+      background: var(--control-bg);
       font-size: 17px;
       font-weight: 700;
       line-height: 1;
@@ -332,7 +260,6 @@ import { RatingChip } from '../../ui/rating-chip';
   `,
 })
 export class MatchCard {
-  private readonly clock = inject(ClockService);
   private readonly telegram = inject(TelegramService);
   private readonly i18n = inject(I18nService);
 
@@ -351,31 +278,18 @@ export class MatchCard {
   protected readonly hasScore = computed(
     () => this.match().teamA.score !== null && this.match().teamB.score !== null,
   );
-  protected readonly timeLimit = computed(() => this.match().durationMs);
 
-  private readonly elapsed = computed(() => elapsedMs(this.match(), this.clock.now()));
-
-  protected readonly overtime = computed(() => {
-    const limit = this.timeLimit();
-    return limit !== null && this.elapsed() >= limit;
-  });
-
-  /** Показываем остаток, а когда время вышло — сколько уже переиграли. */
-  protected readonly clockLabel = computed(() => {
-    const limit = this.timeLimit();
-    if (limit === null) return formatClock(this.elapsed());
-    const left = limit - this.elapsed();
-    return left >= 0 ? formatClock(left) : `+${formatClock(-left)}`;
-  });
-
-  /** Частые исходы игры до N очков: одно касание вместо десяти нажатий «плюс». */
+  /**
+   * Частые исходы игры до N очков: одно касание вместо десяти нажатий «плюс».
+   * Порядок — от крупной победы хозяев к такой же победе гостей, чтобы палец
+   * шёл по ряду в одну сторону.
+   */
   protected readonly presets = computed<[number, number][]>(() => {
     const target = this.store.tournament()?.pointsToWin ?? 11;
+    const margins = [5, 4, 3].filter((margin) => target - margin >= 0);
     return [
-      [target, Math.max(0, target - 5)],
-      [target, Math.max(0, target - 2)],
-      [Math.max(0, target - 5), target],
-      [Math.max(0, target - 2), target],
+      ...margins.map<[number, number]>((margin) => [target, target - margin]),
+      ...[...margins].reverse().map<[number, number]>((margin) => [target - margin, target]),
     ];
   });
 
@@ -386,9 +300,6 @@ export class MatchCard {
   });
 
   constructor() {
-    const release = this.clock.acquire();
-    inject(DestroyRef).onDestroy(release);
-
     // Пока идёт правка счёта, чужие обновления матча не сбрасывают черновик.
     effect(() => {
       const match = this.match();
@@ -402,18 +313,6 @@ export class MatchCard {
     const { teamA, teamB } = this.match();
     if (teamA.score === null || teamB.score === null) return false;
     return first ? teamA.score > teamB.score : teamB.score > teamA.score;
-  }
-
-  protected async start(): Promise<void> {
-    this.telegram.tap('medium');
-    await this.store.startMatch(this.match());
-  }
-
-  protected async finish(): Promise<void> {
-    this.telegram.tap('medium');
-    await this.store.finishMatch(this.match());
-    // Сразу открываем ввод счёта: это следующий шаг организатора.
-    if (!this.hasScore()) this.startEditing();
   }
 
   protected startEditing(): void {

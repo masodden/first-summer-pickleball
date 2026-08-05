@@ -59,6 +59,7 @@ services:
       - api
     environment:
       NODE_ENV: development
+      API_PROXY_TARGET: http://api:3000
     ports:
       - '4200:4200'
     volumes:
@@ -68,7 +69,7 @@ services:
       sh -c "corepack enable &&
              pnpm install --frozen-lockfile --filter '@fsp/web...' &&
              pnpm --filter @fsp/shared build &&
-             pnpm --filter @fsp/web start -- --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json"
+             pnpm --filter @fsp/web start:docker"
 
 volumes:
   db-data:

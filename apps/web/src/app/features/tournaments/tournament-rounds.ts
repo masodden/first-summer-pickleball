@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
+import { ClockService, elapsedMs, formatClock } from '../../core/clock';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { TournamentStore } from '../../core/tournament-store';
@@ -96,6 +97,73 @@ import { MatchCard } from './match-card';
               }
             </div>
 
+            <!-- Один свисток на все корты: раунд стартует и заканчивается целиком. -->
+            <div class="row round-control">
+              <div class="stack stack--1 grow">
+                <span
+                  class="round-clock numeric"
+                  [class.round-clock--running]="store.roundState() === 'running'"
+                  [class.round-clock--over]="overtime()"
+                >
+                  {{ clockLabel() }}
+                </span>
+                @if (overtime()) {
+                  <span class="tiny" style="color: var(--danger)">{{ t()('match.timeUpHint') }}</span>
+                }
+              </div>
+
+              @if (store.canRunRound()) {
+                @switch (store.roundState()) {
+                  @case ('scheduled') {
+                    <button
+                      type="button"
+                      class="btn btn--go"
+                      [disabled]="store.isBusy('round:start')"
+                      (click)="store.startRound()"
+                    >
+                      {{ t()('match.startRound') }}
+                    </button>
+                  }
+                  @case ('running') {
+                    <button
+                      type="button"
+                      class="btn btn--glass"
+                      [disabled]="store.isBusy('round:pause')"
+                      (click)="store.pauseRound()"
+                    >
+                      {{ t()('match.pause') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--primary"
+                      [disabled]="store.isBusy('round:finish')"
+                      (click)="store.finishRound()"
+                    >
+                      {{ t()('match.finishRound') }}
+                    </button>
+                  }
+                  @case ('paused') {
+                    <button
+                      type="button"
+                      class="btn btn--go"
+                      [disabled]="store.isBusy('round:start')"
+                      (click)="store.startRound()"
+                    >
+                      {{ t()('match.resume') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--primary"
+                      [disabled]="store.isBusy('round:finish')"
+                      (click)="store.finishRound()"
+                    >
+                      {{ t()('match.finishRound') }}
+                    </button>
+                  }
+                }
+              }
+            </div>
+
             @if (store.canManage() && store.canReshuffle()) {
               <button type="button" class="btn btn--sm btn--glass btn--block" (click)="reshuffle()">
                 {{ t()('match.reshuffle') }}
@@ -114,7 +182,7 @@ import { MatchCard } from './match-card';
               <section class="glass glass--subtle card--tight stack stack--2">
                 <span class="tiny faint">{{ t()('match.sittingOut') }}</span>
                 @for (player of round.sittingOut; track player.id) {
-                  <app-player-line [player]="player" [avatarSize]="30" />
+                  <app-player-line [player]="player" [avatarSize]="30" [showRating]="true" />
                 }
               </section>
             }
@@ -187,9 +255,9 @@ import { MatchCard } from './match-card';
       width: 34px;
       height: 34px;
       flex: 0 0 auto;
-      border: 1px solid var(--glass-border-strong);
+      border: 1px solid var(--control-border);
       border-radius: 50%;
-      background: var(--surface-input);
+      background: var(--control-bg);
       font-size: 13px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
@@ -213,11 +281,32 @@ import { MatchCard } from './match-card';
       border-color: transparent;
       color: #fff;
     }
+
+    .round-control {
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .round-clock {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .round-clock--running {
+      color: var(--text-strong);
+    }
+
+    .round-clock--over {
+      color: var(--danger);
+    }
   `,
 })
 export class TournamentRoundsTab {
   private readonly confirm = inject(ConfirmService);
   private readonly i18n = inject(I18nService);
+  private readonly clock = inject(ClockService);
 
   protected readonly store = inject(TournamentStore);
   protected readonly t = this.i18n.t;
@@ -228,6 +317,37 @@ export class TournamentRoundsTab {
   protected readonly allDone = computed(() =>
     this.store.rounds().every((round) => round.allScored),
   );
+
+  /** Время раунда: одно на все корты, считается от серверного старта. */
+  private readonly elapsed = computed(() => {
+    const match = this.store.timerMatch();
+    return match ? elapsedMs(match, this.clock.now()) : 0;
+  });
+
+  /** До старта матчей лимит берём из настроек турнира: на табло сразу видно, сколько играть. */
+  private readonly timeLimit = computed(() => {
+    const fromMatch = this.store.timerMatch()?.durationMs;
+    if (fromMatch !== undefined && fromMatch !== null) return fromMatch;
+    const minutes = this.store.tournament()?.matchDurationMin ?? null;
+    return minutes === null ? null : minutes * 60_000;
+  });
+
+  protected readonly overtime = computed(() => {
+    const limit = this.timeLimit();
+    return limit !== null && this.elapsed() >= limit && this.store.roundState() !== 'finished';
+  });
+
+  /** Показываем остаток, а когда время вышло — сколько уже переиграли. */
+  protected readonly clockLabel = computed(() => {
+    const limit = this.timeLimit();
+    if (limit === null) return formatClock(this.elapsed());
+    const left = limit - this.elapsed();
+    return left >= 0 ? formatClock(left) : `+${formatClock(-left)}`;
+  });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(this.clock.acquire());
+  }
 
   protected readonly roundStatus = computed(() => {
     const round = this.store.currentRound();

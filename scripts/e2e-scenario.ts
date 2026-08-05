@@ -10,7 +10,13 @@
  * Запуск: pnpm e2e:scenario (нужны поднятая база и API с ALLOW_DEV_LOGIN=true)
  */
 
-import { WS_PATH, type MatchDto, type RoundDto, type StandingRowDto } from '@fsp/shared';
+// Скрипт лежит вне рабочих пакетов, поэтому берём общий контракт по пути, а не по имени.
+import {
+  WS_PATH,
+  type MatchDto,
+  type RoundDto,
+  type StandingRowDto,
+} from '../packages/shared/src/index.js';
 
 const BASE = process.env['E2E_BASE_URL'] ?? 'http://localhost:3010';
 
@@ -176,38 +182,57 @@ const state = (id: string, token?: string) =>
     standings: StandingRowDto[];
   }>('GET', `/api/tournaments/${id}/state`, token ? { token } : {});
 
-/** Разыгрывает матч так, как это делает организатор: старт, пауза, финиш, счёт. */
-async function playMatch(
+const roundAction = (
   token: string,
-  match: MatchDto,
-  score: [number, number],
+  tournamentId: string,
+  index: number,
+  action: 'start' | 'pause' | 'finish',
+) =>
+  request<{ rounds: RoundDto[] }>(
+    'POST',
+    `/api/tournaments/${tournamentId}/rounds/${index}/${action}`,
+    { token, body: {} },
+  ).then((response) => response.rounds);
+
+/**
+ * Разыгрывает раунд так, как это делает организатор: один старт на все корты,
+ * при необходимости пауза, затем счёт по каждому корту отдельно.
+ */
+async function playRound(
+  token: string,
+  tournamentId: string,
+  round: RoundDto,
+  scoreFor: (index: number) => [number, number],
   options: { withPause?: boolean } = {},
-): Promise<MatchDto> {
-  let current = await request<{ match: MatchDto }>('POST', `/api/matches/${match.id}/start`, {
-    token,
-    body: { version: match.version },
-  }).then((response) => response.match);
+): Promise<RoundDto[]> {
+  let rounds = await roundAction(token, tournamentId, round.index, 'start');
+  const started = rounds.find((item) => item.index === round.index);
+  check(
+    started?.matches.every((match) => match.status === 'running') ?? false,
+    `раунд ${round.index + 1}: все корты стартовали одной кнопкой`,
+  );
 
   if (options.withPause) {
-    current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/pause`, {
-      token,
-      body: { version: current.version },
-    }).then((response) => response.match);
-    current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/start`, {
-      token,
-      body: { version: current.version },
-    }).then((response) => response.match);
+    rounds = await roundAction(token, tournamentId, round.index, 'pause');
+    check(
+      rounds
+        .find((item) => item.index === round.index)
+        ?.matches.every((match) => match.status === 'paused') ?? false,
+      'пауза остановила все корты раунда',
+    );
+    rounds = await roundAction(token, tournamentId, round.index, 'start');
   }
 
-  current = await request<{ match: MatchDto }>('POST', `/api/matches/${current.id}/finish`, {
-    token,
-    body: { version: current.version },
-  }).then((response) => response.match);
+  const live = rounds.find((item) => item.index === round.index)?.matches ?? [];
+  for (const [index, match] of live.entries()) {
+    const score = scoreFor(index);
+    await request<{ match: MatchDto }>('PUT', `/api/matches/${match.id}/score`, {
+      token,
+      body: { scoreA: score[0], scoreB: score[1], version: match.version },
+    });
+  }
 
-  return request<{ match: MatchDto }>('PUT', `/api/matches/${current.id}/score`, {
-    token,
-    body: { scoreA: score[0], scoreB: score[1], version: current.version },
-  }).then((response) => response.match);
+  return roundAction(token, tournamentId, round.index, 'finish');
 }
 
 function partnerKey(a: string, b: string): string {
@@ -235,6 +260,24 @@ async function main(): Promise<void> {
   const moderator = await login('moderator', 'e2e-moderator', 'Второй судья');
   check(admin.session.role === 'admin', 'администратор вошёл');
   check(moderator.session.role === 'moderator', 'модератор вошёл');
+
+  section('Первый вход администратора клуба');
+  // Локально кода из .env нет, и требовать его — значит не дать администратору
+  // привязать свой DUPR на собственной машине.
+  const clubAdmin = await login('user', 'e2e-club-admin', 'Админ клуба');
+  const bootstrapClaim = await request<{ session: { role: string } }>('POST', '/api/auth/claim', {
+    token: clubAdmin.token,
+    body: { duprId: 'PZQZKM' },
+  });
+  check(
+    bootstrapClaim.session.role === 'admin',
+    'админский DUPR привязывается без кода при ALLOW_DEV_LOGIN',
+  );
+  // Возвращаем ID клубу: в этой же базе потом заходит живой администратор.
+  await request('POST', '/api/auth/claim', {
+    token: clubAdmin.token,
+    body: { duprId: `ZZ${RUN_TAG}01`, firstName: 'Тест', lastName: 'Прогонов' },
+  });
 
   section('Справочник игроков');
   const advancedPlayers = await createPlayers(admin.token, 'AD', 4.2);
@@ -470,15 +513,18 @@ async function main(): Promise<void> {
   );
   check(reshuffled.rounds.length === 11, 'после перемешивания снова 11 раундов');
 
-  section('Игры: старт, пауза, счёт');
+  section('Игры: старт раунда, пауза, счёт');
   let played = 0;
   let current = await state(advanced.id, admin.token);
   for (const round of current.rounds) {
-    for (const [index, match] of round.matches.entries()) {
-      const score: [number, number] = index === 0 ? [11, 6] : index === 1 ? [11, 9] : [8, 11];
-      await playMatch(admin.token, match, score, { withPause: round.index === 0 && index === 0 });
-      played += 1;
-    }
+    await playRound(
+      admin.token,
+      advanced.id,
+      round,
+      (index) => (index === 0 ? [11, 6] : index === 1 ? [11, 9] : [8, 11]),
+      { withPause: round.index === 0 },
+    );
+    played += round.matches.length;
 
     if (round.index === 0) {
       const afterFirst = await state(advanced.id, admin.token);
@@ -568,6 +614,15 @@ async function main(): Promise<void> {
   const csv = await fetch(`${BASE}/api/tournaments/${advanced.id}/export.csv`);
   const csvText = await csv.text();
   check(csv.ok && csvText.split('\n').length > 12, 'CSV с результатами выгружается');
+  const firstDuprId = finished.standings[0]!.player.duprId;
+  check(
+    firstDuprId !== null && csvText.includes(firstDuprId),
+    'в CSV есть DUPR ID: по именам игроков не различить',
+  );
+  check(
+    csvText.includes(`${finished.standings[0]!.player.fullName} (${firstDuprId})`),
+    'в списке матчей DUPR ID стоит рядом с именем',
+  );
 
   section('Живые обновления');
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -619,9 +674,9 @@ async function main(): Promise<void> {
   for (let roundIndex = 0; roundIndex < 3; roundIndex += 1) {
     mex = await state(mexicano.id, admin.token);
     const round = mex.rounds[roundIndex]!;
-    for (const [index, match] of round.matches.entries()) {
-      await playMatch(admin.token, match, index === 0 ? [11, 7] : [9, 11]);
-    }
+    await playRound(admin.token, mexicano.id, round, (index) =>
+      index === 0 ? [11, 7] : [9, 11],
+    );
     if (roundIndex < 2) {
       const next = await request<{ roundIndex: number }>(
         'POST',

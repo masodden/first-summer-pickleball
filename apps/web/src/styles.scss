@@ -113,6 +113,18 @@
   --surface-hover: rgba(199, 91, 57, 0.08);
   --divider: rgba(36, 26, 22, 0.09);
 
+  /*
+   * Кнопки и переключатели на светлом фоне.
+   *
+   * Стекло здесь белое, а карточки под ним тоже белые: если взять для кнопки
+   * ту же подложку и белую кромку, получится белое на белом — не видно ни
+   * фона, ни того, какой вариант выбран. Поэтому у неактивных кнопок подложка
+   * чуть темнее фона, а кромка нейтральная, а не светлая.
+   */
+  --control-bg: rgba(36, 26, 22, 0.055);
+  --control-bg-hover: rgba(36, 26, 22, 0.095);
+  --control-border: rgba(36, 26, 22, 0.14);
+
   --accent: var(--clay-500);
   --accent-strong: var(--clay-600);
   --accent-soft: rgba(199, 91, 57, 0.12);
@@ -150,6 +162,11 @@
   --surface-input: rgba(255, 255, 255, 0.07);
   --surface-hover: rgba(255, 255, 255, 0.07);
   --divider: rgba(255, 255, 255, 0.1);
+
+  /* В темноте стекло само по себе светлее фона, поэтому берём его как есть. */
+  --control-bg: var(--glass-bg);
+  --control-bg-hover: var(--glass-bg-strong);
+  --control-border: var(--glass-border);
 
   --accent: var(--clay-400);
   --accent-strong: var(--clay-300);
@@ -372,15 +389,15 @@ button {
 }
 
 .btn--glass {
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
+  background: var(--control-bg);
+  border-color: var(--control-border);
   color: var(--text-strong);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .btn--glass:hover:not(:disabled) {
-  background: var(--glass-bg-strong);
+  background: var(--control-bg-hover);
 }
 
 .btn--ghost {
@@ -456,7 +473,7 @@ button {
   width: 100%;
   min-height: 44px;
   padding: 10px var(--space-4);
-  border: 1px solid var(--glass-border-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-md);
   background: var(--surface-input);
   color: var(--text-strong);
@@ -527,8 +544,8 @@ button {
   width: 100%;
   height: 100%;
   border-radius: var(--radius-full);
-  background: var(--surface-input);
-  border: 1px solid var(--glass-border-strong);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   transition: background var(--duration-base) ease;
 }
 
@@ -583,8 +600,8 @@ button {
   width: 100%;
   height: 100%;
   border-radius: 9px;
-  border: 2px solid var(--glass-border-strong);
-  background: var(--surface-input);
+  border: 2px solid var(--control-border);
+  background: var(--control-bg);
   transition:
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
@@ -628,8 +645,8 @@ button {
   gap: 5px;
   padding: 3px 10px;
   border-radius: var(--radius-full);
-  background: var(--glass-bg-subtle);
-  border: 1px solid var(--glass-border-strong);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-muted);
@@ -674,6 +691,11 @@ button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.rating-chip--compact {
+  padding: 1px 6px;
+  font-size: 11px;
 }
 
 .rating-chip--stale {
@@ -787,6 +809,16 @@ button {
 
 .row--wrap {
   flex-wrap: wrap;
+}
+
+/* Пара полей в одной строке. Поля выравниваются по верху: у одного бывает
+   подсказка под вводом, и от неё соседнее поле не должно съезжать вниз. */
+.row--fields {
+  align-items: flex-start;
+}
+
+.row--fields > .field {
+  align-self: stretch;
 }
 
 .grow {

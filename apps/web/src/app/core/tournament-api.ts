@@ -125,6 +125,19 @@ export class TournamentApi {
     return this.api.post(`/api/tournaments/${id}/rounds`);
   }
 
+  /** Старт, пауза и завершение всех кортов раунда одним запросом. */
+  roundAction(
+    id: string,
+    index: number,
+    action: 'start' | 'pause' | 'finish',
+  ): Promise<{ rounds: RoundDto[] }> {
+    return this.api.post(
+      `/api/tournaments/${id}/rounds/${index}/${action}`,
+      {},
+      { queueLabel: 'Раунд' },
+    );
+  }
+
   finish(id: string): Promise<{ tournament: TournamentDto }> {
     return this.api.post(`/api/tournaments/${id}/finish`);
   }
@@ -135,30 +148,6 @@ export class TournamentApi {
 
   exportCsv(id: string, slug: string): Promise<void> {
     return this.api.download(`/api/tournaments/${id}/export.csv`, `${slug}.csv`);
-  }
-
-  startMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
-    return this.api.post(
-      `/api/matches/${matchId}/start`,
-      { version },
-      { queueLabel: 'Старт матча' },
-    );
-  }
-
-  pauseMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
-    return this.api.post(`/api/matches/${matchId}/pause`, { version }, { queueLabel: 'Пауза' });
-  }
-
-  finishMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
-    return this.api.post(
-      `/api/matches/${matchId}/finish`,
-      { version },
-      { queueLabel: 'Завершение матча' },
-    );
-  }
-
-  reopenMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
-    return this.api.post(`/api/matches/${matchId}/reopen`, { version });
   }
 
   setScore(
@@ -172,14 +161,6 @@ export class TournamentApi {
       { scoreA, scoreB, version },
       { queueLabel: 'Счёт матча' },
     );
-  }
-
-  clearScore(matchId: string, version: number): Promise<{ match: MatchDto }> {
-    return this.api.delete(`/api/matches/${matchId}/score`, { body: { version } });
-  }
-
-  getMatch(matchId: string): Promise<{ match: MatchDto }> {
-    return this.api.get(`/api/matches/${matchId}`);
   }
 
   searchPlayers(query: string, includeGuests = true): Promise<{ items: PlayerDto[] }> {

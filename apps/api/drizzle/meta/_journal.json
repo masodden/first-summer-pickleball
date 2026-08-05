@@ -15,6 +15,13 @@
       "when": 1785946204474,
       "tag": "0001_tiresome_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785952188163,
+      "tag": "0002_daily_hercules",
+      "breakpoints": true
     }
   ]
 }

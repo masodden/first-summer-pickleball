@@ -82,7 +82,8 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     const viewer = requireViewer(request);
     const body = parse(claimSchema, request.body);
     const account = await getAccount(db, viewer.accountId);
-    return { session: await claimDuprId(db, account, body, env.BOOTSTRAP_ADMIN_CODE) };
+    const bootstrapCode = env.ALLOW_DEV_LOGIN ? null : env.BOOTSTRAP_ADMIN_CODE;
+    return { session: await claimDuprId(db, account, body, bootstrapCode) };
   });
 
   app.post<{ Params: { token: string } }>('/api/auth/invite/:token', async (request) => {

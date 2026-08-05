@@ -12,6 +12,17 @@ function toRow(cells: readonly (string | number | null)[]): string {
 }
 
 /**
+ * Имя с DUPR ID: по имени игрока не опознать, если в клубе два Ивана Петрова,
+ * а результаты потом сверяют именно по ID.
+ */
+function withDuprId(player: { fullName: string; duprId: string | null }): string {
+  return player.duprId ? `${player.fullName} (${player.duprId})` : player.fullName;
+}
+
+const namesWithIds = (players: readonly { fullName: string; duprId: string | null }[]): string =>
+  players.map(withDuprId).join(' / ');
+
+/**
  * Итоги турнира одним файлом: сначала таблица, затем все матчи.
  * Разделитель — точка с запятой: так Excel с русской локалью открывает файл сразу.
  */
@@ -30,6 +41,7 @@ export async function buildResultsCsv(db: Database, tournament: TournamentRow): 
     toRow([
       'Место',
       'Игрок',
+      'DUPR ID',
       'DUPR парный',
       'Игр',
       'Победы',
@@ -46,6 +58,7 @@ export async function buildResultsCsv(db: Database, tournament: TournamentRow): 
       toRow([
         row.rank,
         row.player.fullName,
+        row.player.duprId,
         row.player.doublesRating,
         row.played,
         row.wins,
@@ -67,21 +80,17 @@ export async function buildResultsCsv(db: Database, tournament: TournamentRow): 
         toRow([
           round.index + 1,
           match.courtName,
-          match.teamA.players.map((player) => player.fullName).join(' / '),
+          namesWithIds(match.teamA.players),
           match.teamA.score,
           match.teamB.score,
-          match.teamB.players.map((player) => player.fullName).join(' / '),
+          namesWithIds(match.teamB.players),
           match.status,
         ]),
       );
     }
     if (round.sittingOut.length > 0) {
       lines.push(
-        toRow([
-          round.index + 1,
-          'отдых',
-          round.sittingOut.map((player) => player.fullName).join(' / '),
-        ]),
+        toRow([round.index + 1, 'отдых', namesWithIds(round.sittingOut)]),
       );
     }
   }

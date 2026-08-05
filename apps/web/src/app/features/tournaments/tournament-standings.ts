@@ -4,7 +4,8 @@ import type { StandingRowDto, StandingsSortKey } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { TournamentStore } from '../../core/tournament-store';
 import { Avatar } from '../../ui/player-line';
-import { RatingChip } from '../../ui/rating-chip';
+
+type SortDirection = 'asc' | 'desc';
 
 interface Column {
   key: StandingsSortKey;
@@ -22,7 +23,7 @@ interface Column {
 @Component({
   selector: 'app-tournament-standings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Avatar, RatingChip],
+  imports: [RouterLink, Avatar],
   template: `
     <div class="stack stack--3">
       <div class="row row--between">
@@ -46,10 +47,21 @@ interface Column {
                 @for (column of columns(); track column.key) {
                   <th
                     scope="col"
-                    [attr.aria-sort]="sortKey() === column.key ? 'descending' : null"
+                    class="th--sortable"
+                    [attr.aria-sort]="
+                      sortKey() === column.key
+                        ? direction() === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : null
+                    "
+                    [title]="t()('standings.sortHint')"
                     (click)="sortBy(column.key)"
                   >
                     {{ column.label }}
+                    <span class="arrow" [class.arrow--active]="sortKey() === column.key">
+                      {{ sortKey() === column.key && direction() === 'asc' ? '↑' : '↓' }}
+                    </span>
                   </th>
                 }
               </tr>
@@ -67,10 +79,10 @@ interface Column {
                     }
                   </td>
                   <td>
+                    <!-- Рейтинг здесь не показываем: строка узкая, DUPR виден в карточке игрока. -->
                     <a class="player" [routerLink]="['/players', row.player.id]">
                       <app-avatar [player]="row.player" [size]="28" />
                       <span class="truncate">{{ row.player.fullName }}</span>
-                      <app-rating-chip [player]="row.player" [showLabel]="false" />
                     </a>
                   </td>
                   @for (column of columns(); track column.key) {
@@ -88,7 +100,10 @@ interface Column {
           </table>
         </div>
 
-        <p class="tiny faint center">{{ t()('standings.sortBy') }}: {{ activeLabel() }}</p>
+        <p class="tiny faint center">
+          {{ t()('standings.sortBy') }}: {{ activeLabel() }} ·
+          {{ t()(direction() === 'asc' ? 'standings.sortAsc' : 'standings.sortDesc') }}
+        </p>
       }
     </div>
   `,
@@ -137,6 +152,22 @@ interface Column {
       color: var(--accent-strong);
       font-weight: 700;
     }
+
+    .th--sortable {
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .arrow {
+      margin-left: 3px;
+      font-size: 11px;
+      opacity: 0.25;
+    }
+
+    .arrow--active {
+      opacity: 1;
+      color: var(--accent-strong);
+    }
   `,
 })
 export class TournamentStandingsTab {
@@ -146,11 +177,14 @@ export class TournamentStandingsTab {
   protected readonly tournament = this.store.tournament;
 
   private readonly override = signal<StandingsSortKey | null>(null);
+  private readonly directionSignal = signal<SortDirection>('desc');
 
   /** Пока столбец не выбран вручную, действует настройка турнира. */
   protected readonly sortKey = computed<StandingsSortKey>(
     () => this.override() ?? this.tournament()?.standingsSort[0] ?? 'points',
   );
+
+  protected readonly direction = this.directionSignal.asReadonly();
 
   protected readonly columns = computed<Column[]>(() => [
     {
@@ -173,12 +207,29 @@ export class TournamentStandingsTab {
     () => this.columns().find((column) => column.key === this.sortKey())?.label ?? '',
   );
 
-  protected readonly rows = computed(() => this.store.standings());
+  /**
+   * Порядок строк на экране. Место и медали остаются от расчёта сервера —
+   * это итог турнира, он не зависит от того, каким столбцом сейчас смотрят.
+   * При равных значениях сохраняем турнирный порядок.
+   */
+  protected readonly rows = computed(() => {
+    const column = this.columns().find((item) => item.key === this.sortKey());
+    const rows = [...this.store.standings()];
+    if (!column) return rows;
+    const sign = this.directionSignal() === 'asc' ? 1 : -1;
+    return rows.sort(
+      (left, right) => sign * (column.value(left) - column.value(right)) || left.rank - right.rank,
+    );
+  });
 
+  /** Повторное касание того же столбца переворачивает порядок. */
   protected sortBy(key: StandingsSortKey): void {
+    if (this.sortKey() === key) {
+      this.directionSignal.update((value) => (value === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
     this.override.set(key);
-    // Сортировку считает сервер: правила ничьих и подрядность мест едины для всех.
-    void this.store.setStandingsSort([key, 'points', 'diff', 'wins']);
+    this.directionSignal.set('desc');
   }
 
   protected format(column: Column, row: StandingRowDto): string {

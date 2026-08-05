@@ -26,7 +26,7 @@ export async function seedVenues(db: Database): Promise<void> {
       address: 'Москва, ВДНХ, павильон № 27',
       mapUrl: 'https://yandex.ru/maps/?text=ВДНХ павильон 27 Физкультуры и спорта',
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing({ target: venues.name });
 }
 
 const DEMO_FIRST_NAMES = [

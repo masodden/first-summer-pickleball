@@ -7,7 +7,15 @@ import {
   input,
   resource,
 } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  ActivatedRoute,
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import type { TournamentSummaryDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
@@ -16,6 +24,7 @@ import { TelegramService } from '../../core/telegram';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
+import { ViewStateService } from '../../core/view-state';
 import { Ball } from '../../ui/ball';
 import { StatusBadge } from '../../ui/status-badge';
 
@@ -238,8 +247,10 @@ export class TournamentDetailPage {
   private readonly api = inject(TournamentApi);
   private readonly confirm = inject(ConfirmService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly telegram = inject(TelegramService);
+  private readonly viewState = inject(ViewStateService);
 
   protected readonly store = inject(TournamentStore);
   protected readonly session = inject(SessionStore);
@@ -271,6 +282,17 @@ export class TournamentDetailPage {
     effect(() => {
       void this.store.open(this.id());
     });
+
+    // Запоминаем открытую вкладку, чтобы следующий турнир открылся на ней же.
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+      if (event instanceof NavigationEnd) this.rememberTab();
+    });
+    this.rememberTab();
+  }
+
+  private rememberTab(): void {
+    const tab = this.route.firstChild?.snapshot.routeConfig?.path;
+    if (tab) this.viewState.setLastTab(tab);
   }
 
   protected async start(): Promise<void> {

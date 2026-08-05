@@ -4,7 +4,6 @@ import type {
   ParticipantDto,
   RoundDto,
   StandingRowDto,
-  StandingsSortKey,
   TournamentDto,
   UpdateTournamentInput,
 } from '@fsp/shared';
@@ -15,6 +14,7 @@ import { SessionStore } from './session';
 import { TelegramService } from './telegram';
 import { ToastService } from './toast';
 import { TournamentApi } from './tournament-api';
+import { ViewStateService } from './view-state';
 
 /**
  * Состояние одного открытого турнира.
@@ -33,6 +33,7 @@ export class TournamentStore {
   private readonly session = inject(SessionStore);
   private readonly telegram = inject(TelegramService);
   private readonly i18n = inject(I18nService);
+  private readonly viewState = inject(ViewStateService);
 
   private readonly idSignal = signal<string | null>(null);
   private readonly tournamentSignal = signal<TournamentDto | null>(null);
@@ -82,6 +83,37 @@ export class TournamentStore {
   });
   readonly plannedRounds = computed(() => this.tournamentSignal()?.roundsPlanned ?? null);
   readonly isLastGeneratedRound = computed(() => this.viewRoundSignal() >= this.roundCount() - 1);
+
+  /**
+   * Состояние раунда целиком: корты начинают и заканчивают вместе, поэтому
+   * кнопка и таймер одни на всех. Корт, где уже внесли счёт, считается
+   * отыгравшим и на состояние раунда не влияет.
+   */
+  readonly roundState = computed<'scheduled' | 'running' | 'paused' | 'finished'>(() => {
+    const matches = this.currentRound()?.matches ?? [];
+    if (matches.length === 0) return 'scheduled';
+    if (matches.some((match) => match.status === 'running')) return 'running';
+    if (matches.some((match) => match.status === 'paused')) return 'paused';
+    if (matches.every((match) => match.status === 'finished')) return 'finished';
+    return 'scheduled';
+  });
+
+  /**
+   * Матч, по которому считается общий таймер раунда. Все корты стартуют
+   * одновременно, поэтому годится любой ещё не закрытый; если закрыты все —
+   * последний, чтобы на экране осталось итоговое время.
+   */
+  readonly timerMatch = computed<MatchDto | null>(() => {
+    const matches = this.currentRound()?.matches ?? [];
+    const live = matches.find((match) => match.status === 'running' || match.status === 'paused');
+    if (live) return live;
+    const started = matches.filter((match) => match.startedAt !== null);
+    return started[started.length - 1] ?? null;
+  });
+
+  readonly canRunRound = computed(
+    () => this.canManage() && this.tournamentSignal()?.status === 'running',
+  );
 
   /** Можно ли формировать игры: все пришли, оплатили и статус подходящий. */
   readonly canStart = computed(() => {
@@ -145,7 +177,11 @@ export class TournamentStore {
     this.realtime.subscribe(id);
     this.unlisten = this.realtime.listen((event) => this.applyEvent(event));
     await this.load();
-    this.viewRoundSignal.set(this.activeRoundIndex());
+
+    // Возвращаемся к раунду, с которого ушли; если его больше нет — к текущему.
+    const remembered = this.viewState.lastRound(id);
+    const inRange = remembered !== null && remembered < this.roundCount();
+    this.viewRoundSignal.set(inRange ? remembered : this.activeRoundIndex());
   }
 
   close(): void {
@@ -178,23 +214,18 @@ export class TournamentStore {
 
   showRound(index: number): void {
     const max = Math.max(0, this.roundCount() - 1);
-    this.viewRoundSignal.set(Math.min(Math.max(0, index), max));
+    this.setViewRound(Math.min(Math.max(0, index), max));
     this.telegram.tap();
   }
 
   goToActiveRound(): void {
-    this.viewRoundSignal.set(this.activeRoundIndex());
+    this.setViewRound(this.activeRoundIndex());
   }
 
-  async setStandingsSort(keys: StandingsSortKey[]): Promise<void> {
+  private setViewRound(index: number): void {
+    this.viewRoundSignal.set(index);
     const id = this.idSignal();
-    if (!id) return;
-    try {
-      const { standings } = await this.api.getStandings(id, keys);
-      this.standingsSignal.set(standings);
-    } catch (error) {
-      this.toast.failure(error, () => void this.setStandingsSort(keys));
-    }
+    if (id) this.viewState.setLastRound(id, index);
   }
 
   // --- Участники ---
@@ -339,23 +370,35 @@ export class TournamentStore {
     });
   }
 
+  // --- Раунд целиком ---
+
+  startRound(): Promise<void> {
+    return this.roundAction('start');
+  }
+
+  pauseRound(): Promise<void> {
+    return this.roundAction('pause');
+  }
+
+  finishRound(): Promise<void> {
+    return this.roundAction('finish');
+  }
+
+  private roundAction(action: 'start' | 'pause' | 'finish'): Promise<void> {
+    const index = this.viewRoundSignal();
+    return this.run(
+      `round:${action}`,
+      async () => {
+        const { rounds } = await this.api.roundAction(this.requireId(), index, action);
+        this.roundsSignal.set(rounds);
+        this.telegram.tap();
+        void this.refreshStandings();
+      },
+      () => void this.roundAction(action),
+    );
+  }
+
   // --- Матчи ---
-
-  startMatch(match: MatchDto): Promise<void> {
-    return this.matchAction(match, () => this.api.startMatch(match.id, match.version));
-  }
-
-  pauseMatch(match: MatchDto): Promise<void> {
-    return this.matchAction(match, () => this.api.pauseMatch(match.id, match.version));
-  }
-
-  finishMatch(match: MatchDto): Promise<void> {
-    return this.matchAction(match, () => this.api.finishMatch(match.id, match.version));
-  }
-
-  reopenMatch(match: MatchDto): Promise<void> {
-    return this.matchAction(match, () => this.api.reopenMatch(match.id, match.version));
-  }
 
   setScore(match: MatchDto, scoreA: number, scoreB: number): Promise<void> {
     return this.matchAction(
@@ -363,10 +406,6 @@ export class TournamentStore {
       () => this.api.setScore(match.id, scoreA, scoreB, match.version),
       'score.saved',
     );
-  }
-
-  clearScore(match: MatchDto): Promise<void> {
-    return this.matchAction(match, () => this.api.clearScore(match.id, match.version));
   }
 
   private matchAction(

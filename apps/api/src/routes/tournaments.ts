@@ -28,6 +28,7 @@ import {
   updateTournament,
 } from '../services/tournaments.js';
 import { appendRound, reshuffleSchedule, startTournament } from '../services/schedule.js';
+import { applyRoundAction } from '../services/matches.js';
 import { computeTournamentStandings, getTournamentState, loadRounds } from '../services/state.js';
 import {
   broadcastParticipants,
@@ -248,6 +249,26 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     );
     return { roundIndex: index };
   });
+
+  /**
+   * Старт, пауза и завершение сразу всего раунда: корты на площадке начинают
+   * играть одновременно, поэтому и кнопка одна.
+   */
+  for (const action of ['start', 'pause', 'finish'] as const) {
+    app.post<{ Params: { id: string; index: string } }>(
+      `/api/tournaments/:id/rounds/:index/${action}`,
+      async (request) => {
+        const viewer = requireRole(request, 'moderator');
+        const index = Number.parseInt(request.params.index, 10);
+        if (!Number.isInteger(index) || index < 0) {
+          throw new ApiError('validation_failed', 'Некорректный номер раунда');
+        }
+        await applyRoundAction(db, request.params.id, index, action, viewer);
+        await broadcastSchedule(db, hub, request.params.id);
+        return { rounds: await loadRounds(db, await getTournamentRow(db, request.params.id)) };
+      },
+    );
+  }
 
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/finish', async (request) => {
     const viewer = requireRole(request, 'moderator');

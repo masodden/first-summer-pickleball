@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type CanMatchFn, type Routes } from '@angular/router';
 import { SessionStore } from './core/session';
+import { ViewStateService } from './core/view-state';
 
 /** Организаторские экраны: без прав уводим на список турниров. */
 const canManage: CanMatchFn = () => {
@@ -42,7 +43,8 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/tournaments/tournament-detail').then((m) => m.TournamentDetailPage),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'info' },
+      // Открываем ту вкладку, с которой ушли: на площадке возвращаются к своему делу.
+      { path: '', pathMatch: 'full', redirectTo: () => inject(ViewStateService).lastTab() },
       {
         path: 'info',
         loadComponent: () =>

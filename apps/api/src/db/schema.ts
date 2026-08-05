@@ -157,7 +157,8 @@ export const invites = pgTable(
 
 export const venues = pgTable('venues', {
   id: uuid().primaryKey().defaultRandom(),
-  name: text().notNull(),
+  /** Уникально: иначе посев при каждом запуске добавлял бы ещё одну «ВДНХ». */
+  name: text().notNull().unique(),
   address: text(),
   mapUrl: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

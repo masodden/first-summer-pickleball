@@ -214,11 +214,16 @@ export async function claimDuprId(
   db: Database,
   account: AccountRow,
   input: ClaimInput,
-  bootstrapCode: string,
+  /**
+   * `null` — код не спрашиваем. Так работает локальный запуск: там и без того
+   * включён вход без Telegram, и требовать секрет из `.env`, которого у
+   * разработчика нет, значит просто не дать ему привязать свой DUPR.
+   */
+  bootstrapCode: string | null,
 ): Promise<SessionDto> {
   const duprId = normalizeDuprId(input.duprId);
 
-  if (isBootstrapAdmin(duprId)) {
+  if (isBootstrapAdmin(duprId) && bootstrapCode !== null) {
     if (!input.code || !safeCompare(input.code, bootstrapCode)) {
       throw new ApiError('bootstrap_code_invalid', 'Для этого DUPR ID нужен код администратора');
     }

@@ -15,6 +15,7 @@ import { I18nService } from '../core/i18n';
   template: `
     <span
       class="rating-chip"
+      [class.rating-chip--compact]="compact()"
       [class.rating-chip--stale]="player().ratingStale && player().doublesRating !== null"
       [class.rating-chip--none]="player().doublesRating === null"
       [title]="hint()"
@@ -31,6 +32,8 @@ export class RatingChip {
 
   readonly player = input.required<PlayerDto>();
   readonly showLabel = input(true);
+  /** Мельче и уже: для строк матча, где главное — имя, а рейтинг рядом справкой. */
+  readonly compact = input(false);
 
   protected readonly value = computed(() => {
     const rating = this.player().doublesRating;

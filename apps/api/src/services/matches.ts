@@ -320,6 +320,90 @@ export async function clearMatchScore(
   return loadMatchDto(db, matchId);
 }
 
+export type RoundAction = 'start' | 'pause' | 'finish';
+
+/**
+ * Действие сразу по всему раунду.
+ *
+ * На площадке корты стартуют одновременно: судья свистит один раз, и играют все.
+ * Поэтому старт, пауза и завершение — это действия над раундом, а не над
+ * отдельным матчем. Счёт остаётся per-match: корты заканчивают вразнобой.
+ */
+export async function applyRoundAction(
+  db: Database,
+  tournamentId: string,
+  roundIndex: number,
+  action: RoundAction,
+  actor: Viewer,
+): Promise<void> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw notFound('Турнир не найден');
+  assertEditable(tournament, actor);
+
+  const rows = await db
+    .select()
+    .from(matches)
+    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.roundIndex, roundIndex)))
+    .orderBy(asc(matches.court));
+  if (rows.length === 0) throw notFound('Раунд не найден');
+
+  const now = new Date();
+
+  for (const match of rows) {
+    const patch = roundPatchFor(match, action, now);
+    if (!patch) continue;
+    await applyMatchPatch(db, match.id, patch, match.version);
+  }
+
+  await recordAudit(db, actor, {
+    action: `round.${action === 'start' ? 'started' : action === 'pause' ? 'paused' : 'finished'}`,
+    entityType: 'round',
+    entityId: String(roundIndex),
+    tournamentId,
+    payload: { courts: rows.length },
+  });
+}
+
+/** Что меняется у отдельного матча при действии над раундом. `null` — уже в нужном состоянии. */
+function roundPatchFor(
+  match: MatchRow,
+  action: RoundAction,
+  now: Date,
+): Partial<typeof matches.$inferInsert> | null {
+  const pausedSinceMs =
+    match.status === 'paused' && match.pausedAt ? now.getTime() - match.pausedAt.getTime() : 0;
+
+  if (action === 'start') {
+    // Корт с введённым счётом уже отыграл: возвращать его в игру не нужно.
+    if (match.status === 'running' || match.status === 'finished') return null;
+    return match.status === 'paused'
+      ? {
+          status: 'running',
+          pausedAt: null,
+          pausedTotalMs: match.pausedTotalMs + Math.max(0, pausedSinceMs),
+        }
+      : { status: 'running', startedAt: match.startedAt ?? now };
+  }
+
+  if (action === 'pause') {
+    if (match.status !== 'running') return null;
+    return { status: 'paused', pausedAt: now };
+  }
+
+  if (match.status === 'finished') return null;
+  return {
+    status: 'finished',
+    finishedAt: now,
+    startedAt: match.startedAt ?? now,
+    pausedAt: null,
+    pausedTotalMs: match.pausedTotalMs + Math.max(0, pausedSinceMs),
+  };
+}
+
 export async function getMatchTournamentId(db: Database, matchId: string): Promise<string> {
   const [row] = await db
     .select({ tournamentId: matches.tournamentId })
