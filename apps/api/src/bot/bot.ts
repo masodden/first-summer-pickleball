@@ -19,21 +19,27 @@ export function createBot(env: Env): BotBundle | null {
   const appUrl = env.PUBLIC_WEB_URL.replace(/\/$/, '');
 
   bot.command('start', async (ctx) => {
-    const payload = ctx.match?.trim();
-    // Deep-link вида t.me/bot?start=invite_<token>: докидываем токен в Mini App.
-    const inviteToken = payload?.startsWith('invite_') ? payload.slice('invite_'.length) : null;
-    const url = inviteToken ? `${appUrl}/?invite=${encodeURIComponent(inviteToken)}` : appUrl;
+    const payload = ctx.match?.trim() ?? '';
+    // Deep-link: invite_<token> или t_<uuid турнира>.
+    const inviteToken = payload.startsWith('invite_') ? payload.slice('invite_'.length) : null;
+    const tournamentId = payload.startsWith('t_') ? payload.slice(2) : null;
 
-    await ctx.reply(
-      inviteToken
-        ? 'Откройте приложение, чтобы привязать свою карточку игрока.'
-        : 'FIRST SUMMER PICKLEBALL — турниры клуба. Откройте приложение, чтобы посмотреть турниры и заявиться.',
-      {
-        reply_markup: {
-          inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url } }]],
-        },
+    let url = appUrl;
+    let text =
+      'FIRST SUMMER PICKLEBALL — турниры клуба. Откройте приложение, чтобы посмотреть турниры и заявиться.';
+    if (inviteToken) {
+      url = `${appUrl}/?invite=${encodeURIComponent(inviteToken)}`;
+      text = 'Откройте приложение, чтобы привязать свою карточку игрока.';
+    } else if (tournamentId) {
+      url = `${appUrl}/?tournament=${encodeURIComponent(tournamentId)}`;
+      text = 'Откройте приложение, чтобы перейти к турниру.';
+    }
+
+    await ctx.reply(text, {
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url } }]],
       },
-    );
+    });
   });
 
   bot.command('help', async (ctx) => {

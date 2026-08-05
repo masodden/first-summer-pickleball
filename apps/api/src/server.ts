@@ -97,6 +97,7 @@ export async function buildServer() {
     ok: true,
     time: new Date().toISOString(),
     telegram: Boolean(env.TELEGRAM_BOT_TOKEN),
+    telegramBotUsername: env.TELEGRAM_BOT_USERNAME ?? null,
     devLogin: env.ALLOW_DEV_LOGIN,
   }));
 

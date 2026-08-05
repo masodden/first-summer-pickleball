@@ -36,23 +36,6 @@ import { Racket } from '../../ui/ball';
         </p>
       </div>
 
-      @if (currentClaim(); as claim) {
-        <section class="glass card--tight stack stack--2">
-          <span class="chip" [class.chip--go]="claim.status === 'approved'">
-            {{
-              t()(
-                claim.status === 'approved'
-                  ? 'claim.approved'
-                  : claim.status === 'rejected'
-                    ? 'claim.rejected'
-                    : 'claim.pending'
-              )
-            }}
-          </span>
-          <span class="small muted">{{ t()('claim.duprId') }}: {{ claim.duprId }}</span>
-        </section>
-      }
-
       <section class="glass card--tight stack stack--3">
         <label class="field">
           <span class="field__label">{{ t()('common.search') }}</span>

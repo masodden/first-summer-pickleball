@@ -71,7 +71,7 @@ export const mergeGuestSchema = z.object({
   duprId: duprIdSchema,
 });
 
-export const standingsSortSchema = z.array(z.enum(STANDINGS_SORT_KEYS)).min(1).max(6);
+export const standingsSortSchema = z.array(z.enum(STANDINGS_SORT_KEYS)).min(1).max(7);
 
 /**
  * Названия кортов по порядку. Пустые значения допускаются: организатор мог

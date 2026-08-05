@@ -61,6 +61,7 @@ export type TieRule = (typeof TIE_RULES)[number];
 export const STANDINGS_SORT_KEYS = [
   'points',
   'wins',
+  'draws',
   'diff',
   'losses',
   'played',

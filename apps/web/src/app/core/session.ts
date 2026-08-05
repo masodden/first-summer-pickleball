@@ -48,6 +48,11 @@ export class SessionStore {
   );
   readonly canJoinTournaments = computed(() => this.playerId() !== null);
   readonly telegramAvailable = this.telegram.available;
+  /** После «Выйти» можно восстановить сессию без свежей подписи Telegram. */
+  private readonly pausedSignInSignal = signal(false);
+  readonly canSignInAgain = computed(
+    () => this.telegram.available || this.pausedSignInSignal(),
+  );
 
   async init(): Promise<void> {
     try {
@@ -56,6 +61,8 @@ export class SessionStore {
       } else if (this.api.token()) {
         const response = await this.api.get<SessionResponse>('/api/auth/session');
         this.applySession(response.session);
+      } else if (this.api.hasPausedToken()) {
+        this.pausedSignInSignal.set(true);
       }
     } catch (error) {
       // Не смогли войти — остаёмся наблюдателем, приложение всё равно работает.
@@ -63,6 +70,7 @@ export class SessionStore {
         this.api.setToken(null);
       }
       this.sessionSignal.set(null);
+      if (this.api.hasPausedToken()) this.pausedSignInSignal.set(true);
     } finally {
       this.readySignal.set(true);
     }
@@ -123,21 +131,41 @@ export class SessionStore {
   }
 
   signOut(): void {
-    this.api.setToken(null);
+    this.api.pauseToken();
     this.sessionSignal.set(null);
+    this.pausedSignInSignal.set(true);
   }
 
-  /** Повторный вход после «Выйти» в Mini App (initData уже есть). */
+  /**
+   * Повторный вход после «Выйти».
+   *
+   * Сначала поднимаем сохранённый JWT — повторная отправка того же initData
+   * часто даёт «подпись не сходится». Telegram initData — запасной путь.
+   */
   async signInAgain(): Promise<void> {
+    if (this.api.resumePausedToken()) {
+      try {
+        await this.refresh();
+        if (this.sessionSignal()) {
+          this.pausedSignInSignal.set(false);
+          return;
+        }
+      } catch {
+        this.api.setToken(null);
+      }
+    }
+
     if (this.telegram.available && this.telegram.initData) {
       await this.loginWithTelegram(this.telegram.initData);
+      this.pausedSignInSignal.set(false);
       return;
     }
-    if (this.api.token()) {
-      await this.refresh();
-      return;
-    }
-    throw new ApiFailure('unauthorized', 'Нет данных для входа', false);
+
+    throw new ApiFailure(
+      'unauthorized',
+      'Не удалось войти. Закройте Mini App и откройте бота снова.',
+      false,
+    );
   }
 
   private applySession(session: SessionDto | null): void {

@@ -206,7 +206,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
             <select class="select" [value]="sortKey()" (change)="sortKey.set(sort($event))">
-              @for (key of sortKeys; track key) {
+              @for (key of sortKeys(); track key) {
                 <option [value]="key">{{ sortLabel(key) }}</option>
               }
             </select>
@@ -283,8 +283,9 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           <span class="field__label">{{ t()('tournament.description') }}</span>
           <textarea
             class="textarea"
+            rows="5"
             [value]="description()"
-            (input)="description.set(text($event))"
+            (input)="description.set(multiline($event))"
           ></textarea>
         </label>
 
@@ -292,8 +293,9 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           <span class="field__label">{{ t()('tournament.formatDescription') }}</span>
           <textarea
             class="textarea"
+            rows="5"
             [value]="formatDescription()"
-            (input)="formatDescription.set(text($event))"
+            (input)="formatDescription.set(multiline($event))"
           ></textarea>
         </label>
       </section>
@@ -348,7 +350,11 @@ export class TournamentFormPage {
 
   protected readonly formats: TournamentFormat[] = ['americano', 'mexicano'];
   protected readonly presets = PLAYER_PRESETS;
-  protected readonly sortKeys = STANDINGS_SORT_KEYS;
+  protected readonly sortKeys = computed(() =>
+    this.tieRule() === 'draw'
+      ? STANDINGS_SORT_KEYS
+      : STANDINGS_SORT_KEYS.filter((key) => key !== 'draws'),
+  );
 
   protected readonly title = signal('');
   protected readonly category = signal('');
@@ -476,6 +482,11 @@ export class TournamentFormPage {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
 
+  /** Сохраняем переносы строк при вставке из мессенджера / Word (`\r\n` → `\n`). */
+  protected multiline(event: Event): string {
+    return this.text(event).replace(/\r\n?/g, '\n');
+  }
+
   protected checked(event: Event): boolean {
     return (event.target as HTMLInputElement).checked;
   }
@@ -495,6 +506,8 @@ export class TournamentFormPage {
         return this.i18n.translate('standings.points');
       case 'wins':
         return this.i18n.translate('standings.wins');
+      case 'draws':
+        return this.i18n.translate('standings.draws');
       case 'diff':
         return this.i18n.translate('standings.diff');
       case 'losses':
@@ -536,8 +549,8 @@ export class TournamentFormPage {
       standingsSort: uniqueSort(this.sortKey()),
       ratingBalance: this.ratingBalance(),
       entryFee: toNumberOrNull(this.entryFee()),
-      description: this.description().trim() || null,
-      formatDescription: this.formatDescription().trim() || null,
+      description: this.description().replace(/\r\n?/g, '\n').trim() || null,
+      formatDescription: this.formatDescription().replace(/\r\n?/g, '\n').trim() || null,
       venueName: this.venueName().trim() || null,
       venueAddress: this.venueAddress().trim() || null,
       venueMapUrl: this.venueMapUrl().trim() || null,

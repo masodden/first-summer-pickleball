@@ -15,6 +15,8 @@ function valueOf(row: StandingRow, key: StandingsSortKey): number {
       return row.pointsFor;
     case 'wins':
       return row.wins;
+    case 'draws':
+      return row.draws;
     case 'diff':
       return row.diff;
     case 'losses':

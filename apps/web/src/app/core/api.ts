@@ -2,6 +2,8 @@ import { computed, Injectable, signal } from '@angular/core';
 import type { ApiErrorBody, ErrorCode } from '@fsp/shared';
 
 const TOKEN_KEY = 'fsp.token';
+/** JWT после «Выйти»: повторный вход без повторной проверки initData. */
+const PAUSED_TOKEN_KEY = 'fsp.token.paused';
 
 export type FailureCode = ErrorCode | 'network';
 
@@ -75,10 +77,48 @@ export class ApiClient {
   setToken(token: string | null): void {
     this.tokenSignal.set(token);
     try {
-      if (token) localStorage.setItem(TOKEN_KEY, token);
-      else localStorage.removeItem(TOKEN_KEY);
+      if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.removeItem(PAUSED_TOKEN_KEY);
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+      }
     } catch {
       // Без хранилища сессия проживёт до перезагрузки страницы.
+    }
+  }
+
+  /** Убирает активный JWT, но оставляет его для «Войти снова». */
+  pauseToken(): void {
+    const token = this.tokenSignal();
+    this.tokenSignal.set(null);
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+      if (token) localStorage.setItem(PAUSED_TOKEN_KEY, token);
+      else localStorage.removeItem(PAUSED_TOKEN_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Восстанавливает JWT после pauseToken. */
+  resumePausedToken(): boolean {
+    try {
+      const paused = localStorage.getItem(PAUSED_TOKEN_KEY);
+      if (!paused) return false;
+      localStorage.removeItem(PAUSED_TOKEN_KEY);
+      this.setToken(paused);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  hasPausedToken(): boolean {
+    try {
+      return Boolean(localStorage.getItem(PAUSED_TOKEN_KEY));
+    } catch {
+      return false;
     }
   }
 

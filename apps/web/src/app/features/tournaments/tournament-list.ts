@@ -101,11 +101,13 @@ type Filter = 'active' | 'finished';
 
                   <div class="row">
                     <div class="grow stack stack--1">
-                      <h3 class="truncate">{{ item.title }}</h3>
-                      <div class="row row--wrap tile__meta">
+                      <div class="row tile__title">
+                        <h3 class="truncate grow">{{ item.title }}</h3>
                         @if (item.category) {
-                          <span class="chip chip--accent">{{ item.category }}</span>
+                          <span class="chip chip--accent tile__level">{{ item.category }}</span>
                         }
+                      </div>
+                      <div class="row row--wrap tile__meta">
                         <span class="chip">{{ format(item.format) }}</span>
                         <span class="chip">{{ i18n.courts(item.courts) }}</span>
                         @if (item.roundsPlanned) {
@@ -167,6 +169,19 @@ type Filter = 'active' | 'finished';
       text-decoration: none;
       transform: translateY(-2px);
       box-shadow: var(--glass-shadow-lg);
+    }
+
+    .tile__title {
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .tile__level {
+      flex: 0 0 auto;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .tile__meta {

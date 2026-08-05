@@ -247,6 +247,12 @@ import { RatingChip } from '../../ui/rating-chip';
                 <span class="tiny faint">{{ t()('player.statsWins') }}</span>
                 <span class="value numeric">{{ data.stats.wins }}</span>
               </div>
+              @if (data.stats.draws > 0) {
+                <div class="cell">
+                  <span class="tiny faint">{{ t()('standings.draws') }}</span>
+                  <span class="value numeric">{{ data.stats.draws }}</span>
+                </div>
+              }
               <div class="cell">
                 <span class="tiny faint">{{ t()('standings.diff') }}</span>
                 <span class="value numeric">{{

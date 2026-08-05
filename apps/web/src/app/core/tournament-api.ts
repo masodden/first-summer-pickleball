@@ -22,10 +22,21 @@ import type {
 } from '@fsp/shared';
 import { ApiClient } from './api';
 
+export interface PublicConfigDto {
+  ok: boolean;
+  telegram: boolean;
+  telegramBotUsername: string | null;
+  devLogin: boolean;
+}
+
 /** Тонкий слой над HTTP: только адреса и типы, без логики экранов. */
 @Injectable({ providedIn: 'root' })
 export class TournamentApi {
   private readonly api = inject(ApiClient);
+
+  getHealth(): Promise<PublicConfigDto> {
+    return this.api.get('/api/health');
+  }
 
   listTournaments(): Promise<{ items: TournamentSummaryDto[] }> {
     return this.api.get('/api/tournaments');

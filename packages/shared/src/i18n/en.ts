@@ -51,7 +51,7 @@ export const en: Record<TranslationKey, string> = {
   'auth.signOut': 'Sign out',
   'auth.signInAgain': 'Sign in again',
   'auth.signedOutHint':
-    'You signed out. In the Mini App you can sign back in with one tap — Telegram confirms your identity.',
+    'You signed out. Tap “Sign in again” to restore your account. If that fails, close the Mini App and reopen the bot.',
   'auth.bootstrapTitle': 'Administrator verification',
   'auth.bootstrapHint':
     'This DUPR ID is reserved for a club administrator. Enter the BOOTSTRAP_ADMIN_CODE from the server .env file.',
@@ -140,6 +140,10 @@ export const en: Record<TranslationKey, string> = {
   'tournament.finished': 'Tournament finished',
   'tournament.exportCsv': 'Download results as CSV',
   'tournament.publicLink': 'Public standings link',
+  'tournament.appLink': 'Link to tournament in the bot',
+  'tournament.appLinkCopied': 'Link copied — share it with players in chat',
+  'tournament.appLinkMissingBot':
+    'TELEGRAM_BOT_USERNAME is not set on the server — cannot build an in-bot link',
   'tournament.switchTo': 'Go to tournament',
   'tournament.parallel': 'Parallel tournaments',
   'tournament.info': 'Information',

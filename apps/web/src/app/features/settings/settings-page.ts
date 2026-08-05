@@ -53,12 +53,12 @@ import { RatingChip } from '../../ui/rating-chip';
             <span class="strong">{{ t()('auth.spectatorMode') }}</span>
             <span class="small muted">
               {{
-                session.telegramAvailable
+                session.canSignInAgain()
                   ? t()('auth.signedOutHint')
                   : t()('auth.notInTelegramHint')
               }}
             </span>
-            @if (session.telegramAvailable) {
+            @if (session.canSignInAgain()) {
               <button type="button" class="btn btn--primary btn--block" (click)="signInAgain()">
                 {{ t()('auth.signInAgain') }}
               </button>

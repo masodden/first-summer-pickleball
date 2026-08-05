@@ -50,7 +50,7 @@ export const ru = {
   'auth.signOut': 'Выйти',
   'auth.signInAgain': 'Войти снова',
   'auth.signedOutHint':
-    'Вы вышли из аккаунта. В Mini App можно войти снова одной кнопкой — Telegram подтвердит личность сам.',
+    'Вы вышли. Нажмите «Войти снова», чтобы вернуться в аккаунт. Если не получится — закройте Mini App и откройте бота заново.',
   'auth.bootstrapTitle': 'Подтверждение администратора',
   'auth.bootstrapHint':
     'Этот DUPR ID зарезервирован для администратора клуба. Введите код BOOTSTRAP_ADMIN_CODE из файла .env на сервере.',
@@ -138,6 +138,10 @@ export const ru = {
   'tournament.finished': 'Турнир завершён',
   'tournament.exportCsv': 'Скачать результаты в CSV',
   'tournament.publicLink': 'Публичная ссылка на табло',
+  'tournament.appLink': 'Ссылка на турнир в боте',
+  'tournament.appLinkCopied': 'Ссылка скопирована — можно скинуть игрокам в чат',
+  'tournament.appLinkMissingBot':
+    'Не задан TELEGRAM_BOT_USERNAME на сервере — прямую ссылку в бота собрать нельзя',
   'tournament.switchTo': 'Перейти к турниру',
   'tournament.parallel': 'Параллельные турниры',
   'tournament.info': 'Информация',

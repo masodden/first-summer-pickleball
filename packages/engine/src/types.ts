@@ -43,7 +43,14 @@ export interface StandingRow {
   diff: number;
 }
 
-export type StandingsSortKey = 'points' | 'wins' | 'diff' | 'losses' | 'played' | 'pointsAgainst';
+export type StandingsSortKey =
+  | 'points'
+  | 'wins'
+  | 'draws'
+  | 'diff'
+  | 'losses'
+  | 'played'
+  | 'pointsAgainst';
 
 export interface AmericanoScheduleOptions {
   players: readonly EnginePlayer[];

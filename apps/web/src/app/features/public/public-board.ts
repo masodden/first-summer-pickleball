@@ -91,6 +91,9 @@ import { StatusBadge } from '../../ui/status-badge';
                     <th scope="col">{{ t()('standings.player') }}</th>
                     <th scope="col">{{ t()('standings.points') }}</th>
                     <th scope="col">{{ t()('standings.wins') }}</th>
+                    @if (data.tournament.tieRule === 'draw') {
+                      <th scope="col">{{ t()('standings.draws') }}</th>
+                    }
                     <th scope="col">{{ t()('standings.diff') }}</th>
                   </tr>
                 </thead>
@@ -113,6 +116,9 @@ import { StatusBadge } from '../../ui/status-badge';
                       </td>
                       <td class="numeric strong">{{ row.pointsFor }}</td>
                       <td class="numeric">{{ row.wins }}</td>
+                      @if (data.tournament.tieRule === 'draw') {
+                        <td class="numeric">{{ row.draws }}</td>
+                      }
                       <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
                     </tr>
                   }

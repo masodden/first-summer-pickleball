@@ -16,8 +16,9 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import type { TournamentSummaryDto } from '@fsp/shared';
+import type { TournamentFormat, TournamentSummaryDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
+import { tournamentMiniAppLink } from '../../core/deep-link';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
@@ -80,14 +81,33 @@ import { StatusBadge } from '../../ui/status-badge';
             </div>
           </div>
 
-          <div class="stack stack--1">
-            <h1>{{ item.title }}</h1>
-            <p class="small muted">
-              {{ i18n.formatDate(item.startsAt) }}
-              @if (item.venueName) {
-                · {{ item.venueName }}
+          <div class="stack stack--2">
+            <div class="stack stack--1">
+              <h1>{{ item.title }}</h1>
+              <p class="small muted">
+                {{ i18n.formatDate(item.startsAt) }}
+                @if (item.venueName) {
+                  · {{ item.venueName }}
+                }
+              </p>
+            </div>
+            <div class="row row--wrap">
+              @if (item.category) {
+                <span class="chip chip--accent">{{ item.category }}</span>
               }
-            </p>
+              <span class="chip">{{ formatLabel(item.format) }}</span>
+            </div>
+          </div>
+
+          <div class="row row--wrap actions">
+            <button type="button" class="btn btn--sm btn--glass" (click)="copyAppLink()">
+              {{ t()('tournament.appLink') }}
+            </button>
+            @if (store.canManage()) {
+              <button type="button" class="btn btn--sm btn--glass" (click)="copyPublicLink()">
+                {{ t()('tournament.publicLink') }}
+              </button>
+            }
           </div>
 
           @if (store.canManage()) {
@@ -138,9 +158,6 @@ import { StatusBadge } from '../../ui/status-badge';
               <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
                 {{ t()('common.edit') }}
               </a>
-              <button type="button" class="btn btn--sm btn--glass" (click)="copyPublicLink()">
-                {{ t()('tournament.publicLink') }}
-              </button>
               @if (item.status === 'finished') {
                 <button
                   type="button"
@@ -295,6 +312,10 @@ export class TournamentDetailPage {
     if (tab) this.viewState.setLastTab(tab);
   }
 
+  protected formatLabel(format: TournamentFormat): string {
+    return this.i18n.translate(format === 'mexicano' ? 'format.mexicano' : 'format.americano');
+  }
+
   protected async start(): Promise<void> {
     await this.store.start();
     await this.router.navigate(['/tournaments', this.id(), 'rounds']);
@@ -328,6 +349,33 @@ export class TournamentDetailPage {
       await this.router.navigate(['/tournaments']);
     } catch (error) {
       this.toast.failure(error, () => void this.remove());
+    }
+  }
+
+  protected async copyAppLink(): Promise<void> {
+    const current = this.tournament();
+    if (!current) return;
+
+    let botUsername: string | null = null;
+    try {
+      const health = await this.api.getHealth();
+      botUsername = health.telegramBotUsername;
+    } catch {
+      botUsername = null;
+    }
+
+    if (!botUsername) {
+      this.toast.error(this.i18n.translate('tournament.appLinkMissingBot'));
+      return;
+    }
+
+    const url = tournamentMiniAppLink(botUsername, current.id);
+    try {
+      await navigator.clipboard.writeText(url);
+      this.telegram.tap();
+      this.toast.success(this.i18n.translate('tournament.appLinkCopied'), url);
+    } catch {
+      this.toast.info(this.i18n.translate('tournament.appLink'), url);
     }
   }
 

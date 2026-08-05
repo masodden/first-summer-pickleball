@@ -22,6 +22,12 @@ import { Racket } from '../../ui/ball';
       <div class="stack stack--4 stagger">
         <section class="glass card--tight stack stack--3">
           <div class="grid">
+            @if (item.category) {
+              <div class="cell">
+                <span class="tiny faint">{{ t()('tournament.category') }}</span>
+                <span class="strong">{{ item.category }}</span>
+              </div>
+            }
             <div class="cell">
               <span class="tiny faint">{{ t()('tournament.format') }}</span>
               <span class="strong">{{ formatLabel() }}</span>
@@ -95,14 +101,14 @@ import { Racket } from '../../ui/ball';
         @if (item.description) {
           <section class="glass card--tight stack stack--2">
             <h3>{{ t()('tournament.description') }}</h3>
-            <p class="small">{{ item.description }}</p>
+            <p class="small text-block">{{ item.description }}</p>
           </section>
         }
 
         @if (item.formatDescription) {
           <section class="glass card--tight stack stack--2">
             <h3>{{ t()('tournament.formatDescription') }}</h3>
-            <p class="small">{{ item.formatDescription }}</p>
+            <p class="small text-block">{{ item.formatDescription }}</p>
           </section>
         }
 

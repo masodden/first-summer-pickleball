@@ -186,22 +186,35 @@ export class TournamentStandingsTab {
 
   protected readonly direction = this.directionSignal.asReadonly();
 
-  protected readonly columns = computed<Column[]>(() => [
-    {
-      key: 'points',
-      label: this.i18n.translate('standings.points'),
-      value: (row) => row.pointsFor,
-    },
-    { key: 'wins', label: this.i18n.translate('standings.wins'), value: (row) => row.wins },
-    { key: 'losses', label: this.i18n.translate('standings.losses'), value: (row) => row.losses },
-    { key: 'diff', label: this.i18n.translate('standings.diff'), value: (row) => row.diff },
-    { key: 'played', label: this.i18n.translate('standings.played'), value: (row) => row.played },
-    {
-      key: 'pointsAgainst',
-      label: this.i18n.translate('standings.pointsAgainst'),
-      value: (row) => row.pointsAgainst,
-    },
-  ]);
+  protected readonly columns = computed<Column[]>(() => {
+    const columns: Column[] = [
+      {
+        key: 'points',
+        label: this.i18n.translate('standings.points'),
+        value: (row) => row.pointsFor,
+      },
+      { key: 'wins', label: this.i18n.translate('standings.wins'), value: (row) => row.wins },
+    ];
+    // Ничьи считаются и показываются только когда турнир их допускает.
+    if (this.tournament()?.tieRule === 'draw') {
+      columns.push({
+        key: 'draws',
+        label: this.i18n.translate('standings.draws'),
+        value: (row) => row.draws,
+      });
+    }
+    columns.push(
+      { key: 'losses', label: this.i18n.translate('standings.losses'), value: (row) => row.losses },
+      { key: 'diff', label: this.i18n.translate('standings.diff'), value: (row) => row.diff },
+      { key: 'played', label: this.i18n.translate('standings.played'), value: (row) => row.played },
+      {
+        key: 'pointsAgainst',
+        label: this.i18n.translate('standings.pointsAgainst'),
+        value: (row) => row.pointsAgainst,
+      },
+    );
+    return columns;
+  });
 
   protected readonly activeLabel = computed(
     () => this.columns().find((column) => column.key === this.sortKey())?.label ?? '',
