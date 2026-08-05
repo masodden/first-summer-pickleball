@@ -18,7 +18,6 @@
   <circle cx="256" cy="238" r="150" fill="url(#ball)"/>
   <circle cx="256" cy="238" r="150" fill="url(#sheen)"/>
 
-  <!-- B25@AB8O <OG0 4;O ?8:;1>;0 -->
   <g fill="#7fa010" opacity="0.72">
     <circle cx="256" cy="150" r="17"/>
     <circle cx="330" cy="196" r="17"/>

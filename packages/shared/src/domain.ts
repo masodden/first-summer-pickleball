@@ -79,9 +79,8 @@ export const CLAIM_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 
 /**
- * Единственные администраторы клуба по умолчанию.
- * Роль admin выдаётся только при привязке этих DUPR ID (с кодом в проде);
- * назначить admin через UI/API нельзя.
+ * Администраторы клуба по умолчанию: при привязке этих DUPR ID в проде
+ * нужен BOOTSTRAP_ADMIN_CODE. Понизить их нельзя; остальных админов — можно.
  */
 export const BOOTSTRAP_ADMIN_DUPR_IDS = ['PZQZKM', 'P5ML0M'] as const;
 
@@ -108,6 +107,11 @@ export function normalizeDuprId(raw: string): string {
 
 export function isValidDuprId(raw: string): boolean {
   return DUPR_ID_PATTERN.test(normalizeDuprId(raw));
+}
+
+export function isBootstrapAdminDupr(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(normalizeDuprId(raw));
 }
 
 /** Итоговый статус матча зависит от счёта, а он вводится вручную после игры. */

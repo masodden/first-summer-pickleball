@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
-  BOOTSTRAP_ADMIN_DUPR_IDS,
+  isBootstrapAdminDupr,
   normalizeDuprId,
   resolveLocale,
   type ClaimInput,
@@ -29,11 +29,6 @@ import { getPlayerRow } from './players.js';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function isBootstrapAdmin(duprId: string | null): boolean {
-  if (!duprId) return false;
-  return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(duprId);
-}
-
 function safeCompare(a: string, b: string): boolean {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
@@ -57,7 +52,7 @@ export function viewerFromAccount(account: AccountRow): Viewer {
 /** Роль сессии берётся с карточки DUPR, если она привязана. */
 export function effectiveRole(account: AccountRow, player: PlayerRow | null): Role {
   if (!player) return account.role;
-  if (isBootstrapAdmin(player.duprId)) return 'admin';
+  if (isBootstrapAdminDupr(player.duprId)) return 'admin';
   return player.clubRole;
 }
 
@@ -94,7 +89,7 @@ export async function buildSession(db: Database, account: AccountRow): Promise<S
       role !== 'admin' &&
       claim !== undefined &&
       claim.claim.status === 'pending' &&
-      isBootstrapAdmin(claim.player.duprId),
+      isBootstrapAdminDupr(claim.player.duprId),
   };
 }
 
@@ -233,7 +228,7 @@ export async function claimDuprId(
 ): Promise<SessionDto> {
   const duprId = normalizeDuprId(input.duprId);
 
-  if (isBootstrapAdmin(duprId) && bootstrapCode !== null) {
+  if (isBootstrapAdminDupr(duprId) && bootstrapCode !== null) {
     if (!input.code || !safeCompare(input.code, bootstrapCode)) {
       throw new ApiError('bootstrap_code_invalid', 'Для этого DUPR ID нужен код администратора');
     }
@@ -251,13 +246,13 @@ export async function claimDuprId(
   }
 
   // Роль живёт на карточке DUPR; при входе аккаунт её подхватывает.
-  if (isBootstrapAdmin(duprId) && player.clubRole !== 'admin') {
+  if (isBootstrapAdminDupr(duprId) && player.clubRole !== 'admin') {
     await db
       .update(players)
       .set({ clubRole: 'admin', updatedAt: new Date() })
       .where(eq(players.id, player.id));
   }
-  const role: Role = isBootstrapAdmin(duprId) ? 'admin' : player.clubRole;
+  const role: Role = isBootstrapAdminDupr(duprId) ? 'admin' : player.clubRole;
 
   // Старая карточка не должна выглядеть «привязанной» по залипшему @username.
   if (account.playerId && account.playerId !== player.id && account.telegramUsername) {
@@ -290,8 +285,8 @@ export async function claimDuprId(
     accountId: account.id,
     playerId: player.id,
     // Администратор подтверждает себя кодом, остальных проверяет организатор.
-    status: isBootstrapAdmin(duprId) ? 'approved' : 'pending',
-    decidedAt: isBootstrapAdmin(duprId) ? new Date() : null,
+    status: isBootstrapAdminDupr(duprId) ? 'approved' : 'pending',
+    decidedAt: isBootstrapAdminDupr(duprId) ? new Date() : null,
   });
 
   if (account.telegramUsername) {
@@ -305,7 +300,11 @@ export async function claimDuprId(
     action: 'claim.created',
     entityType: 'claim',
     entityId: player.id,
-    payload: { duprId, autoApproved: isBootstrapAdmin(duprId) },
+    payload: {
+      duprId,
+      autoApproved: isBootstrapAdminDupr(duprId),
+      previousPlayerId: account.playerId,
+    },
   });
 
   return buildSession(db, updated as AccountRow);
@@ -505,7 +504,7 @@ export async function listAccounts(db: Database): Promise<AccountSummary[]> {
       telegramUsername: row.account.telegramUsername,
       playerName: row.player ? `${row.player.firstName} ${row.player.lastName}`.trim() : null,
       duprId: row.player?.duprId ?? null,
-      isBootstrapAdmin: isBootstrapAdmin(row.player?.duprId ?? null),
+      isBootstrapAdmin: isBootstrapAdminDupr(row.player?.duprId ?? null),
       lastSeenAt: row.account.lastSeenAt.toISOString(),
     };
   });
@@ -523,7 +522,7 @@ export async function setPlayerClubRole(
 ): Promise<void> {
   const player = await getPlayerRow(db, playerId);
 
-  if (isBootstrapAdmin(player.duprId) && role !== 'admin') {
+  if (isBootstrapAdminDupr(player.duprId) && role !== 'admin') {
     throw forbidden('Администраторы клуба заданы в конфигурации и не могут быть понижены');
   }
   if (actor.playerId === playerId && role === 'user') {

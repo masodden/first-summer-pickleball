@@ -32,11 +32,11 @@ export const claimSchema = z.object({
   lastName: z.string().trim().min(1).max(60).optional(),
   doublesRating: ratingSchema.optional(),
   /** Требуется только для зашитых администраторов клуба. */
-  code: z.string().trim().min(6).max(128).optional(),
+  code: z.string().trim().min(1).max(128).optional(),
 });
 
 export const bootstrapSchema = z.object({
-  code: z.string().trim().min(6).max(128),
+  code: z.string().trim().min(1).max(128),
 });
 
 export const updateSettingsSchema = z.object({

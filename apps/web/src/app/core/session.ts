@@ -127,6 +127,19 @@ export class SessionStore {
     this.sessionSignal.set(null);
   }
 
+  /** Повторный вход после «Выйти» в Mini App (initData уже есть). */
+  async signInAgain(): Promise<void> {
+    if (this.telegram.available && this.telegram.initData) {
+      await this.loginWithTelegram(this.telegram.initData);
+      return;
+    }
+    if (this.api.token()) {
+      await this.refresh();
+      return;
+    }
+    throw new ApiFailure('unauthorized', 'Нет данных для входа', false);
+  }
+
   private applySession(session: SessionDto | null): void {
     this.sessionSignal.set(session);
     if (session) this.i18n.setLocale(session.locale);

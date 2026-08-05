@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { isValidDuprId, type PlayerDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
+import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
@@ -117,14 +118,12 @@ import { PlayerLine } from '../../ui/player-line';
             <label class="field">
               <span class="field__label">{{ t()('rating.doubles') }}</span>
               <input
-                class="input"
-                type="number"
+                class="input numeric"
+                type="text"
                 inputmode="decimal"
-                step="0.001"
-                min="2"
-                max="8"
+                autocomplete="off"
                 [value]="rating()"
-                (input)="rating.set(value($event))"
+                (input)="rating.set(sanitizeRating(value($event)))"
               />
               <span class="field__hint">{{ t()('rating.range') }}</span>
             </label>
@@ -291,16 +290,19 @@ export class PlayerPicker {
     return (event.target as HTMLInputElement).value;
   }
 
+  protected sanitizeRating(value: string): string {
+    return sanitizeRatingInput(value);
+  }
+
   protected async create(): Promise<void> {
     if (!this.canCreate()) return;
     this.saving.set(true);
     try {
-      const parsed = Number.parseFloat(this.rating().replace(',', '.'));
       const { player } = await this.api.createPlayer({
         firstName: this.firstName().trim(),
         lastName: this.lastName().trim(),
         duprId: this.duprId().trim() ? this.duprId().trim() : null,
-        doublesRating: Number.isFinite(parsed) ? parsed : null,
+        doublesRating: parseRatingInput(this.rating()),
       });
       this.toast.success(this.i18n.translate('player.created'));
       this.picked.emit(player.id);

@@ -1,16 +1,11 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { BOOTSTRAP_ADMIN_DUPR_IDS, type PlayerProfileDto, type PlayerStatsDto } from '@fsp/shared';
+import { isBootstrapAdminDupr, type PlayerProfileDto, type PlayerStatsDto } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import { accounts, tournaments } from '../db/schema.js';
 import { toPlayerDto } from './mappers.js';
 import { canEditPlayer, getPlayerRow, getPlayerStats, getRatingHistory } from './players.js';
 import { computeTournamentStandings } from './state.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
-
-function isBootstrapAdmin(duprId: string | null): boolean {
-  if (!duprId) return false;
-  return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(duprId);
-}
 
 /**
  * Личная статистика игрока по всем турнирам.
@@ -72,7 +67,7 @@ export async function getPlayerProfile(
   };
 
   const isOwner = viewer?.playerId === playerId;
-  const bootstrap = isBootstrapAdmin(player.duprId);
+  const bootstrap = isBootstrapAdminDupr(player.duprId);
   const claimed = await isClaimed(db, playerId);
 
   return {

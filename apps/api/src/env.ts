@@ -24,7 +24,7 @@ const schema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
 
   /** Код для первой привязки зашитых администраторов. */
-  BOOTSTRAP_ADMIN_CODE: z.string().min(6).default('first-summer-admin'),
+  BOOTSTRAP_ADMIN_CODE: z.string().min(1).default('first-summer-admin'),
 
   /** Публичный адрес приложения: нужен для ссылок-приглашений и Mini App. */
   PUBLIC_WEB_URL: z.string().default('http://localhost:4200'),

@@ -48,16 +48,23 @@ export const ru = {
   'auth.continueAsSpectator': 'Продолжить как наблюдатель',
   'auth.spectatorMode': 'Режим наблюдателя',
   'auth.signOut': 'Выйти',
+  'auth.signInAgain': 'Войти снова',
+  'auth.signedOutHint':
+    'Вы вышли из аккаунта. В Mini App можно войти снова одной кнопкой — Telegram подтвердит личность сам.',
   'auth.bootstrapTitle': 'Подтверждение администратора',
   'auth.bootstrapHint':
-    'Этот DUPR ID зарезервирован для администратора клуба. Введите код из переменной BOOTSTRAP_ADMIN_CODE на сервере.',
+    'Этот DUPR ID зарезервирован для администратора клуба. Введите код BOOTSTRAP_ADMIN_CODE из файла .env на сервере.',
   'auth.bootstrapCode': 'Код администратора',
 
   'claim.title': 'Привяжите свой DUPR',
   'claim.hint':
     'Найдите себя по имени или введите свой DUPR ID. Организатор подтвердит привязку при регистрации на турнире.',
+  'claim.changeTitle': 'Сменить DUPR ID',
+  'claim.changeHint':
+    'Укажите новый DUPR ID. Заявка уйдёт организатору на подтверждение. Для админских ID PZQZKM и P5ML0M нужен код из .env.',
+  'claim.changeSubmit': 'Сменить DUPR',
   'claim.duprId': 'DUPR ID',
-  'claim.duprIdHint': 'Шесть символов, например PZQZKM. Его видно в приложении DUPR в профиле.',
+  'claim.duprIdHint': 'Шесть символов, например A1B2C3. Его видно в приложении DUPR в профиле.',
   'claim.searchPlaceholder': 'Имя или DUPR ID',
   'claim.notFound': 'Не нашли себя? Заведите карточку вручную',
   'claim.submit': 'Привязать',

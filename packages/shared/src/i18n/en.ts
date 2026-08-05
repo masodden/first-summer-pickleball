@@ -49,17 +49,24 @@ export const en: Record<TranslationKey, string> = {
   'auth.continueAsSpectator': 'Continue as spectator',
   'auth.spectatorMode': 'Spectator mode',
   'auth.signOut': 'Sign out',
+  'auth.signInAgain': 'Sign in again',
+  'auth.signedOutHint':
+    'You signed out. In the Mini App you can sign back in with one tap — Telegram confirms your identity.',
   'auth.bootstrapTitle': 'Administrator verification',
   'auth.bootstrapHint':
-    'This DUPR ID is reserved for a club administrator. Enter the code from the BOOTSTRAP_ADMIN_CODE variable on the server.',
+    'This DUPR ID is reserved for a club administrator. Enter the BOOTSTRAP_ADMIN_CODE from the server .env file.',
   'auth.bootstrapCode': 'Administrator code',
 
   'claim.title': 'Link your DUPR',
   'claim.hint':
     'Find yourself by name or enter your DUPR ID. An organiser will confirm the link at tournament check-in.',
+  'claim.changeTitle': 'Change DUPR ID',
+  'claim.changeHint':
+    'Enter a new DUPR ID. The request goes to an organiser for approval. Admin IDs PZQZKM and P5ML0M need the code from .env.',
+  'claim.changeSubmit': 'Change DUPR',
   'claim.duprId': 'DUPR ID',
   'claim.duprIdHint':
-    'Six characters, for example PZQZKM. You can see it in your DUPR app profile.',
+    'Six characters, for example A1B2C3. You can see it in your DUPR app profile.',
   'claim.searchPlaceholder': 'Name or DUPR ID',
   'claim.notFound': "Can't find yourself? Create a profile manually",
   'claim.submit': 'Link',

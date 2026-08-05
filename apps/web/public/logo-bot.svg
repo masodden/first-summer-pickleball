@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="FIRST SUMMER PICKLEBALL">
+  <defs>
+    <linearGradient id="logo-bot-clay" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3ebe3"/>
+      <stop offset="1" stop-color="#e6d5c8"/>
+    </linearGradient>
+    <linearGradient id="logo-bot-ball" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#d2ef62"/>
+      <stop offset="1" stop-color="#a8cc19"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="360" fill="url(#logo-bot-clay)"/>
+
+  <g transform="translate(320 180) scale(1.85) translate(-150 -46)">
+    <g>
+      <circle cx="34" cy="46" r="30" fill="url(#logo-bot-ball)"/>
+      <g fill="#7fa010" opacity="0.72">
+        <circle cx="34" cy="28" r="3.6"/>
+        <circle cx="49" cy="37" r="3.6"/>
+        <circle cx="49" cy="55" r="3.6"/>
+        <circle cx="34" cy="64" r="3.6"/>
+        <circle cx="19" cy="55" r="3.6"/>
+        <circle cx="19" cy="37" r="3.6"/>
+        <circle cx="34" cy="46" r="3.6"/>
+      </g>
+    </g>
+
+    <text x="80" y="38"
+          font-family="Inter Tight, Inter, system-ui, sans-serif"
+          font-size="21" font-weight="700" letter-spacing="3.4" fill="#c75b39">FIRST SUMMER</text>
+    <text x="80" y="70"
+          font-family="Inter Tight, Inter, system-ui, sans-serif"
+          font-size="27" font-weight="800" letter-spacing="1.6" fill="#1a1a1a">PICKLEBALL</text>
+  </g>
+</svg>

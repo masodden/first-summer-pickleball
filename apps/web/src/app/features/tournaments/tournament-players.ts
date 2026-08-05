@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import type { ParticipantDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
+import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
@@ -83,13 +84,11 @@ import { PlayerPicker } from '../players/player-picker';
                 @if (editing() === participant.player.id) {
                   <input
                     class="input rating-input numeric"
-                    type="number"
+                    type="text"
                     inputmode="decimal"
-                    step="0.001"
-                    min="2"
-                    max="8"
+                    autocomplete="off"
                     [value]="draftRating()"
-                    (input)="draftRating.set(inputValue($event))"
+                    (input)="draftRating.set(sanitizeRating(inputValue($event)))"
                     (keydown.enter)="saveRating(participant)"
                   />
                   <button
@@ -284,10 +283,13 @@ export class TournamentPlayersTab {
     return (event.target as HTMLInputElement).value;
   }
 
+  protected sanitizeRating(value: string): string {
+    return sanitizeRatingInput(value);
+  }
+
   protected async saveRating(participant: ParticipantDto): Promise<void> {
-    const raw = this.draftRating().trim().replace(',', '.');
-    const parsed = raw === '' ? null : Number.parseFloat(raw);
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 2 || parsed > 8)) {
+    const parsed = parseRatingInput(this.draftRating());
+    if (parsed !== null && (parsed < 2 || parsed > 8)) {
       this.toast.error(this.i18n.translate('rating.range'));
       return;
     }

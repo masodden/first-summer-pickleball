@@ -8,8 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { isValidDuprId, type PlayerDto } from '@fsp/shared';
+import { isBootstrapAdminDupr, isValidDuprId, type PlayerDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
+import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
@@ -17,15 +18,10 @@ import { PlayerLine } from '../../ui/player-line';
 import { Racket } from '../../ui/ball';
 
 /**
- * Привязка DUPR ID к аккаунту Telegram.
+ * Привязка или смена DUPR ID.
  *
- * Партнёрского доступа к DUPR нет, поэтому личность игрока подтверждает
- * Telegram, а DUPR ID игрок указывает сам: находит себя в справочнике или
- * вводит ID вручную. Организатор подтверждает привязку при приёме на турнир —
- * это и есть проверка «тот ли это человек».
- *
- * Для двух администраторов клуба дополнительно спрашивается код с сервера:
- * иначе их ID мог бы заявить кто угодно.
+ * Для PZQZKM / P5ML0M сразу показывается поле кода администратора — иначе
+ * сервер отклоняет запрос до того, как сессия успеет попросить код.
  */
 @Component({
   selector: 'app-claim',
@@ -34,8 +30,10 @@ import { Racket } from '../../ui/ball';
   template: `
     <div class="stack stack--4">
       <div class="stack stack--2">
-        <h1>{{ t()('claim.title') }}</h1>
-        <p class="small muted">{{ t()('claim.hint') }}</p>
+        <h1>{{ changing() ? t()('claim.changeTitle') : t()('claim.title') }}</h1>
+        <p class="small muted">
+          {{ changing() ? t()('claim.changeHint') : t()('claim.hint') }}
+        </p>
       </div>
 
       @if (currentClaim(); as claim) {
@@ -52,31 +50,6 @@ import { Racket } from '../../ui/ball';
             }}
           </span>
           <span class="small muted">{{ t()('claim.duprId') }}: {{ claim.duprId }}</span>
-        </section>
-      }
-
-      @if (session.session()?.needsBootstrapCode) {
-        <section class="glass card--tight stack stack--3">
-          <h3>{{ t()('auth.bootstrapTitle') }}</h3>
-          <p class="small muted">{{ t()('auth.bootstrapHint') }}</p>
-          <label class="field">
-            <span class="field__label">{{ t()('auth.bootstrapCode') }}</span>
-            <input
-              class="input"
-              type="password"
-              autocomplete="one-time-code"
-              [value]="code()"
-              (input)="code.set(text($event))"
-            />
-          </label>
-          <button
-            type="button"
-            class="btn btn--primary btn--block"
-            [disabled]="code().length < 6 || busy()"
-            (click)="submitBootstrap()"
-          >
-            {{ t()('common.confirm') }}
-          </button>
         </section>
       }
 
@@ -125,6 +98,20 @@ import { Racket } from '../../ui/ball';
           <span class="field__hint">{{ t()('claim.duprIdHint') }}</span>
         </label>
 
+        @if (needsBootstrapCode()) {
+          <label class="field">
+            <span class="field__label">{{ t()('auth.bootstrapCode') }}</span>
+            <input
+              class="input"
+              type="password"
+              autocomplete="one-time-code"
+              [value]="code()"
+              (input)="code.set(text($event))"
+            />
+            <span class="field__hint">{{ t()('auth.bootstrapHint') }}</span>
+          </label>
+        }
+
         @if (!selected()) {
           <div class="row">
             <label class="field grow">
@@ -141,13 +128,11 @@ import { Racket } from '../../ui/ball';
             <span class="field__label">{{ t()('rating.doubles') }}</span>
             <input
               class="input numeric"
-              type="number"
+              type="text"
               inputmode="decimal"
-              step="0.001"
-              min="2"
-              max="8"
+              autocomplete="off"
               [value]="rating()"
-              (input)="rating.set(text($event))"
+              (input)="rating.set(sanitizeRating(text($event)))"
             />
             <span class="field__hint">{{ t()('rating.range') }}</span>
           </label>
@@ -159,7 +144,7 @@ import { Racket } from '../../ui/ball';
           [disabled]="!canSubmit() || busy()"
           (click)="submit()"
         >
-          {{ t()('claim.submit') }}
+          {{ changing() ? t()('claim.changeSubmit') : t()('claim.submit') }}
         </button>
       </section>
 
@@ -216,6 +201,8 @@ export class ClaimPage {
   protected readonly busy = signal(false);
 
   protected readonly currentClaim = computed(() => this.session.session()?.claim ?? null);
+  protected readonly changing = computed(() => this.session.playerId() !== null);
+  protected readonly needsBootstrapCode = computed(() => isBootstrapAdminDupr(this.duprId()));
 
   protected readonly players = resource({
     params: () => this.debounced(),
@@ -235,6 +222,7 @@ export class ClaimPage {
 
   protected readonly canSubmit = computed(() => {
     if (this.duprInvalid() || this.duprId().trim().length !== 6) return false;
+    if (this.needsBootstrapCode() && this.code().trim().length === 0) return false;
     if (this.selected()) return true;
     return this.firstName().trim().length > 0 && this.lastName().trim().length > 0;
   });
@@ -256,6 +244,10 @@ export class ClaimPage {
     return (event.target as HTMLInputElement).value;
   }
 
+  protected sanitizeRating(value: string): string {
+    return sanitizeRatingInput(value);
+  }
+
   protected select(player: PlayerDto): void {
     this.selected.set(player);
     this.duprId.set(player.duprId ?? '');
@@ -268,12 +260,14 @@ export class ClaimPage {
     if (!this.canSubmit()) return;
     this.busy.set(true);
     try {
-      const parsed = Number.parseFloat(this.rating().replace(',', '.'));
+      const parsed = parseRatingInput(this.rating());
+      const code = this.code().trim();
       await this.session.claimDupr({
         duprId: this.duprId().trim(),
         firstName: this.firstName().trim() || undefined,
         lastName: this.lastName().trim() || undefined,
-        doublesRating: Number.isFinite(parsed) ? parsed : undefined,
+        doublesRating: parsed ?? undefined,
+        ...(code ? { code } : {}),
       });
 
       const claim = this.currentClaim();
@@ -283,22 +277,6 @@ export class ClaimPage {
       if (claim?.status === 'approved') await this.router.navigate(['/tournaments']);
     } catch (error) {
       this.toast.failure(error, () => void this.submit());
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async submitBootstrap(): Promise<void> {
-    this.busy.set(true);
-    try {
-      await this.session.claimDupr({
-        duprId: this.currentClaim()?.duprId ?? this.duprId().trim(),
-        code: this.code().trim(),
-      });
-      this.toast.success(this.i18n.translate('claim.approved'));
-      await this.router.navigate(['/tournaments']);
-    } catch (error) {
-      this.toast.failure(error, () => void this.submitBootstrap());
     } finally {
       this.busy.set(false);
     }

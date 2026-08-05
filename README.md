@@ -133,7 +133,7 @@ E2E_BASE_URL=http://localhost:3000 pnpm e2e:scenario   # в другом
 
 ### 1. Домен
 
-Купите домен (reg.ru, nic.ru, Cloudflare) — например `pickleball.example.com`.
+Купите домен (reg.ru, nic.ru, Cloudflare) — например `first-summer-pickleball.ru`.
 Telegram Mini App работает **только по HTTPS**, а сертификат выдаётся на домен, поэтому без
 домена бота не будет. Табло по IP-адресу открыть можно, Mini App — нет.
 
@@ -146,7 +146,7 @@ Telegram Mini App работает **только по HTTPS**, а сертиф�
 Проверьте, что запись разошлась (может занять до часа):
 
 ```bash
-dig +short pickleball.example.com
+dig +short first-summer-pickleball.ru
 ```
 
 Должен вывестись IP вашего сервера.
@@ -193,10 +193,10 @@ openssl rand -hex 16   # → TELEGRAM_WEBHOOK_SECRET
 Откройте `.env` (`nano .env`) и заполните:
 
 ```ini
-APP_DOMAIN=pickleball.example.com
+APP_DOMAIN=first-summer-pickleball.ru
 POSTGRES_PASSWORD=<из первой команды>
 JWT_SECRET=<из второй команды>
-BOOTSTRAP_ADMIN_CODE=<придумайте свой код, минимум 6 символов>
+BOOTSTRAP_ADMIN_CODE=<придумайте свой код>
 TELEGRAM_BOT_TOKEN=<получим на следующем шаге>
 TELEGRAM_BOT_USERNAME=<имя бота без @>
 TELEGRAM_WEBHOOK_SECRET=<из третьей команды>
@@ -223,10 +223,10 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```bash
 docker compose --env-file .env -f infra/docker-compose.yml ps        # все сервисы healthy/running
 docker compose --env-file .env -f infra/docker-compose.yml logs -f api
-curl https://pickleball.example.com/api/tournaments  # должен вернуть {"items":[],"total":0}
+curl https://first-summer-pickleball.ru/api/tournaments  # должен вернуть {"items":[],"total":0}
 ```
 
-Откройте `https://pickleball.example.com` в браузере — увидите пустой список турниров в режиме
+Откройте `https://first-summer-pickleball.ru` в браузере — увидите пустой список турниров в режиме
 наблюдателя.
 
 ---
@@ -238,7 +238,7 @@ curl https://pickleball.example.com/api/tournaments  # должен вернут
 2. Скопируйте токен и положите его в `.env` (`TELEGRAM_BOT_TOKEN`), а username — в
    `TELEGRAM_BOT_USERNAME` (без `@`).
 3. Там же у BotFather: `/setmenubutton` → выберите бота → пришлите
-   `https://pickleball.example.com` и подпись кнопки, например «Турниры».
+   `https://first-summer-pickleball.ru` и подпись кнопки, например «Турниры».
 4. Перезапустите приложение, чтобы бот увидел токен:
 
 ```bash
@@ -380,8 +380,8 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 Посмотреть, что происходит:
 
 ```bash
-docker compose -f infra/docker-compose.yml logs -f --tail 100 api
-docker compose -f infra/docker-compose.yml logs -f web    # логи Caddy и HTTPS
+docker compose --env-file .env -f infra/docker-compose.yml logs -f --tail 100 api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f web    # логи Caddy и HTTPS
 ```
 
 ---

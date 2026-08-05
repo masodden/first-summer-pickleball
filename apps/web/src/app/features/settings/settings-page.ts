@@ -30,11 +30,17 @@ import { RatingChip } from '../../ui/rating-chip';
             <div class="grow stack stack--1">
               <span class="strong">{{ player.fullName }}</span>
               <span class="tiny muted">{{ roleLabel() }}</span>
+              @if (player.duprId) {
+                <span class="tiny faint">{{ t()('claim.duprId') }}: {{ player.duprId }}</span>
+              }
             </div>
             <app-rating-chip [player]="player" />
           </div>
           <a class="btn btn--sm btn--glass btn--block" [routerLink]="['/players', player.id]">
             {{ t()('player.profile') }}
+          </a>
+          <a class="btn btn--sm btn--glass btn--block" routerLink="/claim">
+            {{ t()('claim.changeSubmit') }}
           </a>
         } @else if (session.isAuthenticated()) {
           <div class="stack stack--2">
@@ -45,8 +51,18 @@ import { RatingChip } from '../../ui/rating-chip';
         } @else {
           <div class="stack stack--2">
             <span class="strong">{{ t()('auth.spectatorMode') }}</span>
-            <span class="small muted">{{ t()('auth.notInTelegramHint') }}</span>
-            @if (allowDevLogin()) {
+            <span class="small muted">
+              {{
+                session.telegramAvailable
+                  ? t()('auth.signedOutHint')
+                  : t()('auth.notInTelegramHint')
+              }}
+            </span>
+            @if (session.telegramAvailable) {
+              <button type="button" class="btn btn--primary btn--block" (click)="signInAgain()">
+                {{ t()('auth.signInAgain') }}
+              </button>
+            } @else if (allowDevLogin()) {
               <button type="button" class="btn btn--glass btn--block" (click)="devLogin()">
                 {{ t()('auth.loginTelegram') }}
               </button>
@@ -257,6 +273,15 @@ export class SettingsPage {
       this.toast.success(this.i18n.translate('settings.saved'));
     } catch (error) {
       this.toast.failure(error);
+    }
+  }
+
+  protected async signInAgain(): Promise<void> {
+    try {
+      await this.session.signInAgain();
+      this.toast.success(this.i18n.translate('settings.saved'));
+    } catch (error) {
+      this.toast.failure(error, () => void this.signInAgain());
     }
   }
 }

@@ -10,6 +10,7 @@ import {
 import { Router } from '@angular/router';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
+import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
 import { ToastService } from '../../core/toast';
@@ -76,13 +77,11 @@ import { RatingChip } from '../../ui/rating-chip';
             <div class="row">
               <input
                 class="input numeric grow"
-                type="number"
+                type="text"
                 inputmode="decimal"
-                step="0.001"
-                min="2"
-                max="8"
+                autocomplete="off"
                 [value]="rating()"
-                (input)="rating.set(text($event))"
+                (input)="rating.set(sanitizeRating(text($event)))"
               />
               <button
                 type="button"
@@ -408,6 +407,10 @@ export class PlayerProfilePage {
     return (event.target as HTMLInputElement).value;
   }
 
+  protected sanitizeRating(value: string): string {
+    return sanitizeRatingInput(value);
+  }
+
   protected diff(pointsFor: number, pointsAgainst: number): string {
     const value = pointsFor - pointsAgainst;
     return value > 0 ? `+${value}` : String(value);
@@ -432,9 +435,8 @@ export class PlayerProfilePage {
   }
 
   protected async saveRating(): Promise<void> {
-    const raw = this.rating().trim().replace(',', '.');
-    const parsed = raw === '' ? null : Number.parseFloat(raw);
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 2 || parsed > 8)) {
+    const parsed = parseRatingInput(this.rating());
+    if (parsed !== null && (parsed < 2 || parsed > 8)) {
       this.toast.error(this.i18n.translate('rating.range'));
       return;
     }
