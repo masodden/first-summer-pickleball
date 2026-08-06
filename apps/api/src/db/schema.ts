@@ -40,6 +40,12 @@ export const matchStatusEnum = pgEnum('match_status', [
 export const teamSideEnum = pgEnum('team_side', ['A', 'B']);
 /** Откуда взялось значение поля: нужно, чтобы импорт не перетирал ручные правки. */
 export const fieldSourceEnum = pgEnum('field_source', ['import', 'manual', 'self']);
+/** Тренировки проще турниров: запись → старт → финиш, без раундов и матчей. */
+export const trainingStatusEnum = pgEnum('training_status', [
+  'registration',
+  'running',
+  'finished',
+]);
 
 /**
  * Игроки. Ключ — DUPR ID, поэтому у настоящего игрока `id === dupr_id`.
@@ -319,6 +325,80 @@ export const roundSitouts = pgTable(
   (table) => [unique('round_sitouts_unique').on(table.roundId, table.playerId)],
 );
 
+/**
+ * Тренировка клуба: запись по ссылке и учёт оплаты за аренду кортов.
+ * Отдельно от турниров — нет расписания, счёта и выгрузки в DUPR.
+ */
+export const trainings = pgTable(
+  'trainings',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    title: text().notNull(),
+    status: trainingStatusEnum().notNull().default('registration'),
+    startsAt: timestamp({ withTimezone: true }).notNull(),
+    /** null — без лимита мест. */
+    maxPlayers: integer(),
+    /** Стоимость одного корта в час (целые единицы, как entryFee у турнира). */
+    pricePerCourtHour: integer().notNull(),
+    description: text(),
+    venueName: text(),
+    venueAddress: text(),
+    venueMapUrl: text(),
+    createdByAccountId: uuid().references(() => accounts.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp({ withTimezone: true }),
+    finishedAt: timestamp({ withTimezone: true }),
+    deletedAt: timestamp({ withTimezone: true }),
+  },
+  (table) => [index('trainings_status_idx').on(table.status, table.startsAt)],
+);
+
+/** Блоки аренды: «1 корт × 1 ч» + «2 корта × 2 ч» → 5 корт·часов. */
+export const trainingCourtBlocks = pgTable(
+  'training_court_blocks',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    trainingId: uuid()
+      .notNull()
+      .references(() => trainings.id, { onDelete: 'cascade' }),
+    sortIndex: integer().notNull(),
+    courts: integer().notNull(),
+    /** Часы с шагом 0.5. */
+    hours: numeric({ precision: 4, scale: 1, mode: 'number' }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('training_court_blocks_unique').on(table.trainingId, table.sortIndex),
+    index('training_court_blocks_training_idx').on(table.trainingId),
+  ],
+);
+
+export const trainingPlayers = pgTable(
+  'training_players',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    trainingId: uuid()
+      .notNull()
+      .references(() => trainings.id, { onDelete: 'cascade' }),
+    playerId: text()
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    status: participantStatusEnum().notNull().default('registered'),
+    confirmedAndPaid: boolean().notNull().default(false),
+    /** Ручная сумма; null — делить totalCost на число записавшихся. */
+    amountDue: integer(),
+    waitlistPosition: integer(),
+    addedBySelf: boolean().notNull().default(false),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('training_players_unique').on(table.trainingId, table.playerId),
+    index('training_players_training_idx').on(table.trainingId),
+  ],
+);
+
 export const auditLog = pgTable(
   'audit_log',
   {
@@ -355,3 +435,6 @@ export type RoundRow = typeof rounds.$inferSelect;
 export type ClaimRow = typeof claims.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
 export type RatingHistoryRow = typeof playerRatingHistory.$inferSelect;
+export type TrainingRow = typeof trainings.$inferSelect;
+export type TrainingCourtBlockRow = typeof trainingCourtBlocks.$inferSelect;
+export type TrainingPlayerRow = typeof trainingPlayers.$inferSelect;

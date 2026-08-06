@@ -20,9 +20,11 @@ export function createBot(env: Env): BotBundle | null {
 
   bot.command('start', async (ctx) => {
     const payload = ctx.match?.trim() ?? '';
-    // Deep-link: invite_<token> или t_<uuid турнира>.
+    // Deep-link: invite_<token>, t_<uuid турнира> или tr_<uuid тренировки>.
     const inviteToken = payload.startsWith('invite_') ? payload.slice('invite_'.length) : null;
-    const tournamentId = payload.startsWith('t_') ? payload.slice(2) : null;
+    const trainingId = payload.startsWith('tr_') ? payload.slice(3) : null;
+    const tournamentId =
+      !trainingId && payload.startsWith('t_') ? payload.slice(2) : null;
 
     let url = appUrl;
     let text =
@@ -30,6 +32,9 @@ export function createBot(env: Env): BotBundle | null {
     if (inviteToken) {
       url = `${appUrl}/?invite=${encodeURIComponent(inviteToken)}`;
       text = 'Откройте приложение, чтобы привязать свою карточку игрока.';
+    } else if (trainingId) {
+      url = `${appUrl}/?training=${encodeURIComponent(trainingId)}`;
+      text = 'Откройте приложение, чтобы перейти к тренировке.';
     } else if (tournamentId) {
       url = `${appUrl}/?tournament=${encodeURIComponent(tournamentId)}`;
       text = 'Откройте приложение, чтобы перейти к турниру.';

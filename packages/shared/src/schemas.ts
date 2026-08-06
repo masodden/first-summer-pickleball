@@ -80,6 +80,30 @@ export const standingsSortSchema = z.array(z.enum(STANDINGS_SORT_KEYS)).min(1).m
  */
 export const courtNamesSchema = z.array(z.string().trim().max(24)).max(20).nullable().optional();
 
+export const trainingCourtBlockSchema = z.object({
+  courts: z.number().int().min(1).max(20),
+  hours: z.number().min(0.5).max(24).multipleOf(0.5),
+});
+
+export const createTrainingSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  startsAt: z.string().datetime({ offset: true }),
+  maxPlayers: z.number().int().min(1).max(200).nullable().optional(),
+  pricePerCourtHour: z.number().int().min(0).max(1_000_000),
+  courtBlocks: z.array(trainingCourtBlockSchema).min(1).max(20),
+  description: z.string().trim().max(4000).nullable().optional(),
+  venueName: z.string().trim().max(160).nullable().optional(),
+  venueAddress: z.string().trim().max(400).nullable().optional(),
+  venueMapUrl: z.string().url().max(500).nullable().optional(),
+});
+
+export const updateTrainingSchema = createTrainingSchema.partial();
+
+export const setTrainingAmountSchema = z.object({
+  /** null — сбросить ручную сумму и снова делить автоматически. */
+  amountDue: z.number().int().min(0).max(1_000_000).nullable(),
+});
+
 export const createTournamentSchema = z.object({
   title: z.string().trim().min(2).max(120),
   category: z.string().trim().max(60).nullable().optional(),
@@ -151,5 +175,8 @@ export type CreatePlayerInput = z.infer<typeof createPlayerSchema>;
 export type UpdatePlayerInput = z.infer<typeof updatePlayerSchema>;
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>;
 export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>;
+export type CreateTrainingInput = z.infer<typeof createTrainingSchema>;
+export type UpdateTrainingInput = z.infer<typeof updateTrainingSchema>;
+export type SetTrainingAmountInput = z.infer<typeof setTrainingAmountSchema>;
 export type MatchScoreInput = z.infer<typeof matchScoreSchema>;
 export type ImportPlayersInput = z.infer<typeof importPlayersSchema>;

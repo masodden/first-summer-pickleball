@@ -9,6 +9,7 @@ import type {
   TieRule,
   TournamentFormat,
   TournamentStatus,
+  TrainingStatus,
 } from './domain.js';
 
 /**
@@ -233,4 +234,61 @@ export interface ImportReportDto {
 export interface PaginatedDto<T> {
   items: T[];
   total: number;
+}
+
+export interface TrainingCourtBlockDto {
+  sortIndex: number;
+  courts: number;
+  hours: number;
+}
+
+export interface TrainingParticipantDto {
+  id: string;
+  player: PlayerDto;
+  status: ParticipantStatus;
+  confirmedAndPaid: boolean;
+  waitlistPosition: number | null;
+  addedBySelf: boolean;
+  /** Ручная сумма; null — использовать suggestedAmount. */
+  amountDue: number | null;
+  /** Автодоля: totalCost / число записавшихся. */
+  suggestedAmount: number;
+  /** Итоговая сумма к показу (ручная или suggested). */
+  amount: number;
+  createdAt: string;
+}
+
+export interface TrainingSummaryDto {
+  id: string;
+  title: string;
+  status: TrainingStatus;
+  startsAt: string;
+  venueName: string | null;
+  maxPlayers: number | null;
+  pricePerCourtHour: number;
+  courtHours: number;
+  totalCost: number;
+  participantCount: number;
+  confirmedCount: number;
+  courtBlocks: TrainingCourtBlockDto[];
+  createdAt: string;
+}
+
+export interface TrainingDto extends TrainingSummaryDto {
+  description: string | null;
+  venueAddress: string | null;
+  venueMapUrl: string | null;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  canManage: boolean;
+  canDelete: boolean;
+  /** Все registered подтверждены и есть хотя бы один — можно стартовать / показывать суммы. */
+  allConfirmed: boolean;
+  myParticipation: TrainingParticipantDto | null;
+}
+
+export interface TrainingStateDto {
+  training: TrainingDto;
+  participants: TrainingParticipantDto[];
 }

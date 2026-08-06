@@ -9,7 +9,7 @@ import {
 } from '@angular/router';
 import { filter, take } from 'rxjs';
 import { ApiClient } from './core/api';
-import { readTournamentDeepLink } from './core/deep-link';
+import { readTournamentDeepLink, readTrainingDeepLink } from './core/deep-link';
 import { I18nService } from './core/i18n';
 import { PreferencesService } from './core/preferences';
 import { RealtimeService } from './core/realtime';
@@ -269,6 +269,12 @@ export class App {
         takeUntilDestroyed(),
       )
       .subscribe(() => {
+        const trainingId = readTrainingDeepLink(this.telegram.startParam);
+        if (trainingId) {
+          if (this.router.url.startsWith(`/trainings/${trainingId}`)) return;
+          void this.router.navigate(['/trainings', trainingId], { replaceUrl: true });
+          return;
+        }
         const tournamentId = readTournamentDeepLink(this.telegram.startParam);
         if (!tournamentId) return;
         if (this.router.url.startsWith(`/tournaments/${tournamentId}`)) return;

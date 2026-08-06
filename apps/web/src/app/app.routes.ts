@@ -70,6 +70,44 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'trainings',
+    loadComponent: () =>
+      import('./features/trainings/training-list').then((m) => m.TrainingListPage),
+    title: 'Тренировки',
+  },
+  {
+    path: 'trainings/new',
+    canMatch: [canManage],
+    loadComponent: () =>
+      import('./features/trainings/training-form').then((m) => m.TrainingFormPage),
+    title: 'Новая тренировка',
+  },
+  {
+    path: 'trainings/:id/edit',
+    canMatch: [canManage],
+    loadComponent: () =>
+      import('./features/trainings/training-form').then((m) => m.TrainingFormPage),
+    title: 'Редактирование тренировки',
+  },
+  {
+    path: 'trainings/:id',
+    loadComponent: () =>
+      import('./features/trainings/training-detail').then((m) => m.TrainingDetailPage),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'info' },
+      {
+        path: 'info',
+        loadComponent: () =>
+          import('./features/trainings/training-info').then((m) => m.TrainingInfoTab),
+      },
+      {
+        path: 'players',
+        loadComponent: () =>
+          import('./features/trainings/training-players').then((m) => m.TrainingPlayersTab),
+      },
+    ],
+  },
+  {
     path: 'players',
     loadComponent: () =>
       import('./features/players/player-directory').then((m) => m.PlayerDirectoryPage),

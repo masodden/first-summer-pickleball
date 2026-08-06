@@ -15,6 +15,7 @@ import { createNoopSender, createTelegramSender } from './bot/notifications.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPlayerRoutes } from './routes/players.js';
 import { registerTournamentRoutes } from './routes/tournaments.js';
+import { registerTrainingRoutes } from './routes/trainings.js';
 import { registerMatchRoutes } from './routes/matches.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -105,6 +106,7 @@ export async function buildServer() {
   registerAuthRoutes(app, ctx);
   registerPlayerRoutes(app, ctx);
   registerTournamentRoutes(app, ctx);
+  registerTrainingRoutes(app, ctx);
   registerMatchRoutes(app, ctx);
   registerAdminRoutes(app, ctx);
   registerPublicRoutes(app, ctx);

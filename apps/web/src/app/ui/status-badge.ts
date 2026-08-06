@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import type { TournamentStatus } from '@fsp/shared';
+import type { TournamentStatus, TrainingStatus } from '@fsp/shared';
 import { I18nService } from '../core/i18n';
 
-/** Статус турнира: «Идёт регистрация», «Идёт», «Завершён». */
+/** Статус турнира или тренировки: «Идёт регистрация», «Идёт», «Завершён». */
 @Component({
   selector: 'app-status-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -10,7 +10,7 @@ import { I18nService } from '../core/i18n';
 })
 export class StatusBadge {
   private readonly i18n = inject(I18nService);
-  readonly status = input.required<TournamentStatus>();
+  readonly status = input.required<TournamentStatus | TrainingStatus>();
 
   protected readonly label = computed(() => {
     switch (this.status()) {

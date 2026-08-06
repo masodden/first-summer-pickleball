@@ -915,6 +915,114 @@ async function main(): Promise<void> {
 
   await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
 
+  section('Тренировка: запись, суммы, старт и финиш');
+  // Блоки: 1×1 + 2×2 = 5 корт·ч × 1000 = 5000 → по 1250 на четверых.
+  const trainingStartsAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const { training: createdTraining } = await request<{
+    training: {
+      id: string;
+      courtHours: number;
+      totalCost: number;
+      status: string;
+    };
+  }>('POST', '/api/trainings', {
+    token: admin.token,
+    body: {
+      title: `Тренировка ${RUN_TAG}`,
+      startsAt: trainingStartsAt,
+      maxPlayers: 4,
+      pricePerCourtHour: 1000,
+      courtBlocks: [
+        { courts: 1, hours: 1 },
+        { courts: 2, hours: 2 },
+      ],
+      venueName: 'ВДНХ',
+    },
+  });
+  check(createdTraining.courtHours === 5, 'корт·часы: 1×1 + 2×2 = 5');
+  check(createdTraining.totalCost === 5000, 'аренда 5 × 1000 = 5000');
+
+  const trainingPlayers = advancedPlayers.slice(0, 4);
+  for (const player of trainingPlayers) {
+    await request('POST', `/api/trainings/${createdTraining.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+  }
+
+  let trainingState = await request<{
+    training: {
+      status: string;
+      allConfirmed: boolean;
+      participantCount: number;
+      totalCost: number;
+    };
+    participants: {
+      player: { id: string };
+      confirmedAndPaid: boolean;
+      amount: number;
+      suggestedAmount: number;
+      amountDue: number | null;
+      status: string;
+    }[];
+  }>(`GET`, `/api/trainings/${createdTraining.id}/state`, { token: admin.token });
+
+  check(trainingState.training.participantCount === 4, 'на тренировку записались 4 игрока');
+  await expectError('not_all_confirmed', 'старт без подтверждений запрещён', () =>
+    request('POST', `/api/trainings/${createdTraining.id}/start`, { token: admin.token }),
+  );
+
+  for (const player of trainingPlayers) {
+    await request('PUT', `/api/trainings/${createdTraining.id}/participants/${player.id}/paid`, {
+      token: admin.token,
+      body: { confirmedAndPaid: true },
+    });
+  }
+
+  trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
+    token: admin.token,
+  });
+  check(trainingState.training.allConfirmed === true, 'все записавшиеся подтверждены');
+  check(
+    trainingState.participants.every((row) => row.suggestedAmount === 1250 && row.amount === 1250),
+    'доля по умолчанию 5000 / 4 = 1250',
+  );
+
+  const editedPlayer = trainingPlayers[0]!;
+  await request(
+    'PUT',
+    `/api/trainings/${createdTraining.id}/participants/${editedPlayer.id}/amount`,
+    { token: admin.token, body: { amountDue: 1500 } },
+  );
+  trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
+    token: admin.token,
+  });
+  const editedRow = trainingState.participants.find((row) => row.player.id === editedPlayer.id);
+  check(editedRow?.amountDue === 1500 && editedRow.amount === 1500, 'ручная сумма сохраняется');
+  check(
+    trainingState.participants
+      .filter((row) => row.player.id !== editedPlayer.id)
+      .every((row) => row.amount === 1250),
+    'у остальных остаётся автодоля',
+  );
+
+  await request('POST', `/api/trainings/${createdTraining.id}/start`, { token: admin.token });
+  trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
+    token: admin.token,
+  });
+  check(trainingState.training.status === 'running', 'тренировка стартовала');
+
+  await request('POST', `/api/trainings/${createdTraining.id}/finish`, { token: admin.token });
+  trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
+    token: admin.token,
+  });
+  check(trainingState.training.status === 'finished', 'тренировку можно завершить в любой момент');
+
+  await request('DELETE', `/api/trainings/${createdTraining.id}`, { token: admin.token });
+  await expectError('not_found', 'удалённая тренировка недоступна', () =>
+    request('GET', `/api/trainings/${createdTraining.id}`),
+  );
+
   section('Права и удаление');
   await expectError('forbidden', 'модератор не удаляет турниры', () =>
     request('DELETE', `/api/tournaments/${mexicano.id}`, { token: moderator.token }),

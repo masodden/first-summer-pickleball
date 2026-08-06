@@ -43,6 +43,13 @@
       "when": 1785962000000,
       "tag": "0005_match_skipped",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785965000000,
+      "tag": "0006_trainings",
+      "breakpoints": true
     }
   ]
 }

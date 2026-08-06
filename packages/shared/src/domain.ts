@@ -51,6 +51,23 @@ export const TOURNAMENT_STATUSES = [
 ] as const;
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
+/** Тренировка: без закрытой регистрации — записались, подтвердили, начали. */
+export const TRAINING_STATUSES = ['registration', 'running', 'finished'] as const;
+export type TrainingStatus = (typeof TRAINING_STATUSES)[number];
+
+/** Сумма корт·часов по блокам аренды. */
+export function trainingCourtHours(
+  blocks: readonly { courts: number; hours: number }[],
+): number {
+  return blocks.reduce((sum, block) => sum + block.courts * block.hours, 0);
+}
+
+/** Доля с человека: totalCost / число записавшихся, округление до целых. */
+export function trainingSuggestedShare(totalCost: number, registeredCount: number): number {
+  if (registeredCount <= 0) return 0;
+  return Math.round(totalCost / registeredCount);
+}
+
 export const MATCH_STATUSES = ['scheduled', 'running', 'paused', 'finished', 'skipped'] as const;
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
 
