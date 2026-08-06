@@ -142,8 +142,14 @@ type Filter = 'active' | 'finished';
                       role="progressbar"
                       [attr.aria-valuenow]="item.participantCount"
                       [attr.aria-valuemax]="item.maxPlayers"
+                      [attr.aria-label]="
+                        t()('tournament.participantsCount', {
+                          count: item.participantCount,
+                          max: item.maxPlayers,
+                        })
+                      "
                     >
-                      <span [style.width.%]="fill(item)"></span>
+                      <span class="progress__fill" [style.width]="fill(item) + '%'"></span>
                     </div>
                   </div>
                 </a>
@@ -189,15 +195,16 @@ type Filter = 'active' | 'finished';
     }
 
     .progress {
-      height: 5px;
+      height: 6px;
       border-radius: var(--radius-full);
-      background: var(--glass-bg-subtle);
+      background: color-mix(in srgb, var(--ink-900) 12%, transparent);
       overflow: hidden;
     }
 
-    .progress span {
+    .progress__fill {
       display: block;
       height: 100%;
+      max-width: 100%;
       border-radius: inherit;
       background: linear-gradient(90deg, var(--lime-400), var(--clay-400));
       transition: width var(--duration-slow) var(--ease-out);
