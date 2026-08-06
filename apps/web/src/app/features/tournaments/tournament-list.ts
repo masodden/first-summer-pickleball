@@ -253,7 +253,9 @@ export class TournamentListPage {
   }
 
   protected fill(item: TournamentSummaryDto): number {
-    if (item.maxPlayers === 0) return 0;
-    return Math.min(100, Math.round((item.participantCount / item.maxPlayers) * 100));
+    const max = Number(item.maxPlayers) || 0;
+    const count = Number(item.participantCount) || 0;
+    if (max <= 0 || count <= 0) return 0;
+    return Math.min(100, Math.round((count / max) * 100));
   }
 }

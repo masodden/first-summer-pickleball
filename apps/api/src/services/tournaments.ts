@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, asc, count, desc, eq, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import {
   normalizeCourtNames,
   type CreateTournamentInput,
@@ -123,36 +123,62 @@ export async function listTournaments(
   db: Database,
   viewer: Viewer | null,
 ): Promise<TournamentSummaryDto[]> {
+  void viewer;
+
   const rows = await db
-    .select({
-      tournament: tournaments,
-      participantCount: sql<number>`(
-        select count(*) from ${tournamentPlayers}
-        where ${tournamentPlayers.tournamentId} = ${tournaments.id}
-          and ${tournamentPlayers.status} = 'registered'
-      )`.mapWith(Number),
-      confirmedCount: sql<number>`(
-        select count(*) from ${tournamentPlayers}
-        where ${tournamentPlayers.tournamentId} = ${tournaments.id}
-          and ${tournamentPlayers.status} = 'registered'
-          and ${tournamentPlayers.confirmedAndPaid}
-      )`.mapWith(Number),
-      roundsGenerated: sql<number>`(
-        select count(*) from ${rounds} where ${rounds.tournamentId} = ${tournaments.id}
-      )`.mapWith(Number),
-    })
+    .select()
     .from(tournaments)
     .where(isNull(tournaments.deletedAt))
     .orderBy(desc(tournaments.startsAt), desc(tournaments.createdAt));
 
-  void viewer;
-  return rows.map((row) =>
-    toSummaryDto(row.tournament, {
-      participantCount: row.participantCount,
-      confirmedCount: row.confirmedCount,
-      roundsGenerated: row.roundsGenerated,
-    }),
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((row) => row.id);
+
+  // Считаем отдельно (не correlated subquery): в Drizzle подзапросы с table
+  // в sql`` иногда дают 0 даже при живом составе.
+  const participantRows = await db
+    .select({
+      tournamentId: tournamentPlayers.tournamentId,
+      participantCount: sql<number>`count(*)`.mapWith(Number),
+      confirmedCount: sql<number>`count(*) filter (where ${tournamentPlayers.confirmedAndPaid})`.mapWith(
+        Number,
+      ),
+    })
+    .from(tournamentPlayers)
+    .where(
+      and(inArray(tournamentPlayers.tournamentId, ids), eq(tournamentPlayers.status, 'registered')),
+    )
+    .groupBy(tournamentPlayers.tournamentId);
+
+  const roundRows = await db
+    .select({
+      tournamentId: rounds.tournamentId,
+      roundsGenerated: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(rounds)
+    .where(inArray(rounds.tournamentId, ids))
+    .groupBy(rounds.tournamentId);
+
+  const participantsById = new Map(
+    participantRows.map((row) => [
+      row.tournamentId,
+      {
+        participantCount: row.participantCount,
+        confirmedCount: row.confirmedCount,
+      },
+    ]),
   );
+  const roundsById = new Map(roundRows.map((row) => [row.tournamentId, row.roundsGenerated]));
+
+  return rows.map((row) => {
+    const participants = participantsById.get(row.id);
+    return toSummaryDto(row, {
+      participantCount: participants?.participantCount ?? 0,
+      confirmedCount: participants?.confirmedCount ?? 0,
+      roundsGenerated: roundsById.get(row.id) ?? 0,
+    });
+  });
 }
 
 async function findParticipation(
