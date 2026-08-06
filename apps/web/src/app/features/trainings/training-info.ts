@@ -98,7 +98,7 @@ import { Racket } from '../../ui/ball';
                 </button>
               }
             </div>
-          } @else if (item.status === 'registration') {
+          } @else if (store.isActive()) {
             <button
               type="button"
               class="btn btn--go btn--block btn--lg"
@@ -111,7 +111,7 @@ import { Racket } from '../../ui/ball';
               <p class="tiny center muted">{{ t()('participant.full') }}</p>
             }
           } @else {
-            <p class="small muted center">{{ t()('status.registration_closed') }}</p>
+            <p class="small muted center">{{ t()('training.finished') }}</p>
           }
         </section>
       </div>

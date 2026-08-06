@@ -40,7 +40,7 @@ export const matchStatusEnum = pgEnum('match_status', [
 export const teamSideEnum = pgEnum('team_side', ['A', 'B']);
 /** Откуда взялось значение поля: нужно, чтобы импорт не перетирал ручные правки. */
 export const fieldSourceEnum = pgEnum('field_source', ['import', 'manual', 'self']);
-/** Тренировки проще турниров: запись → старт → финиш, без раундов и матчей. */
+/** Тренировки: сразу активны (`running`), затем `finished`. `registration` — наследие. */
 export const trainingStatusEnum = pgEnum('training_status', [
   'registration',
   'running',
@@ -334,7 +334,7 @@ export const trainings = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     title: text().notNull(),
-    status: trainingStatusEnum().notNull().default('registration'),
+    status: trainingStatusEnum().notNull().default('running'),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     /** null — без лимита мест. */
     maxPlayers: integer(),

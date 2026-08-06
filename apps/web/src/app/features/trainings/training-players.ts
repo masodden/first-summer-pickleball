@@ -13,7 +13,7 @@ import { PlayerPicker } from '../players/player-picker';
   template: `
     @if (training(); as item) {
       <div class="stack stack--4">
-        @if (store.canManage()) {
+        @if (store.canManage() && store.isActive() && !store.allConfirmed()) {
           <section class="glass card--tight stack stack--3">
             <div class="row row--between">
               <div class="stack stack--1">
@@ -27,33 +27,55 @@ import { PlayerPicker } from '../players/player-picker';
                   }}
                 </span>
               </div>
-              <span
-                class="chip"
-                [class.chip--go]="store.allConfirmed()"
-                [class.chip--accent]="!store.allConfirmed()"
-              >
+              <span class="chip chip--accent">
                 {{ store.confirmedCount() }}/{{ store.registered().length }}
               </span>
             </div>
 
-            @if (store.showAmounts()) {
-              <p class="tiny faint">{{ t()('training.amountsReady') }}</p>
+            <button type="button" class="btn btn--primary btn--block" (click)="picker.set(true)">
+              {{ t()('participant.add') }}
+            </button>
+          </section>
+        }
+
+        @if (store.showAmounts()) {
+          <section class="glass card--tight stack stack--3">
+            <div class="row row--between">
+              <h3>{{ t()('training.distribution') }}</h3>
+              <span
+                class="chip numeric"
+                [class.chip--go]="store.undistributedAmount() === 0"
+                [class.chip--accent]="store.undistributedAmount() > 0"
+                [class.chip--danger]="store.undistributedAmount() < 0"
+              >
+                {{
+                  t()('training.distributedOf', {
+                    distributed: store.distributedAmount(),
+                    total: item.totalCost,
+                  })
+                }}
+              </span>
+            </div>
+            @if (store.undistributedAmount() > 0) {
+              <p class="small strong remainder">
+                {{ t()('training.undistributed', { amount: store.undistributedAmount() }) }}
+              </p>
+            } @else if (store.undistributedAmount() < 0) {
+              <p class="small strong remainder remainder--over">
+                {{ t()('training.overdistributed', { amount: -store.undistributedAmount() }) }}
+              </p>
+            } @else {
+              <p class="tiny muted">{{ t()('training.distributionOk') }}</p>
             }
 
-            @if (item.status === 'registration') {
-              <button type="button" class="btn btn--primary btn--block" (click)="picker.set(true)">
-                {{ t()('participant.add') }}
-              </button>
-            }
-
-            @if (item.status === 'registration' && store.allConfirmed()) {
+            @if (store.canFinish()) {
               <button
                 type="button"
-                class="btn btn--go btn--block"
-                [disabled]="store.isBusy('start')"
-                (click)="start()"
+                class="btn btn--primary btn--block"
+                [disabled]="store.isBusy('finish')"
+                (click)="finish()"
               >
-                {{ t()('training.start') }}
+                {{ t()('training.finish') }}
               </button>
             }
           </section>
@@ -85,7 +107,7 @@ import { PlayerPicker } from '../players/player-picker';
                 @if (store.showAmounts()) {
                   <div class="amount-row">
                     <span class="strong numeric amount">{{ participant.amount }}&nbsp;₽</span>
-                    @if (store.canManage()) {
+                    @if (store.canEditAmounts()) {
                       <button
                         type="button"
                         class="btn btn--icon btn--glass edit-amount"
@@ -102,7 +124,7 @@ import { PlayerPicker } from '../players/player-picker';
                   </div>
                 }
 
-                @if (store.canManage() && item.status !== 'finished') {
+                @if (store.canManage() && store.isActive()) {
                   <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
                     <input
                       type="checkbox"
@@ -113,7 +135,7 @@ import { PlayerPicker } from '../players/player-picker';
                   </label>
                 }
 
-                @if (store.canManage() && item.status === 'registration') {
+                @if (store.canManage() && store.isActive()) {
                   <button
                     type="button"
                     class="btn btn--icon btn--ghost"
@@ -128,7 +150,7 @@ import { PlayerPicker } from '../players/player-picker';
                 }
               </div>
 
-              @if (store.canManage() && editingAmount() === participant.player.id) {
+              @if (store.canEditAmounts() && editingAmount() === participant.player.id) {
                 <div class="person__edit">
                   <input
                     class="input amount-input numeric"
@@ -146,13 +168,6 @@ import { PlayerPicker } from '../players/player-picker';
                     (click)="saveAmount(participant)"
                   >
                     {{ t()('common.save') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn--sm btn--glass"
-                    (click)="resetAmount(participant)"
-                  >
-                    {{ t()('training.amountReset') }}
                   </button>
                 </div>
               }
@@ -252,6 +267,14 @@ import { PlayerPicker } from '../players/player-picker';
       padding: 0 var(--space-2);
     }
 
+    .remainder {
+      color: var(--accent-strong);
+    }
+
+    .remainder--over {
+      color: var(--danger);
+    }
+
     .icon {
       width: 15px;
       height: 15px;
@@ -303,24 +326,17 @@ export class TrainingPlayersTab {
     this.editingAmount.set(null);
   }
 
-  protected async resetAmount(participant: TrainingParticipantDto): Promise<void> {
-    await this.store.setAmount(participant.player.id, null);
-    this.editingAmount.set(null);
-  }
-
   protected async onPicked(playerId: string): Promise<void> {
     this.picker.set(false);
     await this.store.addParticipant(playerId);
   }
 
-  protected async start(): Promise<void> {
+  protected async finish(): Promise<void> {
     const confirmed = await this.confirm.ask({
-      title: this.i18n.translate('training.start'),
-      message: this.i18n.translate('training.startConfirm', {
-        count: this.store.registered().length,
-      }),
-      confirmLabel: this.i18n.translate('training.start'),
+      title: this.i18n.translate('training.finish'),
+      message: this.i18n.translate('training.finishConfirm'),
+      confirmLabel: this.i18n.translate('training.finishShort'),
     });
-    if (confirmed) await this.store.start();
+    if (confirmed) await this.store.finish();
   }
 }

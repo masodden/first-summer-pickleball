@@ -915,7 +915,7 @@ async function main(): Promise<void> {
 
   await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
 
-  section('Тренировка: запись, суммы, старт и финиш');
+  section('Тренировка: запись, суммы и финиш');
   // Блоки: 1×1 + 2×2 = 5 корт·ч × 1000 = 5000 → по 1250 на четверых.
   const trainingStartsAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   const { training: createdTraining } = await request<{
@@ -941,6 +941,7 @@ async function main(): Promise<void> {
   });
   check(createdTraining.courtHours === 5, 'корт·часы: 1×1 + 2×2 = 5');
   check(createdTraining.totalCost === 5000, 'аренда 5 × 1000 = 5000');
+  check(createdTraining.status === 'running', 'новая тренировка сразу в статусе running');
 
   const trainingPlayers = advancedPlayers.slice(0, 4);
   for (const player of trainingPlayers) {
@@ -965,11 +966,10 @@ async function main(): Promise<void> {
       amountDue: number | null;
       status: string;
     }[];
-  }>(`GET`, `/api/trainings/${createdTraining.id}/state`, { token: admin.token });
-
+  }>('GET', `/api/trainings/${createdTraining.id}/state`, { token: admin.token });
   check(trainingState.training.participantCount === 4, 'на тренировку записались 4 игрока');
-  await expectError('not_all_confirmed', 'старт без подтверждений запрещён', () =>
-    request('POST', `/api/trainings/${createdTraining.id}/start`, { token: admin.token }),
+  await expectError('not_all_confirmed', 'финиш без подтверждений запрещён', () =>
+    request('POST', `/api/trainings/${createdTraining.id}/finish`, { token: admin.token }),
   );
 
   for (const player of trainingPlayers) {
@@ -1006,17 +1006,18 @@ async function main(): Promise<void> {
     'у остальных остаётся автодоля',
   );
 
-  await request('POST', `/api/trainings/${createdTraining.id}/start`, { token: admin.token });
-  trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
-    token: admin.token,
-  });
-  check(trainingState.training.status === 'running', 'тренировка стартовала');
-
   await request('POST', `/api/trainings/${createdTraining.id}/finish`, { token: admin.token });
   trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
     token: admin.token,
   });
-  check(trainingState.training.status === 'finished', 'тренировку можно завершить в любой момент');
+  check(trainingState.training.status === 'finished', 'тренировку можно завершить после confirm');
+
+  await expectError('tournament_wrong_status', 'после финиша суммы не правятся', () =>
+    request('PUT', `/api/trainings/${createdTraining.id}/participants/${editedPlayer.id}/amount`, {
+      token: admin.token,
+      body: { amountDue: 1600 },
+    }),
+  );
 
   await request('DELETE', `/api/trainings/${createdTraining.id}`, { token: admin.token });
   await expectError('not_found', 'удалённая тренировка недоступна', () =>

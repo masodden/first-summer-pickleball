@@ -1,5 +1,5 @@
-import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
-import type { TrainingDto, TrainingParticipantDto } from '@fsp/shared';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { isTrainingActive, type TrainingDto, type TrainingParticipantDto } from '@fsp/shared';
 import { ApiFailure } from './api';
 import { I18nService } from './i18n';
 import { SessionStore } from './session';
@@ -12,11 +12,6 @@ export class TrainingStore {
   private readonly toast = inject(ToastService);
   private readonly session = inject(SessionStore);
   private readonly i18n = inject(I18nService);
-  private readonly destroyRef = inject(DestroyRef);
-
-  constructor() {
-    this.destroyRef.onDestroy(() => this.dismissCelebration());
-  }
 
   private readonly idSignal = signal<string | null>(null);
   private readonly trainingSignal = signal<TrainingDto | null>(null);
@@ -24,15 +19,12 @@ export class TrainingStore {
   private readonly loadingSignal = signal(true);
   private readonly errorSignal = signal<ApiFailure | null>(null);
   private readonly busySignal = signal<Set<string>>(new Set());
-  private readonly startCelebrationSignal = signal(false);
-  private celebrationTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly id = this.idSignal.asReadonly();
   readonly training = this.trainingSignal.asReadonly();
   readonly participants = this.participantsSignal.asReadonly();
   readonly loading = this.loadingSignal.asReadonly();
   readonly loadError = this.errorSignal.asReadonly();
-  readonly startCelebration = this.startCelebrationSignal.asReadonly();
 
   readonly registered = computed(() =>
     this.participantsSignal().filter((item) => item.status === 'registered'),
@@ -49,12 +41,28 @@ export class TrainingStore {
     () => this.registered().length > 0 && this.confirmedCount() === this.registered().length,
   );
   readonly canManage = computed(() => this.trainingSignal()?.canManage ?? false);
-  readonly showAmounts = computed(
-    () => this.allConfirmed() || this.trainingSignal()?.status !== 'registration',
+  readonly isActive = computed(() => {
+    const status = this.trainingSignal()?.status;
+    return status ? isTrainingActive(status) : false;
+  });
+  /** Суммы после полного подтверждения состава. */
+  readonly showAmounts = computed(() => this.allConfirmed());
+  readonly canFinish = computed(
+    () => this.canManage() && this.isActive() && this.allConfirmed(),
+  );
+  readonly canEditAmounts = computed(() => this.canManage() && this.isActive() && this.allConfirmed());
+
+  /** Сумма долей у записавшихся — для блока «распределено / остаток». */
+  readonly distributedAmount = computed(() =>
+    this.registered().reduce((sum, row) => sum + row.amount, 0),
   );
 
+  readonly undistributedAmount = computed(() => {
+    const total = this.trainingSignal()?.totalCost ?? 0;
+    return total - this.distributedAmount();
+  });
+
   async load(id: string): Promise<void> {
-    if (this.idSignal() !== id) this.dismissCelebration();
     this.idSignal.set(id);
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
@@ -159,34 +167,8 @@ export class TrainingStore {
     }).then(() => undefined);
   }
 
-  start(): Promise<void> {
-    return this.run('start', async () => {
-      const { training } = await this.api.start(this.requireId());
-      this.trainingSignal.set(training);
-      this.showCelebration();
-      this.toast.success(this.i18n.translate('training.started'));
-      await this.refresh();
-    }).then(() => undefined);
-  }
-
-  dismissCelebration(): void {
-    if (this.celebrationTimer) {
-      clearTimeout(this.celebrationTimer);
-      this.celebrationTimer = null;
-    }
-    this.startCelebrationSignal.set(false);
-  }
-
-  private showCelebration(): void {
-    this.dismissCelebration();
-    this.startCelebrationSignal.set(true);
-    // Короткий оверлей: иначе после старта/финиша анимация «залипает» на экране.
-    this.celebrationTimer = setTimeout(() => this.dismissCelebration(), 2400);
-  }
-
   finish(): Promise<void> {
     return this.run('finish', async () => {
-      this.dismissCelebration();
       const { training } = await this.api.finish(this.requireId());
       this.trainingSignal.set(training);
       this.toast.success(this.i18n.translate('training.finished'));
@@ -202,9 +184,8 @@ export class TrainingStore {
 
   canLeave(): boolean {
     const mine = this.trainingSignal()?.myParticipation;
-    const status = this.trainingSignal()?.status;
     if (!mine || !this.session.isAuthenticated()) return false;
-    if (status !== 'registration') return false;
+    if (!this.isActive()) return false;
     return !mine.confirmedAndPaid;
   }
 }

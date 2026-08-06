@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { TrainingSummaryDto } from '@fsp/shared';
+import { isTrainingActive, type TrainingStatus, type TrainingSummaryDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TrainingApi } from '../../core/training-api';
@@ -49,7 +49,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
           [class.chip--accent]="filter() === 'active'"
           (click)="filter.set('active')"
         >
-          {{ t()('status.running') }} · {{ t()('status.registration') }}
+          {{ t()('status.running') }}
         </button>
         <button
           type="button"
@@ -57,7 +57,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
           [class.chip--accent]="filter() === 'finished'"
           (click)="filter.set('finished')"
         >
-          {{ t()('status.finished') }}
+          {{ t()('training.statusFinished') }}
         </button>
       </div>
 
@@ -93,7 +93,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
               @for (item of group.items; track item.id) {
                 <a class="glass card--tight tile" [routerLink]="['/trainings', item.id]">
                   <div class="row row--between">
-                    <app-status-badge [status]="item.status" />
+                    <app-status-badge entity="training" [status]="badgeStatus(item.status)" />
                     <span class="tiny faint numeric">{{ time(item.startsAt) }}</span>
                   </div>
 
@@ -107,7 +107,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
                         <span class="chip numeric">{{ item.totalCost }}</span>
                       </div>
                     </div>
-                    @if (item.status === 'running') {
+                    @if (isTrainingActive(item.status)) {
                       <app-ball [size]="26" motion="bounce" />
                     }
                   </div>
@@ -219,6 +219,12 @@ export class TrainingListPage {
       items: items.sort((a, b) => compareTrainings(a, b, finished)),
     }));
   });
+
+  protected readonly isTrainingActive = isTrainingActive;
+
+  protected badgeStatus(status: TrainingStatus): TrainingStatus {
+    return isTrainingActive(status) ? 'running' : 'finished';
+  }
 
   protected time(value: string): string {
     return this.i18n.formatDate(value, { day: undefined, month: undefined });

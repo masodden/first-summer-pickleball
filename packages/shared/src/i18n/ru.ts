@@ -430,14 +430,20 @@ export const ru = {
   'training.started': 'Тренировка началась',
   'training.runningHint': 'Тренировка идёт. Завершить можно в любой момент.',
   'training.finish': 'Завершить тренировку',
-  'training.finishConfirm': 'Завершить тренировку?',
+  'training.finishShort': 'Завершить',
+  'training.finishConfirm': 'Завершить тренировку? После этого суммы менять нельзя.',
   'training.finished': 'Тренировка завершена',
+  'training.statusFinished': 'Завершена',
   'training.amount': 'К оплате',
   'training.amountEdit': 'Изменить сумму',
-  'training.amountReset': 'Считать автоматически',
   'training.participantsCount': '{{count}} из {{max}}',
   'training.participantsOpen': '{{count}} записалось',
   'training.amountsReady': 'Суммы посчитаны — можно править карандашом',
+  'training.distribution': 'Распределение',
+  'training.distributedOf': '{{distributed}} из {{total}} ₽',
+  'training.undistributed': 'Нераспределено {{amount}} ₽',
+  'training.overdistributed': 'Перераспределено на {{amount}} ₽',
+  'training.distributionOk': 'Сумма распределена полностью',
 } as const;
 
 export type TranslationKey = keyof typeof ru;

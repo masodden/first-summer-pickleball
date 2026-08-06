@@ -75,12 +75,6 @@ export class TrainingApi {
     return this.api.post(`/api/trainings/${id}/participants/${playerId}/promote`);
   }
 
-  start(id: string): Promise<{ training: TrainingDto }> {
-    return this.api.post(`/api/trainings/${id}/start`, undefined, {
-      queueLabel: 'Старт тренировки',
-    });
-  }
-
   finish(id: string): Promise<{ training: TrainingDto }> {
     return this.api.post(`/api/trainings/${id}/finish`, undefined, {
       queueLabel: 'Завершение тренировки',

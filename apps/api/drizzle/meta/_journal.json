@@ -50,6 +50,13 @@
       "when": 1785965000000,
       "tag": "0006_trainings",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785967000000,
+      "tag": "0007_training_active",
+      "breakpoints": true
     }
   ]
 }

@@ -22,7 +22,6 @@ import {
   removeTrainingParticipant,
   setTrainingParticipantAmount,
   setTrainingParticipantPaid,
-  startTraining,
   updateTraining,
 } from '../services/trainings.js';
 import type { AppContext } from './context.js';
@@ -154,12 +153,6 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
       return { participant };
     },
   );
-
-  app.post<{ Params: { id: string } }>('/api/trainings/:id/start', async (request) => {
-    const viewer = requireRole(request, 'moderator');
-    const training = await startTraining(db, request.params.id, viewer);
-    return { training };
-  });
 
   app.post<{ Params: { id: string } }>('/api/trainings/:id/finish', async (request) => {
     const viewer = requireRole(request, 'moderator');

@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';import {
+  isTrainingActive,
   trainingCourtHours,
   trainingSuggestedShare,
   type CreateTrainingInput,
@@ -289,10 +290,12 @@ export async function createTraining(
 ): Promise<TrainingDto> {
   if (!canManageTournaments(actor)) throw forbidden('Создавать тренировки может организатор');
 
+  const now = new Date();
   const [row] = await db
     .insert(trainings)
     .values({
       title: input.title,
+      status: 'running',
       startsAt: new Date(input.startsAt),
       maxPlayers: input.maxPlayers ?? null,
       pricePerCourtHour: input.pricePerCourtHour,
@@ -301,6 +304,7 @@ export async function createTraining(
       venueAddress: input.venueAddress ?? null,
       venueMapUrl: input.venueMapUrl ?? null,
       createdByAccountId: actor.accountId,
+      startedAt: now,
     })
     .returning();
 
@@ -326,8 +330,8 @@ export async function updateTraining(
 ): Promise<TrainingDto> {
   const current = await getTrainingRow(db, id);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (current.status !== 'registration') {
-    throw wrongStatus('Менять тренировку можно только до старта');
+  if (!isTrainingActive(current.status)) {
+    throw wrongStatus('Завершённую тренировку изменить нельзя');
   }
 
   const patch: Partial<typeof trainings.$inferInsert> = { updatedAt: new Date() };
@@ -390,12 +394,12 @@ export async function addTrainingParticipant(
   const training = await getTrainingRow(db, trainingId);
   if (options.bySelf) {
     if (actor.playerId !== playerId) throw forbidden('Записаться можно только за себя');
-    if (training.status !== 'registration') {
+    if (!isTrainingActive(training.status)) {
       throw wrongStatus('Запись на эту тренировку закрыта');
     }
   } else if (!canManageTournaments(actor)) {
     throw forbidden('Добавлять игроков может организатор');
-  } else if (training.status === 'finished') {
+  } else if (!isTrainingActive(training.status)) {
     throw wrongStatus('Тренировка уже завершена');
   }
 
@@ -480,14 +484,14 @@ export async function removeTrainingParticipant(
   const training = await getTrainingRow(db, trainingId);
   if (options.bySelf) {
     if (actor.playerId !== playerId) throw forbidden('Отменить можно только свою запись');
-    if (training.status === 'running' || training.status === 'finished') {
-      throw wrongStatus('Тренировка уже идёт, обратитесь к организатору');
+    if (!isTrainingActive(training.status)) {
+      throw wrongStatus('Тренировка уже завершена, обратитесь к организатору');
     }
   } else if (!canManageTournaments(actor)) {
     throw forbidden();
   }
-  if (training.status === 'running' || training.status === 'finished') {
-    throw wrongStatus('Состав уже зафиксирован');
+  if (!isTrainingActive(training.status)) {
+    throw wrongStatus('Состав завершённой тренировки менять нельзя');
   }
 
   const [existing] = await db
@@ -578,6 +582,9 @@ export async function setTrainingParticipantAmount(
 ): Promise<TrainingParticipantDto> {
   const training = await getTrainingRow(db, trainingId);
   if (!canManageTournaments(actor)) throw forbidden();
+  if (!isTrainingActive(training.status)) {
+    throw wrongStatus('После завершения суммы менять нельзя');
+  }
 
   const [row] = await db
     .update(trainingPlayers)
@@ -612,6 +619,9 @@ export async function promoteTrainingFromWaitlist(
 ): Promise<TrainingParticipantDto> {
   const training = await getTrainingRow(db, trainingId);
   if (!canManageTournaments(actor)) throw forbidden();
+  if (!isTrainingActive(training.status)) {
+    throw wrongStatus('Тренировка уже завершена');
+  }
 
   const counts = await loadCounts(db, trainingId);
   if (training.maxPlayers !== null && counts.participantCount >= training.maxPlayers) {
@@ -661,15 +671,15 @@ export async function listTrainingParticipants(
   );
 }
 
-export async function startTraining(
+export async function finishTraining(
   db: Database,
   trainingId: string,
   actor: Viewer,
 ): Promise<TrainingDto> {
   const training = await getTrainingRow(db, trainingId);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (training.status !== 'registration') {
-    throw wrongStatus('Тренировку можно начать только из регистрации');
+  if (!isTrainingActive(training.status)) {
+    throw wrongStatus('Тренировка уже завершена');
   }
 
   const counts = await loadCounts(db, trainingId);
@@ -678,31 +688,6 @@ export async function startTraining(
   }
   if (counts.confirmedCount !== counts.participantCount) {
     throw new ApiError('not_all_confirmed', 'Не все записавшиеся подтверждены');
-  }
-
-  await db
-    .update(trainings)
-    .set({ status: 'running', startedAt: new Date(), updatedAt: new Date() })
-    .where(eq(trainings.id, trainingId));
-
-  await recordAudit(db, actor, {
-    action: 'training.started',
-    entityType: 'training',
-    entityId: trainingId,
-  });
-
-  return getTrainingDto(db, trainingId, actor);
-}
-
-export async function finishTraining(
-  db: Database,
-  trainingId: string,
-  actor: Viewer,
-): Promise<TrainingDto> {
-  const training = await getTrainingRow(db, trainingId);
-  if (!canManageTournaments(actor)) throw forbidden();
-  if (training.status !== 'running') {
-    throw wrongStatus('Завершить можно только идущую тренировку');
   }
 
   await db

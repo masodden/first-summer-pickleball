@@ -51,9 +51,16 @@ export const TOURNAMENT_STATUSES = [
 ] as const;
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
-/** Тренировка: без закрытой регистрации — записались, подтвердили, начали. */
+/**
+ * Тренировка: сразу активна (`running` = «Идёт»), затем `finished`.
+ * Значение `registration` осталось в БД для старых строк и читается как активная.
+ */
 export const TRAINING_STATUSES = ['registration', 'running', 'finished'] as const;
 export type TrainingStatus = (typeof TRAINING_STATUSES)[number];
+
+export function isTrainingActive(status: TrainingStatus): boolean {
+  return status !== 'finished';
+}
 
 /** Сумма корт·часов по блокам аренды. */
 export function trainingCourtHours(

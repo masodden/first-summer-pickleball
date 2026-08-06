@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { isTrainingActive, type TrainingStatus } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { trainingMiniAppLink } from '../../core/deep-link';
 import { I18nService } from '../../core/i18n';
@@ -14,14 +16,14 @@ import { ToastService } from '../../core/toast';
 import { TrainingApi } from '../../core/training-api';
 import { TrainingStore } from '../../core/training-store';
 import { TournamentApi } from '../../core/tournament-api';
-import { Ball, Racket } from '../../ui/ball';
+import { Ball } from '../../ui/ball';
 import { StatusBadge } from '../../ui/status-badge';
 
 @Component({
   selector: 'app-training-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [TrainingStore],
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, StatusBadge, Ball, Racket],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, StatusBadge, Ball],
   template: `
     @if (store.loading() && !training()) {
       <div class="stack stack--3">
@@ -35,19 +37,10 @@ import { StatusBadge } from '../../ui/status-badge';
       </div>
     } @else if (training(); as item) {
       <div class="stack stack--4">
-        @if (store.startCelebration()) {
-          <div class="celebration glass card center stack stack--3" (click)="store.dismissCelebration()">
-            <app-racket [size]="72" [swing]="true" />
-            <app-ball [size]="40" motion="bounce" />
-            <h2>{{ t()('training.started') }}</h2>
-            <p class="small muted">{{ t()('training.runningHint') }}</p>
-          </div>
-        }
-
         <header class="glass card--tight stack stack--3">
           <div class="row row--between">
-            <app-status-badge [status]="item.status" />
-            @if (item.status === 'running') {
+            <app-status-badge entity="training" [status]="badgeStatus()" />
+            @if (store.isActive()) {
               <app-ball [size]="22" motion="bounce" />
             }
           </div>
@@ -69,11 +62,11 @@ import { StatusBadge } from '../../ui/status-badge';
             <span class="chip numeric">
               {{ t()('training.totalCost', { amount: item.totalCost }) }}
             </span>
-            @if (item.allConfirmed && item.participantCount > 0) {
+            @if (store.showAmounts()) {
               <span class="chip chip--go numeric">
                 {{
                   t()('training.suggestedShare', {
-                    amount: Math.round(item.totalCost / item.participantCount),
+                    amount: Math.round(item.totalCost / Math.max(item.participantCount, 1)),
                   })
                 }}
               </span>
@@ -85,23 +78,12 @@ import { StatusBadge } from '../../ui/status-badge';
               {{ t()('training.appLink') }}
             </button>
             @if (store.canManage()) {
-              @if (item.status === 'registration') {
-                <button
-                  type="button"
-                  class="btn btn--sm btn--go"
-                  [disabled]="!store.allConfirmed() || store.isBusy('start')"
-                  [title]="
-                    store.allConfirmed() ? t()('training.startHint') : t()('checkin.notAllConfirmed')
-                  "
-                  (click)="start()"
-                >
-                  {{ t()('training.start') }}
-                </button>
+              @if (store.isActive()) {
                 <a class="btn btn--sm btn--glass" [routerLink]="['/trainings', item.id, 'edit']">
                   {{ t()('common.edit') }}
                 </a>
               }
-              @if (item.status === 'running') {
+              @if (store.canFinish()) {
                 <button
                   type="button"
                   class="btn btn--sm btn--primary"
@@ -118,10 +100,6 @@ import { StatusBadge } from '../../ui/status-badge';
               }
             }
           </div>
-
-          @if (item.status === 'running') {
-            <p class="small muted">{{ t()('training.runningHint') }}</p>
-          }
         </header>
 
         <nav class="tabs glass glass--subtle" [attr.aria-label]="t()('training.info')">
@@ -141,22 +119,6 @@ import { StatusBadge } from '../../ui/status-badge';
   styles: `
     .actions {
       gap: var(--space-2);
-    }
-
-    .celebration {
-      animation: pop 0.55s var(--ease-spring);
-      cursor: pointer;
-    }
-
-    @keyframes pop {
-      from {
-        transform: scale(0.92);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
     }
 
     .tabs {
@@ -217,6 +179,13 @@ export class TrainingDetailPage {
   readonly id = input.required<string>();
   protected readonly training = this.store.training;
 
+  /** Старые `registration` показываем как «Идёт». */
+  protected readonly badgeStatus = computed((): TrainingStatus => {
+    const status = this.training()?.status;
+    if (!status || isTrainingActive(status)) return 'running';
+    return 'finished';
+  });
+
   constructor() {
     effect(() => {
       const id = this.id();
@@ -248,22 +217,11 @@ export class TrainingDetailPage {
     }
   }
 
-  protected async start(): Promise<void> {
-    const confirmed = await this.confirm.ask({
-      title: this.i18n.translate('training.start'),
-      message: this.i18n.translate('training.startConfirm', {
-        count: this.store.registered().length,
-      }),
-      confirmLabel: this.i18n.translate('training.start'),
-    });
-    if (confirmed) await this.store.start();
-  }
-
   protected async finish(): Promise<void> {
     const confirmed = await this.confirm.ask({
       title: this.i18n.translate('training.finish'),
       message: this.i18n.translate('training.finishConfirm'),
-      confirmLabel: this.i18n.translate('training.finish'),
+      confirmLabel: this.i18n.translate('training.finishShort'),
     });
     if (confirmed) await this.store.finish();
   }

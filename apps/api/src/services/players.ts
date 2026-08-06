@@ -83,7 +83,7 @@ export async function searchPlayers(
       ilike(players.firstName, pattern),
       ilike(players.lastName, pattern),
       ilike(sql`${players.firstName} || ' ' || ${players.lastName}`, pattern),
-      eq(players.duprId, normalized),
+      ilike(players.duprId, `${normalized}%`),
     );
     if (search) filters.push(search);
   }

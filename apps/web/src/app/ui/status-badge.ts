@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import type { TournamentStatus, TrainingStatus } from '@fsp/shared';
 import { I18nService } from '../core/i18n';
 
-/** Статус турнира или тренировки: «Идёт регистрация», «Идёт», «Завершён». */
+/** Статус турнира или тренировки: «Идёт регистрация», «Идёт», «Завершён»/«Завершена». */
 @Component({
   selector: 'app-status-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -11,6 +11,8 @@ import { I18nService } from '../core/i18n';
 export class StatusBadge {
   private readonly i18n = inject(I18nService);
   readonly status = input.required<TournamentStatus | TrainingStatus>();
+  /** Для тренировки — женский род: «Завершена». */
+  readonly entity = input<'tournament' | 'training'>('tournament');
 
   protected readonly label = computed(() => {
     switch (this.status()) {
@@ -21,7 +23,9 @@ export class StatusBadge {
       case 'running':
         return this.i18n.translate('status.running');
       case 'finished':
-        return this.i18n.translate('status.finished');
+        return this.i18n.translate(
+          this.entity() === 'training' ? 'training.statusFinished' : 'status.finished',
+        );
     }
   });
 }
