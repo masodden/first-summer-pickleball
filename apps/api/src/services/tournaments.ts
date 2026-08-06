@@ -453,8 +453,10 @@ export async function removeParticipant(
   const tournament = await getTournamentRow(db, tournamentId);
   if (options.bySelf) {
     if (actor.playerId !== playerId) throw forbidden('Отменить можно только свою заявку');
-    if (tournament.status !== 'registration') {
-      throw wrongStatus('Регистрация уже закрыта, обратитесь к организатору');
+    // Самим можно сняться, пока турнир не стартовал — и при открытой, и при
+    // закрытой регистрации. После галочки подтверждения — только через организатора.
+    if (tournament.status === 'running' || tournament.status === 'finished') {
+      throw wrongStatus('Турнир уже идёт, обратитесь к организатору');
     }
   } else if (!canManageTournaments(actor)) {
     throw forbidden();

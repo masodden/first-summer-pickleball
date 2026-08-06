@@ -221,14 +221,17 @@ export class TournamentInfoTab {
   );
 
   /**
-   * Снять заявку можно в период регистрации, пока модератор не подтвердил
-   * участие — неважно, заявился сам или добавили организатором.
+   * Кнопка «Отменить заявку» на вкладке «Информация».
+   * Видна обычному игроку (и админу), пока турнир не начат и участие
+   * ещё не подтвердили. Крестики в списке участников — только организаторам.
    */
   protected readonly canLeave = computed(() => {
-    const tournament = this.tournament();
+    const status = this.tournament()?.status;
     const mine = this.participation();
     return (
-      tournament?.status === 'registration' && mine !== null && !mine.confirmedAndPaid
+      mine !== null &&
+      !mine.confirmedAndPaid &&
+      (status === 'registration' || status === 'registration_closed')
     );
   });
 

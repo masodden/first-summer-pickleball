@@ -605,6 +605,7 @@ button {
 }
 
 .checkbox__box {
+  position: relative;
   width: 100%;
   height: 100%;
   border-radius: 9px;
@@ -624,18 +625,20 @@ button {
 .checkbox__box::after {
   content: '';
   position: absolute;
-  top: 8px;
-  left: 9px;
-  width: 11px;
-  height: 6px;
+  top: 46%;
+  left: 50%;
+  width: 12px;
+  height: 7px;
+  margin-top: -1px;
   border-left: 2.5px solid var(--ink-900);
   border-bottom: 2.5px solid var(--ink-900);
-  transform: rotate(-45deg) scale(0);
+  transform: translate(-50%, -55%) rotate(-45deg) scale(0);
+  transform-origin: center;
   transition: transform var(--duration-base) var(--ease-spring);
 }
 
 .checkbox input:checked + .checkbox__box::after {
-  transform: rotate(-45deg) scale(1);
+  transform: translate(-50%, -55%) rotate(-45deg) scale(1);
 }
 
 .checkbox input:focus-visible + .checkbox__box {
