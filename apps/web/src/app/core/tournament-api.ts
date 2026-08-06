@@ -137,11 +137,11 @@ export class TournamentApi {
     return this.api.post(`/api/tournaments/${id}/rounds`);
   }
 
-  /** Старт, пауза и завершение всех кортов раунда одним запросом. */
+  /** Старт, пауза, завершение или пропуск всех кортов раунда одним запросом. */
   roundAction(
     id: string,
     index: number,
-    action: 'start' | 'pause' | 'finish',
+    action: 'start' | 'pause' | 'finish' | 'skip',
   ): Promise<{ rounds: RoundDto[] }> {
     return this.api.post(
       `/api/tournaments/${id}/rounds/${index}/${action}`,

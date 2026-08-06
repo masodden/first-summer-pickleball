@@ -36,6 +36,13 @@
       "when": 1785959000000,
       "tag": "0004_player_club_role",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785962000000,
+      "tag": "0005_match_skipped",
+      "breakpoints": true
     }
   ]
 }

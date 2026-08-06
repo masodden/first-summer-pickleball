@@ -221,9 +221,10 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     await broadcastSchedule(db, hub, request.params.id);
 
     const tournament = await getTournamentRow(db, request.params.id);
-    await notify.sendToTournament(
+    // Только тем, кто стоит в только что собранном расписании — не всему клубу.
+    await notify.sendToSchedule(
       request.params.id,
-      `Турнир «${tournament.title}» начался. Откройте приложение, чтобы увидеть свой корт.`,
+      `Турнир «${escapeHtml(tournament.title)}» начался. Откройте приложение, чтобы увидеть свой корт.`,
     );
     return { tournament: await getTournamentDto(db, request.params.id, viewer) };
   });
@@ -243,9 +244,10 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     const viewer = requireRole(request, 'moderator');
     const index = await appendRound(db, request.params.id, viewer);
     await broadcastSchedule(db, hub, request.params.id);
-    await notify.sendToTournament(
+    await notify.sendToSchedule(
       request.params.id,
       `Раунд ${index + 1} готов. Посмотрите, на каком вы корте.`,
+      index,
     );
     return { roundIndex: index };
   });
@@ -254,7 +256,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
    * Старт, пауза и завершение сразу всего раунда: корты на площадке начинают
    * играть одновременно, поэтому и кнопка одна.
    */
-  for (const action of ['start', 'pause', 'finish'] as const) {
+  for (const action of ['start', 'pause', 'finish', 'skip'] as const) {
     app.post<{ Params: { id: string; index: string } }>(
       `/api/tournaments/:id/rounds/:index/${action}`,
       async (request) => {
@@ -285,7 +287,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       .join('\n');
     await notify.sendToTournament(
       request.params.id,
-      `Турнир «${tournament.title}» завершён.\n${podium}`,
+      `Турнир «${escapeHtml(tournament.title)}» завершён.\n${escapeHtml(podium)}`,
     );
     return { tournament };
   });
@@ -298,11 +300,22 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
   });
 
   app.get<{ Params: { id: string } }>('/api/tournaments/:id/export.csv', async (request, reply) => {
+    requireRole(request, 'moderator');
     const row = await getTournamentRow(db, request.params.id);
     const csv = await buildResultsCsv(db, row);
     reply.header('content-type', 'text/csv; charset=utf-8');
     reply.header('content-disposition', `attachment; filename="tournament-${row.publicSlug}.csv"`);
+    // Telegram downloadFile на web.telegram.org требует этот origin в CORS.
+    reply.header('access-control-allow-origin', 'https://web.telegram.org');
     // BOM нужен, чтобы Excel открыл русские имена без кракозябр.
     return `\uFEFF${csv}`;
   });
+}
+
+/** Telegram HTML: иначе кавычки и имена с `<` ломают parse_mode. */
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }

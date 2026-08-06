@@ -1,5 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
-import { courtLabel, type MatchDto, type MatchStatus } from '@fsp/shared';
+import { courtLabel, isMatchClosed, type MatchDto, type MatchStatus } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
   matchPlayers,
@@ -269,6 +269,10 @@ export async function setMatchScore(
     throw new ApiError('validation_failed', 'В этом турнире ничья не допускается');
   }
 
+  if (match.status === 'skipped') {
+    throw wrongStatus('У пропущенного матча нет счёта');
+  }
+
   const now = new Date();
   await applyMatchPatch(
     db,
@@ -320,7 +324,7 @@ export async function clearMatchScore(
   return loadMatchDto(db, matchId);
 }
 
-export type RoundAction = 'start' | 'pause' | 'finish';
+export type RoundAction = 'start' | 'pause' | 'finish' | 'skip';
 
 /**
  * Действие сразу по всему раунду.
@@ -328,6 +332,9 @@ export type RoundAction = 'start' | 'pause' | 'finish';
  * На площадке корты стартуют одновременно: судья свистит один раз, и играют все.
  * Поэтому старт, пауза и завершение — это действия над раундом, а не над
  * отдельным матчем. Счёт остаётся per-match: корты заканчивают вразнобой.
+ *
+ * Следующий раунд нельзя начать, пока предыдущий не закрыт (finished/skipped).
+ * Несыгранный раунд можно пропустить целиком — тогда открывается следующий.
  */
 export async function applyRoundAction(
   db: Database,
@@ -351,6 +358,20 @@ export async function applyRoundAction(
     .orderBy(asc(matches.court));
   if (rows.length === 0) throw notFound('Раунд не найден');
 
+  if (action === 'start' || action === 'skip') {
+    await assertPreviousRoundClosed(db, tournamentId, roundIndex);
+  }
+
+  if (action === 'skip') {
+    if (!rows.every((match) => match.status === 'scheduled')) {
+      throw wrongStatus('Пропустить можно только раунд, который ещё не начинали');
+    }
+  }
+
+  if (action === 'start' && rows.every((match) => match.status === 'skipped')) {
+    throw wrongStatus('Этот раунд пропущен');
+  }
+
   const now = new Date();
 
   for (const match of rows) {
@@ -359,13 +380,41 @@ export async function applyRoundAction(
     await applyMatchPatch(db, match.id, patch, match.version);
   }
 
+  const auditAction =
+    action === 'start'
+      ? 'round.started'
+      : action === 'pause'
+        ? 'round.paused'
+        : action === 'skip'
+          ? 'round.skipped'
+          : 'round.finished';
+
   await recordAudit(db, actor, {
-    action: `round.${action === 'start' ? 'started' : action === 'pause' ? 'paused' : 'finished'}`,
+    action: auditAction,
     entityType: 'round',
     entityId: String(roundIndex),
     tournamentId,
     payload: { courts: rows.length },
   });
+}
+
+/** Предыдущий раунд должен быть закрыт, иначе на площадке пересекаются игры. */
+async function assertPreviousRoundClosed(
+  db: Database,
+  tournamentId: string,
+  roundIndex: number,
+): Promise<void> {
+  if (roundIndex <= 0) return;
+
+  const previous = await db
+    .select({ status: matches.status })
+    .from(matches)
+    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.roundIndex, roundIndex - 1)));
+
+  if (previous.length === 0) return;
+  if (!previous.every((row) => isMatchClosed(row.status))) {
+    throw wrongStatus('Сначала завершите или пропустите предыдущий раунд');
+  }
 }
 
 /** Что меняется у отдельного матча при действии над раундом. `null` — уже в нужном состоянии. */
@@ -377,9 +426,19 @@ function roundPatchFor(
   const pausedSinceMs =
     match.status === 'paused' && match.pausedAt ? now.getTime() - match.pausedAt.getTime() : 0;
 
+  if (action === 'skip') {
+    if (match.status === 'skipped') return null;
+    return {
+      status: 'skipped',
+      finishedAt: now,
+      startedAt: null,
+      pausedAt: null,
+    };
+  }
+
   if (action === 'start') {
-    // Корт с введённым счётом уже отыграл: возвращать его в игру не нужно.
-    if (match.status === 'running' || match.status === 'finished') return null;
+    // Закрытый корт (счёт или skip) уже не возвращаем в игру.
+    if (match.status === 'running' || isMatchClosed(match.status)) return null;
     return match.status === 'paused'
       ? {
           status: 'running',
@@ -394,7 +453,7 @@ function roundPatchFor(
     return { status: 'paused', pausedAt: now };
   }
 
-  if (match.status === 'finished') return null;
+  if (isMatchClosed(match.status)) return null;
   return {
     status: 'finished',
     finishedAt: now,

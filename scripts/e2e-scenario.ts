@@ -517,6 +517,12 @@ async function main(): Promise<void> {
     body: { approve: true },
   });
 
+  // Новые турниры создаются с закрытой записью — иначе любой из списка
+  // мог бы заявиться и получить уведомление о старте.
+  await request('POST', `/api/tournaments/${advanced.id}/registration/open`, {
+    token: admin.token,
+  });
+
   const joined = await request<{ waitlisted: boolean }>(
     'POST',
     `/api/tournaments/${advanced.id}/join`,
@@ -719,7 +725,9 @@ async function main(): Promise<void> {
   );
   check(board.standings.length === 12, 'табло доступно без авторизации');
 
-  const csv = await fetch(`${BASE}/api/tournaments/${advanced.id}/export.csv`);
+  const csv = await fetch(`${BASE}/api/tournaments/${advanced.id}/export.csv`, {
+    headers: { authorization: `Bearer ${admin.token}` },
+  });
   const csvText = await csv.text();
   check(csv.ok && csvText.split('\n').length > 12, 'CSV с результатами выгружается');
   const firstDuprId = finished.standings[0]!.player.duprId;

@@ -155,6 +155,10 @@ export interface RoundDto {
   sittingOut: PlayerDto[];
   allFinished: boolean;
   allScored: boolean;
+  /** Все матчи пропущены. */
+  skipped: boolean;
+  /** Раунд закрыт (finished или skipped) — можно начинать следующий. */
+  closed: boolean;
 }
 
 export interface StandingRowDto {

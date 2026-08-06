@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { ParticipantDto } from '@fsp/shared';
+import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
@@ -176,7 +177,7 @@ import { PlayerPicker } from '../players/player-picker';
               type="button"
               class="btn btn--go btn--lg btn--block"
               [disabled]="!store.canStart() || store.isBusy('start')"
-              (click)="store.start()"
+              (click)="start()"
             >
               {{ t()('tournament.start') }}
             </button>
@@ -244,6 +245,7 @@ import { PlayerPicker } from '../players/player-picker';
 export class TournamentPlayersTab {
   private readonly api = inject(TournamentApi);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
   private readonly i18n = inject(I18nService);
 
   protected readonly store = inject(TournamentStore);
@@ -266,6 +268,17 @@ export class TournamentPlayersTab {
   protected async add(playerId: string): Promise<void> {
     this.picker.set(false);
     await this.store.addParticipant(playerId);
+  }
+
+  protected async start(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('tournament.start'),
+      message: this.i18n.translate('tournament.startConfirm', {
+        count: this.store.registered().length,
+      }),
+      confirmLabel: this.i18n.translate('tournament.start'),
+    });
+    if (confirmed) await this.store.start();
   }
 
   protected togglePaid(participant: ParticipantDto, event: Event): void {

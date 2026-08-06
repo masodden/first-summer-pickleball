@@ -133,6 +133,10 @@ export const ru = {
   'tournament.reopenRegistration': 'Вернуть регистрацию',
   'tournament.start': 'Создать турнир и начать',
   'tournament.startHint': 'Все участники подтверждены, можно формировать игры',
+  'tournament.startConfirm':
+    'Сформировать игры для {{count}} участников? Им придёт уведомление в Telegram.',
+  'tournament.registrationClosedHint':
+    'Запись закрыта: состав набирает организатор. Откройте регистрацию, если игроки должны записаться сами.',
   'tournament.finish': 'Завершить турнир',
   'tournament.finishConfirm': 'Завершить турнир? После этого счёт нельзя будет изменить.',
   'tournament.finished': 'Турнир завершён',
@@ -200,7 +204,11 @@ export const ru = {
   'match.court': 'Корт {{number}}',
   'match.start': 'Начать игру',
   'match.startRound': 'Начать раунд',
-  'match.finishRound': 'Завершить раунд',
+  'match.finishRound': 'Завершить',
+  'match.skipRound': 'Пропустить',
+  'match.skipRoundConfirm': 'Пропустить этот раунд? Игры не будут сыграны, можно будет начать следующий.',
+  'match.roundWaitingPrevious': 'Сначала завершите или пропустите предыдущий раунд',
+  'match.roundSkipped': 'Раунд пропущен',
   'match.roundNotStarted': 'Раунд ещё не начали',
   'match.scoreAfterFinish': 'Счёт можно ввести после завершения раунда',
   'match.pause': 'Пауза',
@@ -210,6 +218,7 @@ export const ru = {
   'match.started': 'Игра началась',
   'match.paused': 'Пауза',
   'match.finishedLabel': 'Игра завершена',
+  'match.skippedLabel': 'Пропущен',
   'match.timeUp': 'Время вышло',
   'match.timeUpHint': 'Завершите игру вручную, когда закончите розыгрыш',
   'match.waiting': 'Ожидает начала',
@@ -329,7 +338,7 @@ export const ru = {
 
   'import.title': 'Импорт игроков',
   'import.hint':
-    'Загрузите выгрузку справочника DUPR в CSV или JSON. Игроки сопоставляются по DUPR ID, поэтому дубликатов не появится.',
+    'Загрузите выгрузку DUPR: CSV, JSON или players.js. Игроки сопоставляются по DUPR ID, дубликатов не будет.',
   'import.upload': 'Выбрать файл',
   'import.run': 'Импортировать',
   'import.done': 'Импорт завершён',
@@ -337,6 +346,7 @@ export const ru = {
   'import.conflicts': 'Расхождения рейтингов',
   'import.conflictsHint':
     'У этих игроков рейтинг ставили вручную, и в выгрузке значение другое. Выберите, какое оставить.',
+  'import.badFile': 'Не удалось прочитать файл. Нужен CSV, JSON или players.js из выгрузки DUPR.',
 
   'admin.title': 'Администрирование',
   'admin.accounts': 'Аккаунты',

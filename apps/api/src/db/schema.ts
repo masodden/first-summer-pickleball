@@ -35,6 +35,7 @@ export const matchStatusEnum = pgEnum('match_status', [
   'running',
   'paused',
   'finished',
+  'skipped',
 ]);
 export const teamSideEnum = pgEnum('team_side', ['A', 'B']);
 /** Откуда взялось значение поля: нужно, чтобы импорт не перетирал ручные правки. */
@@ -177,7 +178,12 @@ export const tournaments = pgTable(
     title: text().notNull(),
     category: text(),
     format: tournamentFormatEnum().notNull(),
-    status: tournamentStatusEnum().notNull().default('registration'),
+    /**
+     * По умолчанию регистрация закрыта: состав набирает организатор.
+     * Иначе любой, кто открыл список турниров, может нажать «Записаться»
+     * и потом получить уведомление о старте, хотя его «не звали».
+     */
+    status: tournamentStatusEnum().notNull().default('registration_closed'),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     courts: integer().notNull(),
     /**

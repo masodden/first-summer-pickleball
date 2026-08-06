@@ -135,6 +135,10 @@ export const en: Record<TranslationKey, string> = {
   'tournament.reopenRegistration': 'Reopen registration',
   'tournament.start': 'Build tournament and start',
   'tournament.startHint': 'All participants are confirmed, games can be built',
+  'tournament.startConfirm':
+    'Build games for {{count}} participants? They will get a Telegram notification.',
+  'tournament.registrationClosedHint':
+    'Registration is closed: the organizer builds the roster. Open registration if players should sign up themselves.',
   'tournament.finish': 'Finish tournament',
   'tournament.finishConfirm': 'Finish the tournament? Scores can no longer be edited.',
   'tournament.finished': 'Tournament finished',
@@ -203,7 +207,12 @@ export const en: Record<TranslationKey, string> = {
   'match.court': 'Court {{number}}',
   'match.start': 'Start game',
   'match.startRound': 'Start round',
-  'match.finishRound': 'Finish round',
+  'match.finishRound': 'Finish',
+  'match.skipRound': 'Skip',
+  'match.skipRoundConfirm':
+    'Skip this round? Matches will not be played, and you can start the next one.',
+  'match.roundWaitingPrevious': 'Finish or skip the previous round first',
+  'match.roundSkipped': 'Round skipped',
   'match.roundNotStarted': 'The round has not started yet',
   'match.scoreAfterFinish': 'Enter the score after finishing the round',
   'match.pause': 'Pause',
@@ -213,6 +222,7 @@ export const en: Record<TranslationKey, string> = {
   'match.started': 'Game started',
   'match.paused': 'Paused',
   'match.finishedLabel': 'Game finished',
+  'match.skippedLabel': 'Skipped',
   'match.timeUp': "Time's up",
   'match.timeUpHint': 'Finish the game manually once the rally is over',
   'match.waiting': 'Waiting to start',
@@ -332,7 +342,7 @@ export const en: Record<TranslationKey, string> = {
 
   'import.title': 'Import players',
   'import.hint':
-    'Upload a DUPR directory export in CSV or JSON. Players are matched by DUPR ID, so no duplicates appear.',
+    'Upload a DUPR export: CSV, JSON, or players.js. Players are matched by DUPR ID, so no duplicates appear.',
   'import.upload': 'Choose file',
   'import.run': 'Import',
   'import.done': 'Import finished',
@@ -340,6 +350,7 @@ export const en: Record<TranslationKey, string> = {
   'import.conflicts': 'Rating conflicts',
   'import.conflictsHint':
     'These players had their rating set manually and the import has a different value. Choose which one to keep.',
+  'import.badFile': 'Could not read the file. Use CSV, JSON, or players.js from a DUPR export.',
 
   'admin.title': 'Administration',
   'admin.accounts': 'Accounts',

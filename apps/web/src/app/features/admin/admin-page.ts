@@ -108,7 +108,11 @@ import { PlayerLine } from '../../ui/player-line';
         <h2>{{ t()('import.title') }}</h2>
         <p class="small muted">{{ t()('import.hint') }}</p>
 
-        <input class="input" type="file" accept=".csv,.json,.js,.txt" (change)="pickFile($event)" />
+        <!--
+          В Telegram iOS/Android узкий accept часто серит нужные файлы
+          (players.js, csv без расширения и т.п.). Тип проверяем после выбора.
+        -->
+        <input class="input" type="file" accept="*/*" (change)="pickFile($event)" />
 
         @if (fileName()) {
           <span class="tiny faint truncate">{{ fileName() }}</span>
@@ -201,10 +205,23 @@ export class AdminPage {
   }
 
   protected async pickFile(event: Event): Promise<void> {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    this.fileName.set(file.name);
-    this.content.set(await file.text());
+    try {
+      const text = await file.text();
+      if (!text.trim()) {
+        this.toast.error(this.i18n.translate('import.badFile'));
+        return;
+      }
+      this.fileName.set(file.name);
+      this.content.set(text);
+    } catch {
+      this.toast.error(this.i18n.translate('import.badFile'));
+    } finally {
+      // Чтобы тот же файл можно было выбрать снова после ошибки.
+      input.value = '';
+    }
   }
 
   protected async runImport(): Promise<void> {

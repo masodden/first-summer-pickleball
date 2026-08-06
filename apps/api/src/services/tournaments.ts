@@ -125,11 +125,21 @@ export async function listTournaments(
 ): Promise<TournamentSummaryDto[]> {
   void viewer;
 
+  // Приоритет: идущие → остальные активные → завершённые; внутри — ближайшая дата.
   const rows = await db
     .select()
     .from(tournaments)
     .where(isNull(tournaments.deletedAt))
-    .orderBy(desc(tournaments.startsAt), desc(tournaments.createdAt));
+    .orderBy(
+      sql`case ${tournaments.status}
+        when 'running' then 0
+        when 'finished' then 2
+        else 1
+      end`,
+      sql`case when ${tournaments.status} = 'finished' then ${tournaments.startsAt} end desc nulls last`,
+      sql`case when ${tournaments.status} <> 'finished' then ${tournaments.startsAt} end asc nulls last`,
+      desc(tournaments.createdAt),
+    );
 
   if (rows.length === 0) return [];
 
@@ -226,6 +236,8 @@ export async function createTournament(
       title: input.title,
       category: input.category ?? null,
       format: input.format,
+      // Состав сначала собирает организатор; открыть запись — отдельная кнопка.
+      status: 'registration_closed',
       startsAt: new Date(input.startsAt),
       courts: input.courts,
       courtNames: normalizeCourtNames(input.courtNames, input.courts),

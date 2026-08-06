@@ -317,6 +317,14 @@ export class TournamentDetailPage {
   }
 
   protected async start(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('tournament.start'),
+      message: this.i18n.translate('tournament.startConfirm', {
+        count: this.store.registered().length,
+      }),
+      confirmLabel: this.i18n.translate('tournament.start'),
+    });
+    if (!confirmed) return;
     await this.store.start();
     await this.router.navigate(['/tournaments', this.id(), 'rounds']);
   }

@@ -51,8 +51,13 @@ export const TOURNAMENT_STATUSES = [
 ] as const;
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
-export const MATCH_STATUSES = ['scheduled', 'running', 'paused', 'finished'] as const;
+export const MATCH_STATUSES = ['scheduled', 'running', 'paused', 'finished', 'skipped'] as const;
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
+
+/** Раунд закрыт: можно стартовать следующий. */
+export function isMatchClosed(status: MatchStatus): boolean {
+  return status === 'finished' || status === 'skipped';
+}
 
 /** Что делать, если таймер вышел при равном счёте. */
 export const TIE_RULES = ['draw', 'golden_point'] as const;

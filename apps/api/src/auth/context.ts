@@ -29,11 +29,21 @@ export function registerViewerContext(app: FastifyInstance, db: Database): void 
   app.decorateRequest('viewer', null);
 
   app.addHook('onRequest', async (request) => {
+    // Bearer — обычные запросы; ?token= — скачивание файла из Telegram Mini App
+    // (downloadFile ходит на URL без заголовка Authorization).
     const header = request.headers.authorization;
-    if (!header?.startsWith('Bearer ')) return;
+    const queryToken =
+      typeof request.query === 'object' &&
+      request.query !== null &&
+      'token' in request.query &&
+      typeof (request.query as { token?: unknown }).token === 'string'
+        ? (request.query as { token: string }).token
+        : null;
+    const rawToken = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : queryToken;
+    if (!rawToken) return;
 
     try {
-      const payload = await request.jwtVerify<SessionTokenPayload>();
+      const payload = await request.server.jwt.verify<SessionTokenPayload>(rawToken);
       const [account] = await db
         .select()
         .from(accounts)

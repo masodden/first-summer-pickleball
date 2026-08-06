@@ -1,5 +1,6 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import type { ApiErrorBody, ErrorCode } from '@fsp/shared';
+import { TelegramService } from './telegram';
 
 const TOKEN_KEY = 'fsp.token';
 /** JWT после «Выйти»: повторный вход без повторной проверки initData. */
@@ -55,6 +56,7 @@ export interface QueuedAction {
  */
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
+  private readonly telegram = inject(TelegramService);
   private readonly tokenSignal = signal<string | null>(this.readToken());
   private readonly queue = signal<QueuedAction[]>([]);
   private readonly onlineSignal = signal(navigator.onLine);
@@ -186,15 +188,47 @@ export class ApiClient {
     return payload as T;
   }
 
-  /** Скачивание файла: отдельный путь, потому что тело не JSON. */
+  /**
+   * Скачивание файла.
+   *
+   * В десктопном браузере — обычный blob + `<a download>`.
+   * В Telegram Mini App на телефоне это блокируется WebView, поэтому:
+   * 1) нативный `downloadFile` (Bot API 8+),
+   * 2) иначе «Поделиться» файлом,
+   * 3) иначе открываем URL во внешнем браузере (с token в query).
+   */
   async download(path: string, filename: string): Promise<void> {
     const token = this.tokenSignal();
+    const absoluteUrl = new URL(
+      this.buildUrl(path, token ? { token } : undefined),
+      window.location.origin,
+    ).href;
+
+    if (this.telegram.tryDownloadFile(absoluteUrl, filename)) return;
+
     const response = await fetch(this.buildUrl(path), {
       headers: token ? { authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) throw this.toFailure(response.status, await response.text());
 
     const blob = await response.blob();
+    const file = new File([blob], filename, { type: blob.type || 'text/csv' });
+
+    if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      } catch (error) {
+        // Пользователь закрыл sheet — не считаем ошибкой сети.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    }
+
+    if (this.telegram.available) {
+      this.telegram.openExternal(absoluteUrl);
+      return;
+    }
+
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;

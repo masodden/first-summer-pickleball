@@ -165,6 +165,9 @@ import { Racket } from '../../ui/ball';
             }
           } @else {
             <p class="small muted center">{{ t()('status.registration_closed') }}</p>
+            @if (store.canManage() && item.status === 'registration_closed') {
+              <p class="tiny center muted">{{ t()('tournament.registrationClosedHint') }}</p>
+            }
           }
         </section>
       </div>

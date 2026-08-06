@@ -32,7 +32,7 @@ import { MatchCard } from './match-card';
               type="button"
               class="btn btn--go"
               [disabled]="!store.canStart() || store.isBusy('start')"
-              (click)="store.start()"
+              (click)="start()"
             >
               {{ t()('match.generateSchedule') }}
             </button>
@@ -89,7 +89,8 @@ import { MatchCard } from './match-card';
                   type="button"
                   class="pill"
                   [class.pill--active]="round.index === store.viewRound()"
-                  [class.pill--done]="round.allScored"
+                  [class.pill--done]="round.closed"
+                  [class.pill--skipped]="round.skipped"
                   (click)="store.showRound(round.index)"
                 >
                   {{ round.index + 1 }}
@@ -109,6 +110,12 @@ import { MatchCard } from './match-card';
                 </span>
                 @if (overtime()) {
                   <span class="tiny" style="color: var(--danger)">{{ t()('match.timeUpHint') }}</span>
+                } @else if (
+                  store.canRunRound() &&
+                  store.roundState() === 'scheduled' &&
+                  !store.previousRoundClosed()
+                ) {
+                  <span class="tiny muted">{{ t()('match.roundWaitingPrevious') }}</span>
                 }
               </div>
 
@@ -117,8 +124,16 @@ import { MatchCard } from './match-card';
                   @case ('scheduled') {
                     <button
                       type="button"
+                      class="btn btn--glass btn--sm"
+                      [disabled]="!store.canSkipViewedRound() || store.isBusy('round:skip')"
+                      (click)="skipRound()"
+                    >
+                      {{ t()('match.skipRound') }}
+                    </button>
+                    <button
+                      type="button"
                       class="btn btn--go"
-                      [disabled]="store.isBusy('round:start')"
+                      [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
                       (click)="store.startRound()"
                     >
                       {{ t()('match.startRound') }}
@@ -127,11 +142,15 @@ import { MatchCard } from './match-card';
                   @case ('running') {
                     <button
                       type="button"
-                      class="btn btn--glass"
+                      class="btn btn--icon btn--glass"
                       [disabled]="store.isBusy('round:pause')"
+                      [attr.aria-label]="t()('match.pause')"
                       (click)="store.pauseRound()"
                     >
-                      {{ t()('match.pause') }}
+                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                        <rect x="6" y="5" width="4" height="14" rx="1" />
+                        <rect x="14" y="5" width="4" height="14" rx="1" />
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -145,11 +164,14 @@ import { MatchCard } from './match-card';
                   @case ('paused') {
                     <button
                       type="button"
-                      class="btn btn--go"
+                      class="btn btn--icon btn--go"
                       [disabled]="store.isBusy('round:start')"
+                      [attr.aria-label]="t()('match.resume')"
                       (click)="store.startRound()"
                     >
-                      {{ t()('match.resume') }}
+                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                        <path d="M8 5.5v13l11-6.5z" />
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -244,6 +266,11 @@ import { MatchCard } from './match-card';
       stroke-linejoin: round;
     }
 
+    .icon--solid {
+      fill: currentColor;
+      stroke: none;
+    }
+
     .pills {
       gap: var(--space-2);
       padding-bottom: 2px;
@@ -276,10 +303,19 @@ import { MatchCard } from './match-card';
       border-color: color-mix(in srgb, var(--success) 45%, transparent);
     }
 
+    .pill--skipped {
+      color: var(--text-muted);
+      border-style: dashed;
+    }
+
     .pill--active {
       background: linear-gradient(160deg, var(--clay-400), var(--clay-600));
       border-color: transparent;
       color: #fff;
+    }
+
+    .pill--active.pill--skipped {
+      border-style: solid;
     }
 
     .round-control {
@@ -334,7 +370,14 @@ export class TournamentRoundsTab {
 
   protected readonly overtime = computed(() => {
     const limit = this.timeLimit();
-    return limit !== null && this.elapsed() >= limit && this.store.roundState() !== 'finished';
+    const state = this.store.roundState();
+    return (
+      limit !== null &&
+      this.elapsed() >= limit &&
+      state !== 'finished' &&
+      state !== 'skipped' &&
+      state !== 'scheduled'
+    );
   });
 
   /** Показываем остаток, а когда время вышло — сколько уже переиграли. */
@@ -352,12 +395,33 @@ export class TournamentRoundsTab {
   protected readonly roundStatus = computed(() => {
     const round = this.store.currentRound();
     if (!round) return null;
+    if (round.skipped) return this.i18n.translate('match.roundSkipped');
     if (round.allScored) return this.i18n.translate('match.finishedLabel');
     if (round.matches.some((match) => match.status === 'running')) {
       return this.i18n.translate('match.started');
     }
     return null;
   });
+
+  protected async skipRound(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('match.skipRound'),
+      message: this.i18n.translate('match.skipRoundConfirm'),
+      confirmLabel: this.i18n.translate('match.skipRound'),
+    });
+    if (confirmed) await this.store.skipRound();
+  }
+
+  protected async start(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('match.generateSchedule'),
+      message: this.i18n.translate('tournament.startConfirm', {
+        count: this.store.registered().length,
+      }),
+      confirmLabel: this.i18n.translate('match.generateSchedule'),
+    });
+    if (confirmed) await this.store.start();
+  }
 
   protected async reshuffle(): Promise<void> {
     const confirmed = await this.confirm.ask({

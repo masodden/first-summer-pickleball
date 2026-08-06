@@ -89,14 +89,29 @@ export class TournamentStore {
    * кнопка и таймер одни на всех. Корт, где уже внесли счёт, считается
    * отыгравшим и на состояние раунда не влияет.
    */
-  readonly roundState = computed<'scheduled' | 'running' | 'paused' | 'finished'>(() => {
-    const matches = this.currentRound()?.matches ?? [];
+  readonly roundState = computed<'scheduled' | 'running' | 'paused' | 'finished' | 'skipped'>(() => {
+    const round = this.currentRound();
+    const matches = round?.matches ?? [];
     if (matches.length === 0) return 'scheduled';
+    if (round?.skipped || matches.every((match) => match.status === 'skipped')) return 'skipped';
     if (matches.some((match) => match.status === 'running')) return 'running';
     if (matches.some((match) => match.status === 'paused')) return 'paused';
     if (matches.every((match) => match.status === 'finished')) return 'finished';
     return 'scheduled';
   });
+
+  /** Предыдущий раунд закрыт — можно стартовать или пропустить текущий. */
+  readonly previousRoundClosed = computed(() => {
+    const index = this.viewRoundSignal();
+    if (index <= 0) return true;
+    return this.roundsSignal()[index - 1]?.closed ?? false;
+  });
+
+  readonly canStartViewedRound = computed(
+    () => this.canRunRound() && this.previousRoundClosed() && this.roundState() === 'scheduled',
+  );
+
+  readonly canSkipViewedRound = computed(() => this.canStartViewedRound());
 
   /**
    * Матч, по которому считается общий таймер раунда. Все корты стартуют
@@ -384,7 +399,11 @@ export class TournamentStore {
     return this.roundAction('finish');
   }
 
-  private roundAction(action: 'start' | 'pause' | 'finish'): Promise<void> {
+  skipRound(): Promise<void> {
+    return this.roundAction('skip');
+  }
+
+  private roundAction(action: 'start' | 'pause' | 'finish' | 'skip'): Promise<void> {
     const index = this.viewRoundSignal();
     return this.run(
       `round:${action}`,
@@ -490,14 +509,22 @@ export class TournamentStore {
       rounds.map((round) => {
         if (round.index !== match.roundIndex) return round;
         const matches = round.matches.map((item) => (item.id === match.id ? match : item));
+        const skipped =
+          matches.length > 0 && matches.every((item) => item.status === 'skipped');
+        const closed =
+          matches.length > 0 &&
+          matches.every((item) => item.status === 'finished' || item.status === 'skipped');
         return {
           ...round,
           matches,
           allFinished: matches.every((item) => item.status === 'finished'),
           allScored: matches.every(
             (item) =>
-              item.status === 'finished' && item.teamA.score !== null && item.teamB.score !== null,
+              item.status === 'skipped' ||
+              (item.teamA.score !== null && item.teamB.score !== null),
           ),
+          skipped,
+          closed,
         };
       }),
     );

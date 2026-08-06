@@ -1,6 +1,6 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { computeStandings, resolveMedals, type MatchResult } from '@fsp/engine';
-import { courtLabel } from '@fsp/shared';
+import { courtLabel, isMatchClosed } from '@fsp/shared';
 import type {
   MatchDto,
   PlayerDto,
@@ -103,6 +103,11 @@ export async function loadRounds(db: Database, tournament: TournamentRow): Promi
         return toMatchDto(match, lineup.A, lineup.B, durationMs, tournament.courtNames);
       });
 
+    const skipped =
+      roundMatches.length > 0 && roundMatches.every((match) => match.status === 'skipped');
+    const closed =
+      roundMatches.length > 0 && roundMatches.every((match) => isMatchClosed(match.status));
+
     return {
       index: round.index,
       matches: roundMatches,
@@ -111,7 +116,13 @@ export async function loadRounds(db: Database, tournament: TournamentRow): Promi
         roundMatches.length > 0 && roundMatches.every((match) => match.status === 'finished'),
       allScored:
         roundMatches.length > 0 &&
-        roundMatches.every((match) => match.teamA.score !== null && match.teamB.score !== null),
+        roundMatches.every(
+          (match) =>
+            match.status === 'skipped' ||
+            (match.teamA.score !== null && match.teamB.score !== null),
+        ),
+      skipped,
+      closed,
     };
   });
 }

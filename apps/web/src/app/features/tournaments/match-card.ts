@@ -26,7 +26,10 @@ import { RatingChip } from '../../ui/rating-chip';
   imports: [Avatar, RatingChip],
   host: { '[class.card--live]': "match().status === 'running'" },
   template: `
-    <div class="glass card--tight court" [class.court--finished]="match().status === 'finished'">
+    <div
+      class="glass card--tight court"
+      [class.court--finished]="match().status === 'finished' || match().status === 'skipped'"
+    >
       <div class="row row--between">
         <span class="court__label">{{ courtLabel() }}</span>
 
@@ -40,6 +43,9 @@ import { RatingChip } from '../../ui/rating-chip';
             }
             @case ('finished') {
               <span class="chip">{{ t()('match.finishedLabel') }}</span>
+            }
+            @case ('skipped') {
+              <span class="chip">{{ t()('match.skippedLabel') }}</span>
             }
             @default {
               <span class="chip">{{ t()('match.waiting') }}</span>

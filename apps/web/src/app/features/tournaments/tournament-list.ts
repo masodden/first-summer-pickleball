@@ -16,6 +16,21 @@ import { StatusBadge } from '../../ui/status-badge';
 
 type Filter = 'active' | 'finished';
 
+function compareTournaments(
+  a: TournamentSummaryDto,
+  b: TournamentSummaryDto,
+  finished: boolean,
+): number {
+  if (finished) {
+    return b.startsAt.localeCompare(a.startsAt) || b.createdAt.localeCompare(a.createdAt);
+  }
+  const rank = (status: TournamentSummaryDto['status']): number =>
+    status === 'running' ? 0 : 1;
+  const byStatus = rank(a.status) - rank(b.status);
+  if (byStatus !== 0) return byStatus;
+  return a.startsAt.localeCompare(b.startsAt) || a.createdAt.localeCompare(b.createdAt);
+}
+
 /**
  * Главный экран: список турниров.
  *
@@ -229,18 +244,25 @@ export class TournamentListPage {
     return this.tournaments.value().filter((item) => (item.status === 'finished') === finished);
   });
 
-  /** Турниры одного дня показываются вместе: это и есть параллельные потоки. */
+  /**
+   * Турниры одного дня вместе (параллельные потоки).
+   * Порядок: сначала идущие, затем ближайшие по дате; в архиве — свежие сверху.
+   */
   protected readonly groups = computed(() => {
+    const finished = this.filter() === 'finished';
+    const sorted = [...this.visible()].sort((a, b) => compareTournaments(a, b, finished));
+
     const byDay = new Map<string, TournamentSummaryDto[]>();
-    for (const item of this.visible()) {
+    for (const item of sorted) {
       const day = this.i18n.formatDay(item.startsAt);
       const bucket = byDay.get(day);
       if (bucket) bucket.push(item);
       else byDay.set(day, [item]);
     }
+
     return [...byDay.entries()].map(([day, items]) => ({
       day,
-      items: items.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+      items: items.sort((a, b) => compareTournaments(a, b, finished)),
     }));
   });
 

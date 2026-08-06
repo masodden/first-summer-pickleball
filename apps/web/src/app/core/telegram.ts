@@ -18,6 +18,12 @@ interface TelegramWebApp {
   setHeaderColor?(color: string): void;
   openLink?(url: string): void;
   openTelegramLink?(url: string): void;
+  /** Bot API 8.0+: нативный диалог сохранения файла (iOS/Android WebView). */
+  downloadFile?(
+    params: { url: string; file_name: string },
+    callback?: (accepted: boolean) => void,
+  ): void;
+  isVersionAtLeast?(version: string): boolean;
   HapticFeedback?: TelegramHaptics;
   onEvent?(event: string, handler: () => void): void;
 }
@@ -113,5 +119,25 @@ export class TelegramService {
     }
     if (this.app?.openLink) this.app.openLink(url);
     else window.open(url, '_blank', 'noopener');
+  }
+
+  /**
+   * Скачивание файла в Mini App.
+   *
+   * Обычный `<a download>` в WebView Telegram на iOS/Android не работает
+   * (sandbox без allow-downloads). Нужен нативный `downloadFile` или открытие
+   * ссылки во внешнем браузере. URL должен быть https и отдавать файл с
+   * Content-Disposition: attachment.
+   */
+  tryDownloadFile(url: string, fileName: string): boolean {
+    const app = this.app;
+    if (!app?.downloadFile) return false;
+    if (app.isVersionAtLeast && !app.isVersionAtLeast('8.0')) return false;
+    try {
+      app.downloadFile({ url, file_name: fileName });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
