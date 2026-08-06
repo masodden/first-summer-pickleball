@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { courtLabel, isMatchClosed, type MatchDto, type MatchStatus } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
@@ -324,7 +324,7 @@ export async function clearMatchScore(
   return loadMatchDto(db, matchId);
 }
 
-export type RoundAction = 'start' | 'pause' | 'finish' | 'skip';
+export type RoundAction = 'start' | 'pause' | 'finish' | 'skip' | 'unskip';
 
 /**
  * Действие сразу по всему раунду.
@@ -334,7 +334,8 @@ export type RoundAction = 'start' | 'pause' | 'finish' | 'skip';
  * отдельным матчем. Счёт остаётся per-match: корты заканчивают вразнобой.
  *
  * Следующий раунд нельзя начать, пока предыдущий не закрыт (finished/skipped).
- * Несыгранный раунд можно пропустить целиком — тогда открывается следующий.
+ * В americano пропущенный раунд можно вернуть (unskip) или сразу запустить.
+ * В mexicano пропуска нет: следующий раунд строится по таблице.
  */
 export async function applyRoundAction(
   db: Database,
@@ -358,18 +359,27 @@ export async function applyRoundAction(
     .orderBy(asc(matches.court));
   if (rows.length === 0) throw notFound('Раунд не найден');
 
-  if (action === 'start' || action === 'skip') {
-    await assertPreviousRoundClosed(db, tournamentId, roundIndex);
-  }
-
   if (action === 'skip') {
+    if (tournament.format === 'mexicano') {
+      throw wrongStatus(
+        'В mexicano раунд нельзя пропустить: следующий строится по результатам текущего',
+      );
+    }
     if (!rows.every((match) => match.status === 'scheduled')) {
       throw wrongStatus('Пропустить можно только раунд, который ещё не начинали');
     }
+    await assertPreviousRoundClosed(db, tournamentId, roundIndex);
   }
 
-  if (action === 'start' && rows.every((match) => match.status === 'skipped')) {
-    throw wrongStatus('Этот раунд пропущен');
+  if (action === 'unskip') {
+    if (!rows.every((match) => match.status === 'skipped')) {
+      throw wrongStatus('Вернуть можно только пропущенный раунд');
+    }
+  }
+
+  if (action === 'start') {
+    await assertPreviousRoundClosed(db, tournamentId, roundIndex);
+    await assertNoOtherLiveRound(db, tournamentId, roundIndex);
   }
 
   const now = new Date();
@@ -387,7 +397,9 @@ export async function applyRoundAction(
         ? 'round.paused'
         : action === 'skip'
           ? 'round.skipped'
-          : 'round.finished';
+          : action === 'unskip'
+            ? 'round.unskipped'
+            : 'round.finished';
 
   await recordAudit(db, actor, {
     action: auditAction,
@@ -417,6 +429,28 @@ async function assertPreviousRoundClosed(
   }
 }
 
+/** На кортах одновременно идёт только один раунд. */
+async function assertNoOtherLiveRound(
+  db: Database,
+  tournamentId: string,
+  roundIndex: number,
+): Promise<void> {
+  const live = await db
+    .select({ id: matches.id, roundIndex: matches.roundIndex })
+    .from(matches)
+    .where(
+      and(
+        eq(matches.tournamentId, tournamentId),
+        inArray(matches.status, ['running', 'paused']),
+      ),
+    )
+    .limit(1);
+  const other = live.find((row) => row.roundIndex !== roundIndex);
+  if (other) {
+    throw wrongStatus('Сначала завершите текущий раунд на кортах');
+  }
+}
+
 /** Что меняется у отдельного матча при действии над раундом. `null` — уже в нужном состоянии. */
 function roundPatchFor(
   match: MatchRow,
@@ -436,16 +470,38 @@ function roundPatchFor(
     };
   }
 
+  if (action === 'unskip') {
+    if (match.status !== 'skipped') return null;
+    return {
+      status: 'scheduled',
+      finishedAt: null,
+      startedAt: null,
+      pausedAt: null,
+      pausedTotalMs: 0,
+    };
+  }
+
   if (action === 'start') {
-    // Закрытый корт (счёт или skip) уже не возвращаем в игру.
-    if (match.status === 'running' || isMatchClosed(match.status)) return null;
-    return match.status === 'paused'
-      ? {
-          status: 'running',
-          pausedAt: null,
-          pausedTotalMs: match.pausedTotalMs + Math.max(0, pausedSinceMs),
-        }
-      : { status: 'running', startedAt: match.startedAt ?? now };
+    if (match.status === 'running') return null;
+    // Finished с счётом не трогаем; skipped можно вернуть в игру.
+    if (match.status === 'finished') return null;
+    if (match.status === 'paused') {
+      return {
+        status: 'running',
+        pausedAt: null,
+        pausedTotalMs: match.pausedTotalMs + Math.max(0, pausedSinceMs),
+      };
+    }
+    if (match.status === 'skipped') {
+      return {
+        status: 'running',
+        startedAt: now,
+        finishedAt: null,
+        pausedAt: null,
+        pausedTotalMs: 0,
+      };
+    }
+    return { status: 'running', startedAt: match.startedAt ?? now };
   }
 
   if (action === 'pause') {

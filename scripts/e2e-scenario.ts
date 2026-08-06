@@ -186,7 +186,7 @@ const roundAction = (
   token: string,
   tournamentId: string,
   index: number,
-  action: 'start' | 'pause' | 'finish',
+  action: 'start' | 'pause' | 'finish' | 'skip' | 'unskip',
 ) =>
   request<{ rounds: RoundDto[] }>(
     'POST',
@@ -517,12 +517,6 @@ async function main(): Promise<void> {
     body: { approve: true },
   });
 
-  // Новые турниры создаются с закрытой записью — иначе любой из списка
-  // мог бы заявиться и получить уведомление о старте.
-  await request('POST', `/api/tournaments/${advanced.id}/registration/open`, {
-    token: admin.token,
-  });
-
   const joined = await request<{ waitlisted: boolean }>(
     'POST',
     `/api/tournaments/${advanced.id}/join`,
@@ -781,6 +775,11 @@ async function main(): Promise<void> {
   });
   let mex = await state(mexicano.id, admin.token);
   check(mex.rounds.length === 1, 'mexicano начинается с одного раунда');
+  await expectError(
+    'tournament_wrong_status',
+    'в mexicano раунд нельзя пропустить — следующий строится по таблице',
+    () => roundAction(admin.token, mexicano.id, 0, 'skip'),
+  );
   check(mex.rounds[0]!.matches.length === 2, 'два корта — два матча');
 
   await expectError('round_not_finished', 'следующий раунд ждёт счёт предыдущего', () =>
@@ -826,10 +825,26 @@ async function main(): Promise<void> {
     'подписи кортов в mexicano не перемешиваются между раундами',
   );
 
-  await request('POST', `/api/tournaments/${mexicano.id}/finish`, { token: admin.token });
+  // Создаём ещё один раунд и сразу завершаем турнир — незаигранные матчи
+  // не должны блокировать финиш и медали.
+  await request('POST', `/api/tournaments/${mexicano.id}/rounds`, { token: admin.token });
+  mex = await state(mexicano.id, admin.token);
+  check(mex.rounds.length === 4, 'в mexicano можно создать следующий раунд после трёх');
   check(
-    (await state(mexicano.id, admin.token)).tournament.status === 'finished',
-    'mexicano можно завершить в любой момент',
+    mex.rounds[3]!.matches.every((match) => match.status === 'scheduled'),
+    'четвёртый раунд ещё не сыгран',
+  );
+
+  await request('POST', `/api/tournaments/${mexicano.id}/finish`, { token: admin.token });
+  const mexFinished = await state(mexicano.id, admin.token);
+  check(mexFinished.tournament.status === 'finished', 'mexicano можно завершить в любой момент');
+  check(
+    mexFinished.standings.some((row) => row.medal === 'gold'),
+    'после финиша mexicano в таблице есть золотая медаль',
+  );
+  check(
+    mexFinished.rounds[3]!.matches.every((match) => match.status === 'skipped'),
+    'несыгранный раунд при финише mexicano помечается skipped',
   );
 
   section('Корты без названий');
@@ -863,6 +878,41 @@ async function main(): Promise<void> {
     plainState.rounds.every((round) => round.matches.every((match) => match.courtName === '1')),
     'без названий корт подписан своим номером',
   );
+
+  section('Пропуск раунда и возврат (americano)');
+  // R0 сыграли → R1 пропустили → R2 стартовали → R1 нельзя, пока R2 живой →
+  // R2 завершили → R1 вернули и запустили.
+  await playRound(admin.token, plain.id, plainState.rounds[0]!, () => [11, 5]);
+  let skipFlow = await roundAction(admin.token, plain.id, 1, 'skip');
+  check(skipFlow[1]?.skipped === true, 'раунд 2 помечен skipped');
+  check(skipFlow[1]?.closed === true, 'skipped раунд считается закрытым для следующего');
+
+  skipFlow = await roundAction(admin.token, plain.id, 2, 'start');
+  check(
+    skipFlow[2]?.matches.every((match) => match.status === 'running') ?? false,
+    'следующий раунд стартует, пока предыдущий пропущен',
+  );
+  await expectError(
+    'tournament_wrong_status',
+    'пропущенный нельзя запустить, пока другой раунд на кортах',
+    () => roundAction(admin.token, plain.id, 1, 'start'),
+  );
+
+  skipFlow = await roundAction(admin.token, plain.id, 2, 'finish');
+
+  skipFlow = await roundAction(admin.token, plain.id, 1, 'unskip');
+  check(skipFlow[1]?.skipped === false, 'unskip возвращает раунд в scheduled');
+  skipFlow = await roundAction(admin.token, plain.id, 1, 'skip');
+  check(skipFlow[1]?.skipped === true, 'раунд снова можно пропустить');
+
+  // Play на skipped: сразу в running, без отдельного unskip.
+  skipFlow = await roundAction(admin.token, plain.id, 1, 'start');
+  check(
+    skipFlow[1]?.matches.every((match) => match.status === 'running') ?? false,
+    'пропущенный раунд можно запустить напрямую',
+  );
+  await roundAction(admin.token, plain.id, 1, 'finish');
+
   await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
 
   section('Права и удаление');

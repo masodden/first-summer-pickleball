@@ -141,7 +141,7 @@ export class TournamentApi {
   roundAction(
     id: string,
     index: number,
-    action: 'start' | 'pause' | 'finish' | 'skip',
+    action: 'start' | 'pause' | 'finish' | 'skip' | 'unskip',
   ): Promise<{ rounds: RoundDto[] }> {
     return this.api.post(
       `/api/tournaments/${id}/rounds/${index}/${action}`,

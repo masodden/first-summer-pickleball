@@ -178,12 +178,7 @@ export const tournaments = pgTable(
     title: text().notNull(),
     category: text(),
     format: tournamentFormatEnum().notNull(),
-    /**
-     * По умолчанию регистрация закрыта: состав набирает организатор.
-     * Иначе любой, кто открыл список турниров, может нажать «Записаться»
-     * и потом получить уведомление о старте, хотя его «не звали».
-     */
-    status: tournamentStatusEnum().notNull().default('registration_closed'),
+    status: tournamentStatusEnum().notNull().default('registration'),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     courts: integer().notNull(),
     /**

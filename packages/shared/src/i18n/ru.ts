@@ -138,7 +138,8 @@ export const ru = {
   'tournament.registrationClosedHint':
     'Запись закрыта: состав набирает организатор. Откройте регистрацию, если игроки должны записаться сами.',
   'tournament.finish': 'Завершить турнир',
-  'tournament.finishConfirm': 'Завершить турнир? После этого счёт нельзя будет изменить.',
+  'tournament.finishShort': 'Закончить',
+  'tournament.finishConfirm': 'Завершить турнир? После этого счёт нельзя будет изменить, в таблице появятся медали.',
   'tournament.finished': 'Турнир завершён',
   'tournament.exportCsv': 'Скачать результаты в CSV',
   'tournament.publicLink': 'Публичная ссылка на табло',
@@ -206,8 +207,11 @@ export const ru = {
   'match.startRound': 'Начать раунд',
   'match.finishRound': 'Завершить',
   'match.skipRound': 'Пропустить',
-  'match.skipRoundConfirm': 'Пропустить этот раунд? Игры не будут сыграны, можно будет начать следующий.',
+  'match.skipRoundConfirm':
+    'Пропустить этот раунд? Позже к нему можно вернуться. Следующий раунд при этом можно начать.',
+  'match.unskipRound': 'Вернуть раунд',
   'match.roundWaitingPrevious': 'Сначала завершите или пропустите предыдущий раунд',
+  'match.roundWaitingLive': 'Сначала завершите раунд, который сейчас на кортах',
   'match.roundSkipped': 'Раунд пропущен',
   'match.roundNotStarted': 'Раунд ещё не начали',
   'match.scoreAfterFinish': 'Счёт можно ввести после завершения раунда',

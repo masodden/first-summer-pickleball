@@ -256,7 +256,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
    * Старт, пауза и завершение сразу всего раунда: корты на площадке начинают
    * играть одновременно, поэтому и кнопка одна.
    */
-  for (const action of ['start', 'pause', 'finish', 'skip'] as const) {
+  for (const action of ['start', 'pause', 'finish', 'skip', 'unskip'] as const) {
     app.post<{ Params: { id: string; index: string } }>(
       `/api/tournaments/:id/rounds/:index/${action}`,
       async (request) => {

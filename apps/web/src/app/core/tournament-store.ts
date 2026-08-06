@@ -107,11 +107,34 @@ export class TournamentStore {
     return this.roundsSignal()[index - 1]?.closed ?? false;
   });
 
-  readonly canStartViewedRound = computed(
-    () => this.canRunRound() && this.previousRoundClosed() && this.roundState() === 'scheduled',
+  /** На кортах уже идёт другой раунд — новый/пропущенный стартовать нельзя. */
+  readonly otherRoundLive = computed(() => {
+    const index = this.viewRoundSignal();
+    return this.roundsSignal().some(
+      (round) =>
+        round.index !== index &&
+        round.matches.some((match) => match.status === 'running' || match.status === 'paused'),
+    );
+  });
+
+  readonly canStartViewedRound = computed(() => {
+    if (!this.canRunRound() || !this.previousRoundClosed() || this.otherRoundLive()) return false;
+    const state = this.roundState();
+    return state === 'scheduled' || state === 'skipped';
+  });
+
+  /** Пропуск только в americano: в mexicano следующий раунд зависит от счёта. */
+  readonly canSkipViewedRound = computed(
+    () =>
+      this.canRunRound() &&
+      !this.isMexicano() &&
+      this.previousRoundClosed() &&
+      this.roundState() === 'scheduled',
   );
 
-  readonly canSkipViewedRound = computed(() => this.canStartViewedRound());
+  readonly canUnskipViewedRound = computed(
+    () => this.canRunRound() && this.roundState() === 'skipped' && !this.otherRoundLive(),
+  );
 
   /**
    * Матч, по которому считается общий таймер раунда. Все корты стартуют
@@ -163,7 +186,27 @@ export class TournamentStore {
   readonly canFinish = computed(() => {
     const tournament = this.tournamentSignal();
     if (!tournament?.canManage || tournament.status !== 'running') return false;
-    return this.roundsSignal().every((round) => round.allScored);
+    const rounds = this.roundsSignal();
+    if (rounds.length === 0) return false;
+
+    const hasLive = rounds.some((round) =>
+      round.matches.some((match) => match.status === 'running' || match.status === 'paused'),
+    );
+    if (hasLive) return false;
+
+    if (tournament.format === 'mexicano') {
+      // Можно закончить после любого сыгранного раунда; ещё не начатый
+      // следующий раунд медалям не мешает.
+      if (!rounds.some((round) => round.allScored)) return false;
+      return rounds.every(
+        (round) =>
+          round.allScored ||
+          round.skipped ||
+          round.matches.every((match) => match.status === 'scheduled'),
+      );
+    }
+
+    return rounds.every((round) => round.allScored);
   });
 
   readonly myParticipation = computed(() => {
@@ -403,7 +446,11 @@ export class TournamentStore {
     return this.roundAction('skip');
   }
 
-  private roundAction(action: 'start' | 'pause' | 'finish' | 'skip'): Promise<void> {
+  unskipRound(): Promise<void> {
+    return this.roundAction('unskip');
+  }
+
+  private roundAction(action: 'start' | 'pause' | 'finish' | 'skip' | 'unskip'): Promise<void> {
     const index = this.viewRoundSignal();
     return this.run(
       `round:${action}`,

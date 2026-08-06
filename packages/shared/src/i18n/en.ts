@@ -140,7 +140,9 @@ export const en: Record<TranslationKey, string> = {
   'tournament.registrationClosedHint':
     'Registration is closed: the organizer builds the roster. Open registration if players should sign up themselves.',
   'tournament.finish': 'Finish tournament',
-  'tournament.finishConfirm': 'Finish the tournament? Scores can no longer be edited.',
+  'tournament.finishShort': 'Finish',
+  'tournament.finishConfirm':
+    'Finish the tournament? Scores can no longer be edited, and medals will appear in the standings.',
   'tournament.finished': 'Tournament finished',
   'tournament.exportCsv': 'Download results as CSV',
   'tournament.publicLink': 'Public standings link',
@@ -210,8 +212,10 @@ export const en: Record<TranslationKey, string> = {
   'match.finishRound': 'Finish',
   'match.skipRound': 'Skip',
   'match.skipRoundConfirm':
-    'Skip this round? Matches will not be played, and you can start the next one.',
+    'Skip this round? You can come back to it later. The next round can start in the meantime.',
+  'match.unskipRound': 'Restore round',
   'match.roundWaitingPrevious': 'Finish or skip the previous round first',
+  'match.roundWaitingLive': 'Finish the round currently on court first',
   'match.roundSkipped': 'Round skipped',
   'match.roundNotStarted': 'The round has not started yet',
   'match.scoreAfterFinish': 'Enter the score after finishing the round',

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, asc, count, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, max, notInArray, sql } from 'drizzle-orm';
 import {
   normalizeCourtNames,
   type CreateTournamentInput,
@@ -236,8 +236,6 @@ export async function createTournament(
       title: input.title,
       category: input.category ?? null,
       format: input.format,
-      // Состав сначала собирает организатор; открыть запись — отдельная кнопка.
-      status: 'registration_closed',
       startsAt: new Date(input.startsAt),
       courts: input.courts,
       courtNames: normalizeCourtNames(input.courtNames, input.courts),
@@ -652,13 +650,37 @@ export async function finishTournament(
     throw wrongStatus('Завершить можно только идущий турнир');
   }
 
-  const [unscored] = await db
-    .select({ total: count() })
-    .from(matches)
-    .where(and(eq(matches.tournamentId, tournamentId), isNull(matches.scoreA)));
-  if (Number(unscored?.total ?? 0) > 0) {
-    // Не даём завершить турнир с пустыми матчами: таблица получилась бы неполной.
-    throw new ApiError('score_required', 'В некоторых матчах не введён счёт');
+  if (tournament.format === 'mexicano') {
+    // Несыгранный «следующий» раунд не должен блокировать финиш: организатор
+    // решает, когда хватит игр. Счёт обязателен только у начатых матчей.
+    const [unscored] = await db
+      .select({ total: count() })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.tournamentId, tournamentId),
+          isNull(matches.scoreA),
+          notInArray(matches.status, ['scheduled', 'skipped']),
+        ),
+      );
+    if (Number(unscored?.total ?? 0) > 0) {
+      throw new ApiError('score_required', 'В некоторых матчах не введён счёт');
+    }
+    await db
+      .update(matches)
+      .set({ status: 'skipped', finishedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(eq(matches.tournamentId, tournamentId), eq(matches.status, 'scheduled')),
+      );
+  } else {
+    const [unscored] = await db
+      .select({ total: count() })
+      .from(matches)
+      .where(and(eq(matches.tournamentId, tournamentId), isNull(matches.scoreA)));
+    if (Number(unscored?.total ?? 0) > 0) {
+      // Не даём завершить турнир с пустыми матчами: таблица получилась бы неполной.
+      throw new ApiError('score_required', 'В некоторых матчах не введён счёт');
+    }
   }
 
   await db

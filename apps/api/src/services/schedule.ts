@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ne } from 'drizzle-orm';
+import { and, asc, count, eq, ne, notInArray } from 'drizzle-orm';
 import {
   ScheduleError,
   generateAmericanoSchedule,
@@ -284,10 +284,16 @@ export async function appendRound(
   }
 
   if (lastRound) {
-    const [unfinished] = await db
-      .select({ total: count() })
-      .from(matches)
-      .where(and(eq(matches.roundId, lastRound.id), ne(matches.status, 'finished')));
+    // Mexicano: нужен именно finished со счётом — следующий раунд от таблицы.
+    // Americano: достаточно закрытого раунда (finished или skipped).
+    const openFilter =
+      tournament.format === 'mexicano'
+        ? and(eq(matches.roundId, lastRound.id), ne(matches.status, 'finished'))
+        : and(
+            eq(matches.roundId, lastRound.id),
+            notInArray(matches.status, ['finished', 'skipped']),
+          );
+    const [unfinished] = await db.select({ total: count() }).from(matches).where(openFilter);
     if (Number(unfinished?.total ?? 0) > 0) {
       throw new ApiError('round_not_finished', 'Сначала завершите все матчи текущего раунда');
     }

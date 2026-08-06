@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { ClockService, elapsedMs, formatClock } from '../../core/clock';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
@@ -112,31 +113,89 @@ import { MatchCard } from './match-card';
                   <span class="tiny" style="color: var(--danger)">{{ t()('match.timeUpHint') }}</span>
                 } @else if (
                   store.canRunRound() &&
-                  store.roundState() === 'scheduled' &&
+                  (store.roundState() === 'scheduled' || store.roundState() === 'skipped') &&
                   !store.previousRoundClosed()
                 ) {
                   <span class="tiny muted">{{ t()('match.roundWaitingPrevious') }}</span>
+                } @else if (store.canRunRound() && store.otherRoundLive()) {
+                  <span class="tiny muted">{{ t()('match.roundWaitingLive') }}</span>
                 }
               </div>
 
               @if (store.canRunRound()) {
                 @switch (store.roundState()) {
                   @case ('scheduled') {
+                    @if (!store.isMexicano()) {
+                      <button
+                        type="button"
+                        class="btn btn--icon btn--glass"
+                        [disabled]="!store.canSkipViewedRound() || store.isBusy('round:skip')"
+                        [attr.aria-label]="t()('match.skipRound')"
+                        (click)="skipRound()"
+                      >
+                        <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                          <path d="M5 5.5v13l9-6.5z" />
+                          <rect x="16" y="5" width="3" height="14" rx="1" />
+                        </svg>
+                      </button>
+                    }
                     <button
                       type="button"
-                      class="btn btn--glass btn--sm"
-                      [disabled]="!store.canSkipViewedRound() || store.isBusy('round:skip')"
-                      (click)="skipRound()"
+                      class="btn btn--icon btn--go"
+                      [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
+                      [attr.aria-label]="t()('match.startRound')"
+                      (click)="store.startRound()"
                     >
-                      {{ t()('match.skipRound') }}
+                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                        <path d="M8 5.5v13l11-6.5z" />
+                      </svg>
+                    </button>
+                    @if (store.isMexicano() && store.canFinish()) {
+                      <button
+                        type="button"
+                        class="btn btn--glass"
+                        [disabled]="store.isBusy('finish')"
+                        (click)="finish()"
+                      >
+                        {{ t()('tournament.finishShort') }}
+                      </button>
+                    }
+                  }
+                  @case ('finished') {
+                    @if (store.isMexicano() && store.canFinish()) {
+                      <button
+                        type="button"
+                        class="btn btn--primary"
+                        [disabled]="store.isBusy('finish')"
+                        (click)="finish()"
+                      >
+                        {{ t()('tournament.finishShort') }}
+                      </button>
+                    }
+                  }
+                  @case ('skipped') {
+                    <button
+                      type="button"
+                      class="btn btn--icon btn--glass"
+                      [disabled]="!store.canUnskipViewedRound() || store.isBusy('round:unskip')"
+                      [attr.aria-label]="t()('match.unskipRound')"
+                      (click)="unskipRound()"
+                    >
+                      <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                        <path d="M9 15l-5-5 5-5" />
+                        <path d="M4 10h10a5 5 0 010 10H9" />
+                      </svg>
                     </button>
                     <button
                       type="button"
-                      class="btn btn--go"
+                      class="btn btn--icon btn--go"
                       [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
+                      [attr.aria-label]="t()('match.startRound')"
                       (click)="store.startRound()"
                     >
-                      {{ t()('match.startRound') }}
+                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                        <path d="M8 5.5v13l11-6.5z" />
+                      </svg>
                     </button>
                   }
                   @case ('running') {
@@ -216,14 +275,27 @@ import { MatchCard } from './match-card';
 
               @if (store.isLastGeneratedRound()) {
                 @if (store.canManage() && store.canCreateNextRound()) {
-                  <button
-                    type="button"
-                    class="btn btn--primary btn--lg btn--block"
-                    [disabled]="store.isBusy('next-round')"
-                    (click)="store.createNextRound()"
-                  >
-                    {{ isMexicano() ? t()('match.createNextRound') : t()('match.nextRound') }}
-                  </button>
+                  <div class="stack stack--2">
+                    <button
+                      type="button"
+                      class="btn btn--primary btn--block"
+                      [class.btn--lg]="!(store.isMexicano() && store.canFinish())"
+                      [disabled]="store.isBusy('next-round')"
+                      (click)="store.createNextRound()"
+                    >
+                      {{ isMexicano() ? t()('match.createNextRound') : t()('match.nextRound') }}
+                    </button>
+                    @if (store.isMexicano() && store.canFinish()) {
+                      <button
+                        type="button"
+                        class="btn btn--glass btn--block"
+                        [disabled]="store.isBusy('finish')"
+                        (click)="finish()"
+                      >
+                        {{ t()('tournament.finish') }}
+                      </button>
+                    }
+                  </div>
                 } @else if (allDone()) {
                   <div class="glass card--tight row">
                     <app-ball [size]="26" motion="bounce" />
@@ -321,6 +393,14 @@ import { MatchCard } from './match-card';
     .round-control {
       gap: var(--space-2);
       align-items: center;
+
+      /* Иконки play/pause — 40px; текстовые рядом должны совпадать по высоте. */
+      > .btn:not(.btn--icon) {
+        min-height: 40px;
+        height: 40px;
+        padding: 0 var(--space-4);
+        font-size: 13.5px;
+      }
     }
 
     .round-clock {
@@ -343,6 +423,7 @@ export class TournamentRoundsTab {
   private readonly confirm = inject(ConfirmService);
   private readonly i18n = inject(I18nService);
   private readonly clock = inject(ClockService);
+  private readonly router = inject(Router);
 
   protected readonly store = inject(TournamentStore);
   protected readonly t = this.i18n.t;
@@ -412,6 +493,10 @@ export class TournamentRoundsTab {
     if (confirmed) await this.store.skipRound();
   }
 
+  protected async unskipRound(): Promise<void> {
+    await this.store.unskipRound();
+  }
+
   protected async start(): Promise<void> {
     const confirmed = await this.confirm.ask({
       title: this.i18n.translate('match.generateSchedule'),
@@ -436,8 +521,11 @@ export class TournamentRoundsTab {
     const confirmed = await this.confirm.ask({
       title: this.i18n.translate('tournament.finish'),
       message: this.i18n.translate('tournament.finishConfirm'),
-      confirmLabel: this.i18n.translate('tournament.finish'),
+      confirmLabel: this.i18n.translate('tournament.finishShort'),
     });
-    if (confirmed) await this.store.finish();
+    if (!confirmed) return;
+    await this.store.finish();
+    const id = this.store.tournament()?.id;
+    if (id) await this.router.navigate(['/tournaments', id, 'standings']);
   }
 }
