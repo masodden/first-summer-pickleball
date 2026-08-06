@@ -344,7 +344,7 @@ export const en: Record<TranslationKey, string> = {
   'settings.about': 'About',
   'settings.saved': 'Settings saved',
   'settings.version': 'Version',
-  'settings.feedback': 'Feedback and bug reports are welcome in Telegram:',
+  'settings.feedback': 'Feedback & bugs',
 
   'import.title': 'Import players',
   'import.hint':

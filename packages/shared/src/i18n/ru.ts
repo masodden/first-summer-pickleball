@@ -340,7 +340,7 @@ export const ru = {
   'settings.about': 'О приложении',
   'settings.saved': 'Настройки сохранены',
   'settings.version': 'Версия',
-  'settings.feedback': 'Оставить свой фидбэк или зарепортить баг можете мне в tg:',
+  'settings.feedback': 'Фидбэк и баги',
 
   'import.title': 'Импорт игроков',
   'import.hint':
