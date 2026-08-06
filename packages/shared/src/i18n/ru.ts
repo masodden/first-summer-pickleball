@@ -86,6 +86,7 @@ export const ru = {
 
   'role.admin': 'Администратор',
   'role.moderator': 'Модератор',
+  'role.organizer': 'Организатор',
   'role.user': 'Игрок',
   'role.spectator': 'Наблюдатель',
   'role.change': 'Изменить роль',
@@ -336,7 +337,8 @@ export const ru = {
   'settings.appearance': 'Оформление',
   'settings.reducedMotion': 'Меньше анимаций',
   'settings.notifications': 'Уведомления в Telegram',
-  'settings.notificationsHint': 'Сообщения о старте турнира, готовности корта и результатах',
+  'settings.notificationsHint':
+    'Старт и итоги турнира, подтверждение участия, привязка DUPR и изменения состава',
   'settings.about': 'О приложении',
   'settings.saved': 'Настройки сохранены',
   'settings.version': 'Версия',
@@ -361,7 +363,7 @@ export const ru = {
   'admin.removeModerator': 'Снять модератора',
   'admin.auditLog': 'Журнал действий',
   'admin.bootstrapHint':
-    'Здесь только администраторы и модераторы. Роль пишется на DUPR ID; PZQZKM и P5ML0M понизить нельзя.',
+    'Здесь администраторы, модераторы и организаторы. Роль пишется на DUPR ID; PZQZKM и P5ML0M понизить нельзя.',
 
   'errors.unauthorized': 'Нужно войти в приложение',
   'errors.forbidden': 'Недостаточно прав для этого действия',

@@ -19,7 +19,7 @@ import type { AppContext } from './context.js';
 
 const devLoginSchema = z.object({
   name: z.string().trim().min(1).max(60).default('Локальный организатор'),
-  role: z.enum(['admin', 'moderator', 'user']).default('admin'),
+  role: z.enum(['admin', 'moderator', 'organizer', 'user']).default('admin'),
   telegramId: z.string().trim().min(1).max(32).default('dev-1'),
 });
 

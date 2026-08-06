@@ -57,6 +57,13 @@
       "when": 1785967000000,
       "tag": "0007_training_active",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785970000000,
+      "tag": "0008_role_organizer",
+      "breakpoints": true
     }
   ]
 }

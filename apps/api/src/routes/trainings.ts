@@ -35,7 +35,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   });
 
   app.post('/api/trainings', async (request, reply) => {
-    const viewer = requireRole(request, 'moderator');
+    const viewer = requireRole(request, 'organizer');
     const body = parse(createTrainingSchema, request.body);
     const training = await createTraining(db, body, viewer);
     reply.code(201);
@@ -51,7 +51,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   });
 
   app.patch<{ Params: { id: string } }>('/api/trainings/:id', async (request) => {
-    const viewer = requireRole(request, 'moderator');
+    const viewer = requireRole(request, 'organizer');
     const body = parse(updateTrainingSchema, request.body ?? {});
     const training = await updateTraining(db, request.params.id, body, viewer);
     return { training };
@@ -69,7 +69,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   });
 
   app.post<{ Params: { id: string } }>('/api/trainings/:id/participants', async (request) => {
-    const viewer = requireRole(request, 'moderator');
+    const viewer = requireRole(request, 'organizer');
     const body = parse(addParticipantSchema, request.body);
     return addTrainingParticipant(db, request.params.id, body.playerId, viewer, {
       bySelf: false,
@@ -79,7 +79,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   app.delete<{ Params: { id: string; playerId: string } }>(
     '/api/trainings/:id/participants/:playerId',
     async (request) => {
-      const viewer = requireRole(request, 'moderator');
+      const viewer = requireRole(request, 'organizer');
       await removeTrainingParticipant(db, request.params.id, request.params.playerId, viewer, {
         bySelf: false,
       });
@@ -111,7 +111,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   app.put<{ Params: { id: string; playerId: string } }>(
     '/api/trainings/:id/participants/:playerId/paid',
     async (request) => {
-      const viewer = requireRole(request, 'moderator');
+      const viewer = requireRole(request, 'organizer');
       const body = parse(setPaidSchema, request.body);
       const participant = await setTrainingParticipantPaid(
         db,
@@ -127,7 +127,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   app.put<{ Params: { id: string; playerId: string } }>(
     '/api/trainings/:id/participants/:playerId/amount',
     async (request) => {
-      const viewer = requireRole(request, 'moderator');
+      const viewer = requireRole(request, 'organizer');
       const body = parse(setTrainingAmountSchema, request.body);
       const participant = await setTrainingParticipantAmount(
         db,
@@ -143,7 +143,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   app.post<{ Params: { id: string; playerId: string } }>(
     '/api/trainings/:id/participants/:playerId/promote',
     async (request) => {
-      const viewer = requireRole(request, 'moderator');
+      const viewer = requireRole(request, 'organizer');
       const participant = await promoteTrainingFromWaitlist(
         db,
         request.params.id,
@@ -155,7 +155,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   );
 
   app.post<{ Params: { id: string } }>('/api/trainings/:id/finish', async (request) => {
-    const viewer = requireRole(request, 'moderator');
+    const viewer = requireRole(request, 'organizer');
     const training = await finishTraining(db, request.params.id, viewer);
     return { training };
   });

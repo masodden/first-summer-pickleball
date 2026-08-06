@@ -23,7 +23,7 @@ import {
 } from '../db/schema.js';
 import { ApiError, forbidden, notFound, wrongStatus } from '../lib/errors.js';
 import { toPlayerDto } from './mappers.js';
-import { canManageTournaments, isAdmin, type Viewer } from '../auth/context.js';
+import { canManageTrainings, isAdmin, type Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
 
 interface TrainingCounts {
@@ -148,7 +148,7 @@ function toTrainingDto(
     updatedAt: row.updatedAt.toISOString(),
     startedAt: row.startedAt?.toISOString() ?? null,
     finishedAt: row.finishedAt?.toISOString() ?? null,
-    canManage: canManageTournaments(viewer),
+    canManage: canManageTrainings(viewer),
     canDelete: isAdmin(viewer),
     allConfirmed,
     myParticipation,
@@ -288,7 +288,7 @@ export async function createTraining(
   input: CreateTrainingInput,
   actor: Viewer,
 ): Promise<TrainingDto> {
-  if (!canManageTournaments(actor)) throw forbidden('Создавать тренировки может организатор');
+  if (!canManageTrainings(actor)) throw forbidden('Создавать тренировки может организатор');
 
   const now = new Date();
   const [row] = await db
@@ -329,7 +329,7 @@ export async function updateTraining(
   actor: Viewer,
 ): Promise<TrainingDto> {
   const current = await getTrainingRow(db, id);
-  if (!canManageTournaments(actor)) throw forbidden();
+  if (!canManageTrainings(actor)) throw forbidden();
   if (!isTrainingActive(current.status)) {
     throw wrongStatus('Завершённую тренировку изменить нельзя');
   }
@@ -397,7 +397,7 @@ export async function addTrainingParticipant(
     if (!isTrainingActive(training.status)) {
       throw wrongStatus('Запись на эту тренировку закрыта');
     }
-  } else if (!canManageTournaments(actor)) {
+  } else if (!canManageTrainings(actor)) {
     throw forbidden('Добавлять игроков может организатор');
   } else if (!isTrainingActive(training.status)) {
     throw wrongStatus('Тренировка уже завершена');
@@ -487,7 +487,7 @@ export async function removeTrainingParticipant(
     if (!isTrainingActive(training.status)) {
       throw wrongStatus('Тренировка уже завершена, обратитесь к организатору');
     }
-  } else if (!canManageTournaments(actor)) {
+  } else if (!canManageTrainings(actor)) {
     throw forbidden();
   }
   if (!isTrainingActive(training.status)) {
@@ -545,7 +545,7 @@ export async function setTrainingParticipantPaid(
   actor: Viewer,
 ): Promise<TrainingParticipantDto> {
   const training = await getTrainingRow(db, trainingId);
-  if (!canManageTournaments(actor)) throw forbidden();
+  if (!canManageTrainings(actor)) throw forbidden();
   if (training.status === 'finished') throw wrongStatus('Тренировка уже завершена');
 
   const [row] = await db
@@ -581,7 +581,7 @@ export async function setTrainingParticipantAmount(
   actor: Viewer,
 ): Promise<TrainingParticipantDto> {
   const training = await getTrainingRow(db, trainingId);
-  if (!canManageTournaments(actor)) throw forbidden();
+  if (!canManageTrainings(actor)) throw forbidden();
   if (!isTrainingActive(training.status)) {
     throw wrongStatus('После завершения суммы менять нельзя');
   }
@@ -618,7 +618,7 @@ export async function promoteTrainingFromWaitlist(
   actor: Viewer,
 ): Promise<TrainingParticipantDto> {
   const training = await getTrainingRow(db, trainingId);
-  if (!canManageTournaments(actor)) throw forbidden();
+  if (!canManageTrainings(actor)) throw forbidden();
   if (!isTrainingActive(training.status)) {
     throw wrongStatus('Тренировка уже завершена');
   }
@@ -677,7 +677,7 @@ export async function finishTraining(
   actor: Viewer,
 ): Promise<TrainingDto> {
   const training = await getTrainingRow(db, trainingId);
-  if (!canManageTournaments(actor)) throw forbidden();
+  if (!canManageTrainings(actor)) throw forbidden();
   if (!isTrainingActive(training.status)) {
     throw wrongStatus('Тренировка уже завершена');
   }

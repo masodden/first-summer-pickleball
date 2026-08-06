@@ -127,10 +127,15 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     '/api/tournaments/:id/participants/:playerId',
     async (request) => {
       const viewer = requireRole(request, 'moderator');
+      const tournament = await getTournamentRow(db, request.params.id);
       await removeParticipant(db, request.params.id, request.params.playerId, viewer, {
         bySelf: false,
       });
       await broadcastParticipants(db, hub, request.params.id);
+      await notify.sendToPlayers(
+        [request.params.playerId],
+        `Вас исключили из турнира «${escapeHtml(tournament.title)}».`,
+      );
       return { ok: true };
     },
   );
@@ -169,6 +174,13 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
         viewer,
       );
       await broadcastParticipants(db, hub, request.params.id);
+      if (body.confirmedAndPaid) {
+        const tournament = await getTournamentRow(db, request.params.id);
+        await notify.sendToPlayers(
+          [request.params.playerId],
+          `Ваше участие в турнире «${escapeHtml(tournament.title)}» подтверждено, битва будет эпичной!`,
+        );
+      }
       return { participant };
     },
   );
@@ -224,7 +236,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     // Только тем, кто стоит в только что собранном расписании — не всему клубу.
     await notify.sendToSchedule(
       request.params.id,
-      `Турнир «${escapeHtml(tournament.title)}» начался. Откройте приложение, чтобы увидеть свой корт.`,
+      `Турнир «${escapeHtml(tournament.title)}» скоро начнётся. Откройте приложение, чтобы посмотреть свои игры.`,
     );
     return { tournament: await getTournamentDto(db, request.params.id, viewer) };
   });
@@ -244,11 +256,6 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     const viewer = requireRole(request, 'moderator');
     const index = await appendRound(db, request.params.id, viewer);
     await broadcastSchedule(db, hub, request.params.id);
-    await notify.sendToSchedule(
-      request.params.id,
-      `Раунд ${index + 1} готов. Посмотрите, на каком вы корте.`,
-      index,
-    );
     return { roundIndex: index };
   });
 
@@ -282,12 +289,15 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       await getTournamentRow(db, request.params.id),
     );
     const podium = standings
-      .filter((row) => row.medal)
+      .slice(0, 3)
+      .filter((row) => row.played > 0)
       .map((row, index) => `${index + 1}. ${row.player.fullName} — ${row.pointsFor}`)
       .join('\n');
     await notify.sendToTournament(
       request.params.id,
-      `Турнир «${escapeHtml(tournament.title)}» завершён.\n${escapeHtml(podium)}`,
+      podium
+        ? `Турнир «${escapeHtml(tournament.title)}» завершён.\n${escapeHtml(podium)}`
+        : `Турнир «${escapeHtml(tournament.title)}» завершён.`,
     );
     return { tournament };
   });

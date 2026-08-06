@@ -92,6 +92,11 @@ export function canManageTournaments(viewer: Viewer | null): boolean {
   return isRoleAtLeast(viewer?.role, 'moderator');
 }
 
+/** Тренировки: организатор, модератор и админ. */
+export function canManageTrainings(viewer: Viewer | null): boolean {
+  return isRoleAtLeast(viewer?.role, 'organizer');
+}
+
 export function isAdmin(viewer: Viewer | null): boolean {
   return viewer?.role === 'admin';
 }

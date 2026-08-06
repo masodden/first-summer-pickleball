@@ -14,7 +14,7 @@ import { auditLog, venues } from '../db/schema.js';
 import type { AppContext } from './context.js';
 
 export function registerAdminRoutes(app: FastifyInstance, ctx: AppContext): void {
-  const { db } = ctx;
+  const { db, notify } = ctx;
 
   app.get('/api/admin/accounts', async (request) => {
     requireRole(request, 'admin');
@@ -37,7 +37,13 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: AppContext): void
   app.post<{ Params: { id: string } }>('/api/claims/:id/decision', async (request) => {
     const viewer = requireRole(request, 'moderator');
     const body = parse(z.object({ approve: z.boolean() }), request.body);
-    await decideClaim(db, request.params.id, body.approve, viewer);
+    const decided = await decideClaim(db, request.params.id, body.approve, viewer);
+    if (body.approve) {
+      await notify.sendToPlayers(
+        [decided.playerId],
+        'Ваша заявка на привязку DUPR одобрена. Можно записываться на турниры.',
+      );
+    }
     return { ok: true };
   });
 

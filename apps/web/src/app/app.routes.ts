@@ -3,11 +3,18 @@ import { Router, type CanMatchFn, type Routes } from '@angular/router';
 import { SessionStore } from './core/session';
 import { ViewStateService } from './core/view-state';
 
-/** Организаторские экраны: без прав уводим на список турниров. */
-const canManage: CanMatchFn = () => {
+/** Турниры: модератор и админ. */
+const canManageTournaments: CanMatchFn = () => {
   const session = inject(SessionStore);
   if (session.isModerator()) return true;
   return inject(Router).parseUrl('/tournaments');
+};
+
+/** Тренировки: организатор, модератор и админ. */
+const canManageTrainings: CanMatchFn = () => {
+  const session = inject(SessionStore);
+  if (session.canManageTrainings()) return true;
+  return inject(Router).parseUrl('/trainings');
 };
 
 const isAdmin: CanMatchFn = () => {
@@ -26,14 +33,14 @@ export const routes: Routes = [
   },
   {
     path: 'tournaments/new',
-    canMatch: [canManage],
+    canMatch: [canManageTournaments],
     loadComponent: () =>
       import('./features/tournaments/tournament-form').then((m) => m.TournamentFormPage),
     title: 'Новый турнир',
   },
   {
     path: 'tournaments/:id/edit',
-    canMatch: [canManage],
+    canMatch: [canManageTournaments],
     loadComponent: () =>
       import('./features/tournaments/tournament-form').then((m) => m.TournamentFormPage),
     title: 'Редактирование турнира',
@@ -77,14 +84,14 @@ export const routes: Routes = [
   },
   {
     path: 'trainings/new',
-    canMatch: [canManage],
+    canMatch: [canManageTrainings],
     loadComponent: () =>
       import('./features/trainings/training-form').then((m) => m.TrainingFormPage),
     title: 'Новая тренировка',
   },
   {
     path: 'trainings/:id/edit',
-    canMatch: [canManage],
+    canMatch: [canManageTrainings],
     loadComponent: () =>
       import('./features/trainings/training-form').then((m) => m.TrainingFormPage),
     title: 'Редактирование тренировки',

@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import {
   isBootstrapAdminDupr,
   normalizeDuprId,
@@ -337,7 +337,7 @@ export async function decideClaim(
   claimId: string,
   approve: boolean,
   actor: Viewer,
-): Promise<void> {
+): Promise<{ playerId: string; accountId: string }> {
   const [row] = await db.select().from(claims).where(eq(claims.id, claimId)).limit(1);
   if (!row) throw notFound('Заявка не найдена');
 
@@ -380,6 +380,8 @@ export async function decideClaim(
     entityId: claimId,
     payload: { playerId: row.playerId },
   });
+
+  return { playerId: row.playerId, accountId: row.accountId };
 }
 
 /**
@@ -484,13 +486,18 @@ export interface AccountSummary {
   lastSeenAt: string;
 }
 
-/** В списке админки — только админы и модераторы; обычные игроки скрыты. */
+/** В списке админки — staff-роли; обычные игроки скрыты. */
 export async function listAccounts(db: Database): Promise<AccountSummary[]> {
   const rows = await db
     .select({ account: accounts, player: players })
     .from(accounts)
     .leftJoin(players, eq(players.id, accounts.playerId))
-    .where(inArray(accounts.role, ['admin', 'moderator']))
+    .where(
+      or(
+        inArray(accounts.role, ['admin', 'moderator', 'organizer']),
+        inArray(players.clubRole, ['admin', 'moderator', 'organizer']),
+      ),
+    )
     .orderBy(desc(accounts.lastSeenAt));
 
   return rows.map((row) => {

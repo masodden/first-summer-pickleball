@@ -34,11 +34,19 @@ export function normalizeCourtNames(
   return trimmed.some((name) => name.length > 0) ? trimmed : null;
 }
 
-/** Роли. `spectator` не хранится в базе: это просто отсутствие аккаунта. */
-export const ROLES = ['admin', 'moderator', 'user'] as const;
+/**
+ * Роли. `spectator` не хранится в базе: это просто отсутствие аккаунта.
+ * `organizer` — тренировки; турниры — с `moderator` и выше.
+ */
+export const ROLES = ['admin', 'moderator', 'organizer', 'user'] as const;
 export type Role = (typeof ROLES)[number];
 
-export const ROLE_WEIGHT: Record<Role, number> = { user: 0, moderator: 1, admin: 2 };
+export const ROLE_WEIGHT: Record<Role, number> = {
+  user: 0,
+  organizer: 1,
+  moderator: 2,
+  admin: 3,
+};
 
 export const TOURNAMENT_FORMATS = ['americano', 'mexicano'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];

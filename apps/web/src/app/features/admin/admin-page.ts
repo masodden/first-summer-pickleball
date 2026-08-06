@@ -96,6 +96,7 @@ import { PlayerLine } from '../../ui/player-line';
                 (change)="setRole(account, $event)"
               >
                 <option value="user">{{ t()('role.user') }}</option>
+                <option value="organizer">{{ t()('role.organizer') }}</option>
                 <option value="moderator">{{ t()('role.moderator') }}</option>
                 <option value="admin">{{ t()('role.admin') }}</option>
               </select>
@@ -174,9 +175,15 @@ export class AdminPage {
   protected readonly report = signal<ImportReportDto | null>(null);
 
   protected roleLabel(role: Role): string {
-    return this.i18n.translate(
-      role === 'admin' ? 'role.admin' : role === 'moderator' ? 'role.moderator' : 'role.user',
-    );
+    const key =
+      role === 'admin'
+        ? 'role.admin'
+        : role === 'moderator'
+          ? 'role.moderator'
+          : role === 'organizer'
+            ? 'role.organizer'
+            : 'role.user';
+    return this.i18n.translate(key);
   }
 
   protected async decide(claim: ClaimRequestDto, approve: boolean): Promise<void> {

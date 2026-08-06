@@ -323,6 +323,8 @@ export class SettingsPage {
         return this.i18n.translate('role.admin');
       case 'moderator':
         return this.i18n.translate('role.moderator');
+      case 'organizer':
+        return this.i18n.translate('role.organizer');
       case 'user':
         return this.i18n.translate('role.user');
       default:

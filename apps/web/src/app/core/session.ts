@@ -39,6 +39,8 @@ export class SessionStore {
   readonly role = computed<Role | null>(() => this.sessionSignal()?.role ?? null);
   readonly isAuthenticated = computed(() => this.sessionSignal() !== null);
   readonly isModerator = computed(() => isRoleAtLeast(this.role(), 'moderator'));
+  /** Тренировки: организатор и выше. */
+  readonly canManageTrainings = computed(() => isRoleAtLeast(this.role(), 'organizer'));
   readonly isAdmin = computed(() => this.role() === 'admin');
   readonly player = computed(() => this.sessionSignal()?.player ?? null);
   readonly playerId = computed(() => this.sessionSignal()?.player?.id ?? null);

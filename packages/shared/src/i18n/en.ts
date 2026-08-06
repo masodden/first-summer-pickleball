@@ -88,6 +88,7 @@ export const en: Record<TranslationKey, string> = {
 
   'role.admin': 'Administrator',
   'role.moderator': 'Moderator',
+  'role.organizer': 'Organizer',
   'role.user': 'Player',
   'role.spectator': 'Spectator',
   'role.change': 'Change role',
@@ -340,7 +341,8 @@ export const en: Record<TranslationKey, string> = {
   'settings.appearance': 'Appearance',
   'settings.reducedMotion': 'Reduce animations',
   'settings.notifications': 'Telegram notifications',
-  'settings.notificationsHint': 'Messages about tournament start, court readiness and results',
+  'settings.notificationsHint':
+    'Tournament start and results, check-in confirmation, DUPR link and roster changes',
   'settings.about': 'About',
   'settings.saved': 'Settings saved',
   'settings.version': 'Version',
@@ -365,7 +367,7 @@ export const en: Record<TranslationKey, string> = {
   'admin.removeModerator': 'Remove moderator',
   'admin.auditLog': 'Activity log',
   'admin.bootstrapHint':
-    'Only administrators and moderators are listed. Roles are stored on the DUPR ID; PZQZKM and P5ML0M cannot be demoted.',
+    'Administrators, moderators and organizers are listed. Roles are stored on the DUPR ID; PZQZKM and P5ML0M cannot be demoted.',
 
   'errors.unauthorized': 'You need to sign in',
   'errors.forbidden': 'Not enough permissions for this action',

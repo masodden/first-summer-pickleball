@@ -222,6 +222,7 @@ import { RatingChip } from '../../ui/rating-chip';
                 (change)="setRole($event)"
               >
                 <option value="user">{{ t()('role.user') }}</option>
+                <option value="organizer">{{ t()('role.organizer') }}</option>
                 <option value="moderator">{{ t()('role.moderator') }}</option>
                 <option value="admin">{{ t()('role.admin') }}</option>
               </select>

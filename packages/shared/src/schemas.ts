@@ -160,7 +160,7 @@ export const matchActionSchema = z.object({
 
 /** Роль клуба на карточке игрока (DUPR). Зашитых админов понизить нельзя. */
 export const setRoleSchema = z.object({
-  role: z.enum(['admin', 'moderator', 'user']),
+  role: z.enum(['admin', 'moderator', 'organizer', 'user']),
 });
 
 export const importPlayersSchema = z.object({

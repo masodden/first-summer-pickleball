@@ -35,7 +35,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
     <div class="stack stack--4">
       <div class="row row--between header">
         <app-domain-switch />
-        @if (session.isModerator()) {
+        @if (session.canManageTrainings()) {
           <a class="btn btn--primary btn--sm create" routerLink="/trainings/new">
             {{ t()('common.create') }}
           </a>
@@ -78,7 +78,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
         <div class="glass card empty-state">
           <app-racket [size]="56" [swing]="true" />
           <h3>{{ t()('training.empty') }}</h3>
-          @if (session.isModerator()) {
+          @if (session.canManageTrainings()) {
             <p class="small">{{ t()('training.emptyHint') }}</p>
             <a class="btn btn--primary" routerLink="/trainings/new">
               {{ t()('training.create') }}

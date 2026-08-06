@@ -13,7 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-export const roleEnum = pgEnum('role', ['admin', 'moderator', 'user']);
+export const roleEnum = pgEnum('role', ['admin', 'moderator', 'organizer', 'user']);
 export const localeEnum = pgEnum('locale', ['ru', 'en']);
 export const ratingSourceEnum = pgEnum('rating_source', ['import', 'moderator', 'self']);
 export const claimStatusEnum = pgEnum('claim_status', ['pending', 'approved', 'rejected']);
