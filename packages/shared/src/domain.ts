@@ -106,6 +106,25 @@ export const STANDINGS_SORT_KEYS = [
 ] as const;
 export type StandingsSortKey = (typeof STANDINGS_SORT_KEYS)[number];
 
+/** Пресеты правила победителя в форме турнира → цепочка standingsSort. */
+export const WINNER_RULE_IDS = ['points_diff', 'points_wins', 'wins_points'] as const;
+export type WinnerRuleId = (typeof WINNER_RULE_IDS)[number];
+
+export const WINNER_RULE_SORT: Record<WinnerRuleId, readonly StandingsSortKey[]> = {
+  points_diff: ['points', 'diff', 'wins'],
+  points_wins: ['points', 'wins', 'diff'],
+  wins_points: ['wins', 'points', 'diff'],
+};
+
+/** Подбирает ближайший пресет к сохранённой сортировке турнира. */
+export function matchWinnerRule(sort: readonly StandingsSortKey[]): WinnerRuleId {
+  const primary = sort[0];
+  const secondary = sort[1];
+  if (primary === 'wins') return 'wins_points';
+  if (primary === 'points' && secondary === 'wins') return 'points_wins';
+  return 'points_diff';
+}
+
 /** Откуда взялось значение рейтинга DUPR. К API DUPR приложение не обращается. */
 export const RATING_SOURCES = ['import', 'moderator', 'self'] as const;
 export type RatingSource = (typeof RATING_SOURCES)[number];

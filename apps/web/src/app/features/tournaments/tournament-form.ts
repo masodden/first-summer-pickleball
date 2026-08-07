@@ -10,12 +10,14 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  STANDINGS_SORT_KEYS,
+  WINNER_RULE_IDS,
+  WINNER_RULE_SORT,
+  matchWinnerRule,
   type CreateTournamentInput,
-  type StandingsSortKey,
   type TieRule,
   type TournamentFormat,
   type VenueDto,
+  type WinnerRuleId,
 } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { ToastService } from '../../core/toast';
@@ -205,9 +207,13 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
 
           <label class="field grow">
             <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
-            <select class="select" [value]="sortKey()" (change)="sortKey.set(sort($event))">
-              @for (key of sortKeys(); track key) {
-                <option [value]="key">{{ sortLabel(key) }}</option>
+            <select
+              class="select"
+              [value]="winnerRule()"
+              (change)="winnerRule.set(winnerRuleFrom($event))"
+            >
+              @for (rule of winnerRules; track rule) {
+                <option [value]="rule">{{ winnerRuleLabel(rule) }}</option>
               }
             </select>
           </label>
@@ -350,11 +356,7 @@ export class TournamentFormPage {
 
   protected readonly formats: TournamentFormat[] = ['americano', 'mexicano'];
   protected readonly presets = PLAYER_PRESETS;
-  protected readonly sortKeys = computed(() =>
-    this.tieRule() === 'draw'
-      ? STANDINGS_SORT_KEYS
-      : STANDINGS_SORT_KEYS.filter((key) => key !== 'draws'),
-  );
+  protected readonly winnerRules = WINNER_RULE_IDS;
 
   protected readonly title = signal('');
   protected readonly category = signal('');
@@ -368,7 +370,7 @@ export class TournamentFormPage {
   protected readonly matchDuration = signal('');
   protected readonly rounds = signal('');
   protected readonly tieRule = signal<TieRule>('draw');
-  protected readonly sortKey = signal<StandingsSortKey>('points');
+  protected readonly winnerRule = signal<WinnerRuleId>('points_diff');
   protected readonly ratingBalance = signal(true);
   protected readonly entryFee = signal('');
   protected readonly venueName = signal('');
@@ -433,7 +435,7 @@ export class TournamentFormPage {
       this.matchDuration.set(tournament.matchDurationMin?.toString() ?? '');
       this.rounds.set(tournament.roundsPlanned?.toString() ?? '');
       this.tieRule.set(tournament.tieRule);
-      this.sortKey.set(tournament.standingsSort[0] ?? 'points');
+      this.winnerRule.set(matchWinnerRule(tournament.standingsSort));
       this.ratingBalance.set(tournament.ratingBalance);
       this.entryFee.set(tournament.entryFee?.toString() ?? '');
       this.venueName.set(tournament.venueName ?? '');
@@ -495,27 +497,19 @@ export class TournamentFormPage {
     return (event.target as HTMLSelectElement).value === 'golden_point' ? 'golden_point' : 'draw';
   }
 
-  protected sort(event: Event): StandingsSortKey {
-    const value = (event.target as HTMLSelectElement).value as StandingsSortKey;
-    return STANDINGS_SORT_KEYS.includes(value) ? value : 'points';
+  protected winnerRuleFrom(event: Event): WinnerRuleId {
+    const value = (event.target as HTMLSelectElement).value as WinnerRuleId;
+    return WINNER_RULE_IDS.includes(value) ? value : 'points_diff';
   }
 
-  protected sortLabel(key: StandingsSortKey): string {
-    switch (key) {
-      case 'points':
-        return this.i18n.translate('standings.points');
-      case 'wins':
-        return this.i18n.translate('standings.wins');
-      case 'draws':
-        return this.i18n.translate('standings.draws');
-      case 'diff':
-        return this.i18n.translate('standings.diff');
-      case 'losses':
-        return this.i18n.translate('standings.losses');
-      case 'played':
-        return this.i18n.translate('standings.played');
-      case 'pointsAgainst':
-        return this.i18n.translate('standings.pointsAgainst');
+  protected winnerRuleLabel(rule: WinnerRuleId): string {
+    switch (rule) {
+      case 'points_diff':
+        return this.i18n.translate('tournament.winnerRule.pointsDiff');
+      case 'points_wins':
+        return this.i18n.translate('tournament.winnerRule.pointsWins');
+      case 'wins_points':
+        return this.i18n.translate('tournament.winnerRule.winsPoints');
     }
   }
 
@@ -546,7 +540,7 @@ export class TournamentFormPage {
       matchDurationMin: toNumberOrNull(this.matchDuration()),
       roundsPlanned: toNumberOrNull(this.rounds()) ?? this.suggestedRounds(),
       tieRule: this.tieRule(),
-      standingsSort: uniqueSort(this.sortKey()),
+      standingsSort: [...WINNER_RULE_SORT[this.winnerRule()]],
       ratingBalance: this.ratingBalance(),
       entryFee: toNumberOrNull(this.entryFee()),
       description: this.description().replace(/\r\n?/g, '\n').trim() || null,
@@ -578,12 +572,6 @@ export class TournamentFormPage {
 function toNumberOrNull(value: string): number | null {
   const parsed = Number.parseInt(value.trim(), 10);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-/** Первый ключ — выбранный, дальше разумные тай-брейки. */
-function uniqueSort(primary: StandingsSortKey): StandingsSortKey[] {
-  const rest: StandingsSortKey[] = ['points', 'diff', 'wins'];
-  return [primary, ...rest.filter((key) => key !== primary)];
 }
 
 function defaultStart(): string {
