@@ -70,14 +70,15 @@ import { PlayerPicker } from '../players/player-picker';
           <div class="stack stack--2">
             @for (participant of store.registered(); track participant.id; let index = $index) {
               <div
-                class="glass card--tight person"
+                class="glass person"
                 [class.person--confirmed]="participant.confirmedAndPaid"
               >
-                <span class="person__index tiny faint numeric">{{ index + 1 }}</span>
+                <span class="person__index faint numeric">{{ index + 1 }}</span>
 
                 <app-player-line
                   class="grow"
                   [player]="participant.player"
+                  [avatarSize]="30"
                   [showRating]="false"
                   [subtitle]="participant.addedBySelf ? t()('participant.selfAdded') : null"
                 />
@@ -113,29 +114,31 @@ import { PlayerPicker } from '../players/player-picker';
                 }
 
                 @if (store.canManage()) {
-                  <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
-                    <input
-                      type="checkbox"
-                      [checked]="participant.confirmedAndPaid"
-                      [disabled]="item.status === 'finished'"
-                      (change)="togglePaid(participant, $event)"
-                    />
-                    <span class="checkbox__box"></span>
-                  </label>
+                  <div class="person__actions">
+                    <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
+                      <input
+                        type="checkbox"
+                        [checked]="participant.confirmedAndPaid"
+                        [disabled]="item.status === 'finished'"
+                        (change)="togglePaid(participant, $event)"
+                      />
+                      <span class="checkbox__box"></span>
+                    </label>
 
-                  @if (item.status === 'registration' || item.status === 'registration_closed') {
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--ghost"
-                      [attr.aria-label]="t()('participant.remove')"
-                      [disabled]="store.isBusy('remove:' + participant.player.id)"
-                      (click)="store.removeParticipant(participant.player.id)"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
-                  }
+                    @if (item.status === 'registration' || item.status === 'registration_closed') {
+                      <button
+                        type="button"
+                        class="btn btn--icon btn--ghost"
+                        [attr.aria-label]="t()('participant.remove')"
+                        [disabled]="store.isBusy('remove:' + participant.player.id)"
+                        (click)="store.removeParticipant(participant.player.id)"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                          <path d="M6 6l12 12M18 6L6 18" />
+                        </svg>
+                      </button>
+                    }
+                  </div>
                 }
               </div>
             }
@@ -201,17 +204,39 @@ import { PlayerPicker } from '../players/player-picker';
     .person {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      transition: border-color var(--duration-base) ease;
+      gap: var(--space-2);
+      padding: 10px 12px;
+      transition:
+        border-color var(--duration-base) ease,
+        background var(--duration-base) ease;
     }
 
     .person--confirmed {
-      border-color: color-mix(in srgb, var(--success) 45%, transparent);
+      border-color: color-mix(in srgb, var(--success) 35%, transparent);
+      background: color-mix(in srgb, var(--success) 8%, var(--glass-bg));
     }
 
     .person__index {
-      width: 18px;
+      width: 20px;
       text-align: right;
+      flex: 0 0 auto;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .person :deep(.line) {
+      gap: var(--space-2);
+    }
+
+    .person :deep(.line__name) {
+      font-size: 13px;
+    }
+
+    .person__actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       flex: 0 0 auto;
     }
 

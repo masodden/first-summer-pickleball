@@ -112,11 +112,11 @@ function compareTournaments(
                 <a class="glass card--tight tile" [routerLink]="['/tournaments', item.id]">
                   <div class="row row--between">
                     <app-status-badge [status]="item.status" />
-                    <span class="tiny faint numeric">{{ time(item.startsAt) }}</span>
+                    <span class="tile__time numeric">{{ time(item.startsAt) }}</span>
                   </div>
 
                   <div class="row">
-                    <div class="grow stack stack--1">
+                    <div class="grow stack tile__body">
                       <div class="row tile__title">
                         <h3 class="truncate grow">{{ item.title }}</h3>
                         @if (item.category) {
@@ -201,6 +201,19 @@ function compareTournaments(
       text-decoration: none;
       transform: translateY(-2px);
       box-shadow: var(--glass-shadow-lg);
+    }
+
+    .tile__time {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text-strong);
+      line-height: 1;
+    }
+
+    .tile__body {
+      gap: var(--space-2);
+      min-width: 0;
     }
 
     .tile__title {

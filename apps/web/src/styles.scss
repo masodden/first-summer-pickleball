@@ -619,7 +619,8 @@ button {
 
 .checkbox input:checked + .checkbox__box {
   background: linear-gradient(160deg, var(--lime-300), var(--lime-500));
-  border-color: transparent;
+  /* Не transparent: на светлом фоне antialias даёт серый ободок. */
+  border-color: var(--lime-500);
 }
 
 .checkbox__box::after {
