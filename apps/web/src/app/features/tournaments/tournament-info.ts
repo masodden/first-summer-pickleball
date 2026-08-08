@@ -1,6 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { courtLabel, matchWinnerRule, type WinnerRuleId } from '@fsp/shared';
+import {
+  courtLabel,
+  matchWinnerRule,
+  type TranslationKey,
+  type WinnerRuleId,
+} from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
@@ -250,7 +255,7 @@ export class TournamentInfoTab {
   }
 }
 
-function winnerRuleI18nKey(rule: WinnerRuleId): string {
+function winnerRuleI18nKey(rule: WinnerRuleId): TranslationKey {
   switch (rule) {
     case 'points_diff':
       return 'tournament.winnerRule.pointsDiff';
