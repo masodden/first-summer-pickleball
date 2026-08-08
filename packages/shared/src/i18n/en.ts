@@ -169,7 +169,7 @@ export const en: Record<TranslationKey, string> = {
   'format.americano': 'Americano',
   'format.mexicano': 'Mexicano',
   'format.americano.description':
-    'Everyone partners with everyone: partners rotate each round and scored points go into the standings.',
+    'Everyone partners with everyone: partners rotate each round.',
   'format.mexicano.description':
     'Teams for each round are built from the current standings: leaders move up to the top courts, others move down.',
 
@@ -209,7 +209,7 @@ export const en: Record<TranslationKey, string> = {
   'checkin.allConfirmed': 'All participants confirmed',
   'checkin.notAllConfirmed': 'Some participants are not confirmed yet',
 
-  'match.courtsTab': 'Courts',
+  'match.courtsTab': 'Games',
   'match.round': 'Round {{index}}',
   'match.roundOf': 'Round {{index}} of {{total}}',
   'match.court': 'Court {{number}}',

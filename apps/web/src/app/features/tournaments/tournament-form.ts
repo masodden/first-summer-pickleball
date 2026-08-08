@@ -93,6 +93,19 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </span>
         </div>
 
+        <label class="field">
+          <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
+          <select
+            class="select"
+            [value]="winnerRule()"
+            (change)="winnerRule.set(winnerRuleFrom($event))"
+          >
+            @for (rule of winnerRules; track rule) {
+              <option [value]="rule">{{ winnerRuleLabel(rule) }}</option>
+            }
+          </select>
+        </label>
+
         <div class="field">
           <span class="field__label">{{ t()('tournament.maxPlayers') }}</span>
           <div class="row row--wrap">
@@ -196,28 +209,13 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </label>
         </div>
 
-        <div class="row row--wrap row--fields">
-          <label class="field grow">
-            <span class="field__label">{{ t()('tournament.tieRule') }}</span>
-            <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">
-              <option value="draw">{{ t()('tie.draw') }}</option>
-              <option value="golden_point">{{ t()('tie.golden_point') }}</option>
-            </select>
-          </label>
-
-          <label class="field grow">
-            <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
-            <select
-              class="select"
-              [value]="winnerRule()"
-              (change)="winnerRule.set(winnerRuleFrom($event))"
-            >
-              @for (rule of winnerRules; track rule) {
-                <option [value]="rule">{{ winnerRuleLabel(rule) }}</option>
-              }
-            </select>
-          </label>
-        </div>
+        <label class="field">
+          <span class="field__label">{{ t()('tournament.tieRule') }}</span>
+          <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">
+            <option value="draw">{{ t()('tie.draw') }}</option>
+            <option value="golden_point">{{ t()('tie.golden_point') }}</option>
+          </select>
+        </label>
 
         <div class="row row--between">
           <div class="stack stack--1 grow">

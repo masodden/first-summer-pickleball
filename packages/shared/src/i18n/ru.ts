@@ -166,7 +166,7 @@ export const ru = {
   'format.americano': 'Americano',
   'format.mexicano': 'Mexicano',
   'format.americano.description':
-    'Каждый играет в паре с каждым: партнёры меняются каждый раунд, в таблицу идут набранные очки.',
+    'Каждый играет в паре с каждым: партнёры меняются каждый раунд.',
   'format.mexicano.description':
     'Пары на каждый раунд собираются по текущей таблице: сильные поднимаются на верхние корты, остальные опускаются.',
 
@@ -205,7 +205,7 @@ export const ru = {
   'checkin.allConfirmed': 'Все участники подтверждены',
   'checkin.notAllConfirmed': 'Ещё не все участники подтверждены',
 
-  'match.courtsTab': 'Корты',
+  'match.courtsTab': 'Игры',
   'match.round': 'Раунд {{index}}',
   'match.roundOf': 'Раунд {{index}} из {{total}}',
   'match.court': 'Корт {{number}}',

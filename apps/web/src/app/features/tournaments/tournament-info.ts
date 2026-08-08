@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { courtLabel } from '@fsp/shared';
+import { courtLabel, matchWinnerRule, type WinnerRuleId } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
@@ -74,6 +74,10 @@ import { Racket } from '../../ui/ball';
               <span class="strong">
                 {{ t()(item.tieRule === 'draw' ? 'tie.draw' : 'tie.golden_point') }}
               </span>
+            </div>
+            <div class="cell">
+              <span class="tiny faint">{{ t()('tournament.standingsSort') }}</span>
+              <span class="strong">{{ winnerRuleLabel() }}</span>
             </div>
           </div>
 
@@ -220,6 +224,12 @@ export class TournamentInfoTab {
     ),
   );
 
+  protected readonly winnerRuleLabel = computed(() => {
+    const sort = this.tournament()?.standingsSort ?? [];
+    const rule = matchWinnerRule(sort);
+    return this.i18n.translate(winnerRuleI18nKey(rule));
+  });
+
   /**
    * Кнопка «Отменить заявку» на вкладке «Информация».
    * Видна обычному игроку (и админу), пока турнир не начат и участие
@@ -237,5 +247,16 @@ export class TournamentInfoTab {
 
   protected openMap(url: string): void {
     this.telegram.openExternal(url);
+  }
+}
+
+function winnerRuleI18nKey(rule: WinnerRuleId): string {
+  switch (rule) {
+    case 'points_diff':
+      return 'tournament.winnerRule.pointsDiff';
+    case 'points_wins':
+      return 'tournament.winnerRule.pointsWins';
+    case 'wins_points':
+      return 'tournament.winnerRule.winsPoints';
   }
 }
