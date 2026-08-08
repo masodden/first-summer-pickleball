@@ -157,7 +157,7 @@ export const en: Record<TranslationKey, string> = {
   'tournament.appLinkMissingBot':
     'TELEGRAM_BOT_USERNAME is not set on the server — cannot build an in-bot link',
   'tournament.switchTo': 'Go to tournament',
-  'tournament.parallel': 'Parallel tournaments',
+  'tournament.parallel': 'Parallel',
   'tournament.info': 'Information',
   'tournament.participantsCount': '{{count}} of {{max}}',
 

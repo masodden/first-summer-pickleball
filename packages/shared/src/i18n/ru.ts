@@ -154,7 +154,7 @@ export const ru = {
   'tournament.appLinkMissingBot':
     'Не задан TELEGRAM_BOT_USERNAME на сервере — прямую ссылку в бота собрать нельзя',
   'tournament.switchTo': 'Перейти к турниру',
-  'tournament.parallel': 'Параллельные турниры',
+  'tournament.parallel': 'Параллельно',
   'tournament.info': 'Информация',
   'tournament.participantsCount': '{{count}} из {{max}}',
 
