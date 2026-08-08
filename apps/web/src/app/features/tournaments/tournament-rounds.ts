@@ -100,149 +100,158 @@ import { MatchCard } from './match-card';
             </div>
 
             <!-- Один свисток на все корты: раунд стартует и заканчивается целиком. -->
-            <div class="row round-control">
-              <div class="stack stack--1 grow">
+            <div class="stack stack--1 round-control">
+              <div class="row round-control__bar">
                 <span
-                  class="round-clock numeric"
+                  class="round-clock numeric grow"
                   [class.round-clock--running]="store.roundState() === 'running'"
                   [class.round-clock--over]="overtime()"
                 >
                   {{ clockLabel() }}
                 </span>
+
+                @if (store.canRunRound()) {
+                  <div class="round-control__actions">
+                    @switch (store.roundState()) {
+                      @case ('scheduled') {
+                        @if (!store.isMexicano()) {
+                          <button
+                            type="button"
+                            class="btn btn--icon btn--glass"
+                            [disabled]="!store.canSkipViewedRound() || store.isBusy('round:skip')"
+                            [attr.aria-label]="t()('match.skipRound')"
+                            (click)="skipRound()"
+                          >
+                            <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                              <path d="M5 5.5v13l9-6.5z" />
+                              <rect x="16" y="5" width="3" height="14" rx="1" />
+                            </svg>
+                          </button>
+                        }
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--go"
+                          [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
+                          [attr.aria-label]="t()('match.startRound')"
+                          (click)="store.startRound()"
+                        >
+                          <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                            <path d="M8 5.5v13l11-6.5z" />
+                          </svg>
+                        </button>
+                        @if (store.isMexicano() && store.canFinish()) {
+                          <button
+                            type="button"
+                            class="btn btn--glass"
+                            [disabled]="store.isBusy('finish')"
+                            (click)="finish()"
+                          >
+                            {{ t()('tournament.finishShort') }}
+                          </button>
+                        }
+                      }
+                      @case ('finished') {
+                        @if (store.isMexicano() && store.canFinish()) {
+                          <button
+                            type="button"
+                            class="btn btn--primary"
+                            [disabled]="store.isBusy('finish')"
+                            (click)="finish()"
+                          >
+                            {{ t()('tournament.finishShort') }}
+                          </button>
+                        }
+                      }
+                      @case ('skipped') {
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--glass"
+                          [disabled]="!store.canUnskipViewedRound() || store.isBusy('round:unskip')"
+                          [attr.aria-label]="t()('match.unskipRound')"
+                          (click)="unskipRound()"
+                        >
+                          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                            <path d="M9 15l-5-5 5-5" />
+                            <path d="M4 10h10a5 5 0 010 10H9" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--go"
+                          [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
+                          [attr.aria-label]="t()('match.startRound')"
+                          (click)="store.startRound()"
+                        >
+                          <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                            <path d="M8 5.5v13l11-6.5z" />
+                          </svg>
+                        </button>
+                      }
+                      @case ('running') {
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--glass"
+                          [disabled]="store.isBusy('round:pause')"
+                          [attr.aria-label]="t()('match.pause')"
+                          (click)="store.pauseRound()"
+                        >
+                          <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                            <rect x="6" y="5" width="4" height="14" rx="1" />
+                            <rect x="14" y="5" width="4" height="14" rx="1" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn--primary"
+                          [disabled]="store.isBusy('round:finish')"
+                          (click)="store.finishRound()"
+                        >
+                          {{ t()('match.finishRound') }}
+                        </button>
+                      }
+                      @case ('paused') {
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--go"
+                          [disabled]="store.isBusy('round:start')"
+                          [attr.aria-label]="t()('match.resume')"
+                          (click)="store.startRound()"
+                        >
+                          <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
+                            <path d="M8 5.5v13l11-6.5z" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn--primary"
+                          [disabled]="store.isBusy('round:finish')"
+                          (click)="store.finishRound()"
+                        >
+                          {{ t()('match.finishRound') }}
+                        </button>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+
+              <div
+                class="round-control__hint tiny"
+                [class.round-control__hint--danger]="overtime()"
+                [class.muted]="!overtime()"
+              >
                 @if (overtime()) {
-                  <span class="tiny" style="color: var(--danger)">{{ t()('match.timeUpHint') }}</span>
+                  {{ t()('match.timeUpHint') }}
                 } @else if (
                   store.canRunRound() &&
                   (store.roundState() === 'scheduled' || store.roundState() === 'skipped') &&
                   !store.previousRoundClosed()
                 ) {
-                  <span class="tiny muted">{{ t()('match.roundWaitingPrevious') }}</span>
+                  {{ t()('match.roundWaitingPrevious') }}
                 } @else if (store.canRunRound() && store.otherRoundLive()) {
-                  <span class="tiny muted">{{ t()('match.roundWaitingLive') }}</span>
+                  {{ t()('match.roundWaitingLive') }}
                 }
               </div>
-
-              @if (store.canRunRound()) {
-                @switch (store.roundState()) {
-                  @case ('scheduled') {
-                    @if (!store.isMexicano()) {
-                      <button
-                        type="button"
-                        class="btn btn--icon btn--glass"
-                        [disabled]="!store.canSkipViewedRound() || store.isBusy('round:skip')"
-                        [attr.aria-label]="t()('match.skipRound')"
-                        (click)="skipRound()"
-                      >
-                        <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
-                          <path d="M5 5.5v13l9-6.5z" />
-                          <rect x="16" y="5" width="3" height="14" rx="1" />
-                        </svg>
-                      </button>
-                    }
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--go"
-                      [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
-                      [attr.aria-label]="t()('match.startRound')"
-                      (click)="store.startRound()"
-                    >
-                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
-                        <path d="M8 5.5v13l11-6.5z" />
-                      </svg>
-                    </button>
-                    @if (store.isMexicano() && store.canFinish()) {
-                      <button
-                        type="button"
-                        class="btn btn--glass"
-                        [disabled]="store.isBusy('finish')"
-                        (click)="finish()"
-                      >
-                        {{ t()('tournament.finishShort') }}
-                      </button>
-                    }
-                  }
-                  @case ('finished') {
-                    @if (store.isMexicano() && store.canFinish()) {
-                      <button
-                        type="button"
-                        class="btn btn--primary"
-                        [disabled]="store.isBusy('finish')"
-                        (click)="finish()"
-                      >
-                        {{ t()('tournament.finishShort') }}
-                      </button>
-                    }
-                  }
-                  @case ('skipped') {
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--glass"
-                      [disabled]="!store.canUnskipViewedRound() || store.isBusy('round:unskip')"
-                      [attr.aria-label]="t()('match.unskipRound')"
-                      (click)="unskipRound()"
-                    >
-                      <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-                        <path d="M9 15l-5-5 5-5" />
-                        <path d="M4 10h10a5 5 0 010 10H9" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--go"
-                      [disabled]="!store.canStartViewedRound() || store.isBusy('round:start')"
-                      [attr.aria-label]="t()('match.startRound')"
-                      (click)="store.startRound()"
-                    >
-                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
-                        <path d="M8 5.5v13l11-6.5z" />
-                      </svg>
-                    </button>
-                  }
-                  @case ('running') {
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--glass"
-                      [disabled]="store.isBusy('round:pause')"
-                      [attr.aria-label]="t()('match.pause')"
-                      (click)="store.pauseRound()"
-                    >
-                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
-                        <rect x="6" y="5" width="4" height="14" rx="1" />
-                        <rect x="14" y="5" width="4" height="14" rx="1" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn--primary"
-                      [disabled]="store.isBusy('round:finish')"
-                      (click)="store.finishRound()"
-                    >
-                      {{ t()('match.finishRound') }}
-                    </button>
-                  }
-                  @case ('paused') {
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--go"
-                      [disabled]="store.isBusy('round:start')"
-                      [attr.aria-label]="t()('match.resume')"
-                      (click)="store.startRound()"
-                    >
-                      <svg viewBox="0 0 24 24" class="icon icon--solid" aria-hidden="true">
-                        <path d="M8 5.5v13l11-6.5z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn--primary"
-                      [disabled]="store.isBusy('round:finish')"
-                      (click)="store.finishRound()"
-                    >
-                      {{ t()('match.finishRound') }}
-                    </button>
-                  }
-                }
-              }
             </div>
 
             @if (store.canManage() && store.canReshuffle()) {
@@ -391,16 +400,46 @@ import { MatchCard } from './match-card';
     }
 
     .round-control {
-      gap: var(--space-2);
-      align-items: center;
+      gap: var(--space-1);
+    }
 
-      /* Иконки play/pause — 40px; текстовые рядом должны совпадать по высоте. */
-      > .btn:not(.btn--icon) {
-        min-height: 40px;
-        height: 40px;
-        padding: 0 var(--space-4);
-        font-size: 13.5px;
-      }
+    .round-control__bar {
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 40px;
+    }
+
+    .round-control__actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex: 0 0 auto;
+    }
+
+    .round-control__actions > .btn--icon {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      max-height: 40px;
+      flex: 0 0 40px;
+    }
+
+    /* Текстовые кнопки рядом с иконками — той же высоты. */
+    .round-control__actions > .btn:not(.btn--icon) {
+      min-height: 40px;
+      height: 40px;
+      padding: 0 var(--space-4);
+      font-size: 13.5px;
+    }
+
+    /* Слот подсказки всегда занят — кнопки не прыгают при смене раунда. */
+    .round-control__hint {
+      min-height: 1.35em;
+      line-height: 1.35;
+    }
+
+    .round-control__hint--danger {
+      color: var(--danger);
     }
 
     .round-clock {
@@ -408,6 +447,7 @@ import { MatchCard } from './match-card';
       font-size: 22px;
       font-weight: 700;
       color: var(--text-muted);
+      line-height: 40px;
     }
 
     .round-clock--running {
