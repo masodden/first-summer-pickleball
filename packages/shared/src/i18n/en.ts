@@ -145,6 +145,10 @@ export const en: Record<TranslationKey, string> = {
     'Build games for {{count}} participants? They will get a Telegram notification.',
   'tournament.registrationClosedHint':
     'Registration is closed: the organizer builds the roster. Open registration if players should sign up themselves.',
+  'tournament.unstart': 'Back to registration',
+  'tournament.unstartConfirm':
+    'Roll the tournament back to “Registration closed”? The schedule will be deleted — you can replace a player and build games again.',
+  'tournament.unstarted': 'Tournament rolled back to registration',
   'tournament.finish': 'Finish tournament',
   'tournament.finishShort': 'Finish',
   'tournament.finishConfirm':

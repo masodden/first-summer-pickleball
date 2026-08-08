@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, asc, count, desc, eq, inArray, isNull, max, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, max, ne, notInArray, sql } from 'drizzle-orm';
 import {
   normalizeCourtNames,
   type CreateTournamentInput,
@@ -717,6 +717,46 @@ export async function reopenTournament(
 
   await recordAudit(db, actor, {
     action: 'tournament.reopened',
+    entityType: 'tournament',
+    entityId: tournamentId,
+    tournamentId,
+  });
+
+  return getTournamentDto(db, tournamentId, actor);
+}
+
+/**
+ * Откат «идёт» → «регистрация завершена»: сносит расписание, чтобы можно было
+ * заменить игрока и заново собрать игры. Только до первого начатого матча.
+ */
+export async function unstartTournament(
+  db: Database,
+  tournamentId: string,
+  actor: Viewer,
+): Promise<TournamentDto> {
+  const tournament = await getTournamentRow(db, tournamentId);
+  if (!canManageTournaments(actor)) throw forbidden();
+  if (tournament.status !== 'running') {
+    throw wrongStatus('Откатить можно только идущий турнир');
+  }
+
+  const [started] = await db
+    .select({ total: count() })
+    .from(matches)
+    .where(and(eq(matches.tournamentId, tournamentId), ne(matches.status, 'scheduled')));
+  if (Number(started?.total ?? 0) > 0) {
+    throw wrongStatus('Откатить можно только до начала первого матча');
+  }
+
+  // Каскадом уходят матчи, составы и sit-out'ы — как при start/reshuffle.
+  await db.delete(rounds).where(eq(rounds.tournamentId, tournamentId));
+  await db
+    .update(tournaments)
+    .set({ status: 'registration_closed', updatedAt: new Date() })
+    .where(eq(tournaments.id, tournamentId));
+
+  await recordAudit(db, actor, {
+    action: 'tournament.unstarted',
     entityType: 'tournament',
     entityId: tournamentId,
     tournamentId,

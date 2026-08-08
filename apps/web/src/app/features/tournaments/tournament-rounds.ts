@@ -258,6 +258,14 @@ import { MatchCard } from './match-card';
               <button type="button" class="btn btn--sm btn--glass btn--block" (click)="reshuffle()">
                 {{ t()('match.reshuffle') }}
               </button>
+              <button
+                type="button"
+                class="btn btn--sm btn--glass btn--block"
+                [disabled]="store.isBusy('unstart')"
+                (click)="unstart()"
+              >
+                {{ t()('tournament.unstart') }}
+              </button>
             }
           </div>
 
@@ -555,6 +563,18 @@ export class TournamentRoundsTab {
       confirmLabel: this.i18n.translate('match.reshuffle'),
     });
     if (confirmed) await this.store.reshuffle();
+  }
+
+  protected async unstart(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('tournament.unstart'),
+      message: this.i18n.translate('tournament.unstartConfirm'),
+      confirmLabel: this.i18n.translate('tournament.unstart'),
+    });
+    if (!confirmed) return;
+    await this.store.unstart();
+    const id = this.store.tournament()?.id;
+    if (id) await this.router.navigate(['/tournaments', id, 'players']);
   }
 
   protected async finish(): Promise<void> {

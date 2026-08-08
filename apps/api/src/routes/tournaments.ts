@@ -25,6 +25,7 @@ import {
   reopenTournament,
   setParticipantPaid,
   setRegistrationOpen,
+  unstartTournament,
   updateTournament,
 } from '../services/tournaments.js';
 import { appendRound, reshuffleSchedule, startTournament } from '../services/schedule.js';
@@ -278,6 +279,14 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       },
     );
   }
+
+  app.post<{ Params: { id: string } }>('/api/tournaments/:id/unstart', async (request) => {
+    const viewer = requireRole(request, 'moderator');
+    const tournament = await unstartTournament(db, request.params.id, viewer);
+    // Пустое расписание + смена статуса — клиенты сбрасывают раунды.
+    await broadcastSchedule(db, hub, request.params.id);
+    return { tournament };
+  });
 
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/finish', async (request) => {
     const viewer = requireRole(request, 'moderator');

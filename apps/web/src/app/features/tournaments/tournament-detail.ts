@@ -145,6 +145,16 @@ import { StatusBadge } from '../../ui/status-badge';
                   {{ t()('tournament.start') }}
                 </button>
               }
+              @if (store.canUnstart()) {
+                <button
+                  type="button"
+                  class="btn btn--sm btn--glass"
+                  [disabled]="store.isBusy('unstart')"
+                  (click)="unstart()"
+                >
+                  {{ t()('tournament.unstart') }}
+                </button>
+              }
               @if (store.canFinish()) {
                 <button
                   type="button"
@@ -327,6 +337,17 @@ export class TournamentDetailPage {
     if (!confirmed) return;
     await this.store.start();
     await this.router.navigate(['/tournaments', this.id(), 'rounds']);
+  }
+
+  protected async unstart(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('tournament.unstart'),
+      message: this.i18n.translate('tournament.unstartConfirm'),
+      confirmLabel: this.i18n.translate('tournament.unstart'),
+    });
+    if (!confirmed) return;
+    await this.store.unstart();
+    await this.router.navigate(['/tournaments', this.id(), 'players']);
   }
 
   protected async finish(): Promise<void> {

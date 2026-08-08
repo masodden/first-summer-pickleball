@@ -172,6 +172,9 @@ export class TournamentStore {
     );
   });
 
+  /** Откат к «регистрация завершена» — те же условия, что и у решафла. */
+  readonly canUnstart = computed(() => this.canReshuffle());
+
   readonly canCreateNextRound = computed(() => {
     const tournament = this.tournamentSignal();
     if (!tournament?.canManage || tournament.status !== 'running') return false;
@@ -401,6 +404,15 @@ export class TournamentStore {
       const { roundIndex } = await this.api.createNextRound(this.requireId());
       await this.load({ silent: true });
       this.showRound(roundIndex);
+    });
+  }
+
+  unstart(): Promise<void> {
+    return this.run('unstart', async () => {
+      const { tournament } = await this.api.unstart(this.requireId());
+      this.tournamentSignal.set(tournament);
+      await this.load({ silent: true });
+      this.toast.success(this.i18n.translate('tournament.unstarted'));
     });
   }
 

@@ -150,6 +150,10 @@ export class TournamentApi {
     );
   }
 
+  unstart(id: string): Promise<{ tournament: TournamentDto }> {
+    return this.api.post(`/api/tournaments/${id}/unstart`);
+  }
+
   finish(id: string): Promise<{ tournament: TournamentDto }> {
     return this.api.post(`/api/tournaments/${id}/finish`);
   }
