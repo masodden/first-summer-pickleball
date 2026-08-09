@@ -181,6 +181,7 @@ export const en: Record<TranslationKey, string> = {
   'tie.golden_point': 'Play out a golden point',
 
   'participant.list': 'Participants',
+  'participant.empty': 'No one has signed up yet',
   'participant.add': 'Add player',
   'participant.addFromBase': 'Pick from database',
   'participant.addNew': 'Create profile',

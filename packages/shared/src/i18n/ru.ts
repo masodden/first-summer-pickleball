@@ -178,6 +178,7 @@ export const ru = {
   'tie.golden_point': 'Доигрывать до победы',
 
   'participant.list': 'Участники',
+  'participant.empty': 'Пока никто не записался',
   'participant.add': 'Добавить игрока',
   'participant.addFromBase': 'Выбрать из базы',
   'participant.addNew': 'Создать карточку',

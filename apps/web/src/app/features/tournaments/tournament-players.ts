@@ -65,7 +65,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
         <section class="stack stack--2">
           @if (store.registered().length === 0) {
             <div class="glass card empty-state">
-              <p>{{ t()('common.empty') }}</p>
+              <p class="muted center">{{ t()('participant.empty') }}</p>
             </div>
           }
 
