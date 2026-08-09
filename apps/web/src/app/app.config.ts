@@ -23,7 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(
       routes,
-      // Переходы между экранами анимируются браузером: мяч «перелетает» между страницами.
+      // View Transitions: chrome (хедер/таббар) зафиксирован в CSS, кроссфейд только у main.
       withViewTransitions({ skipInitialTransition: true }),
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),

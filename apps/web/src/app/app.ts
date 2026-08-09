@@ -34,7 +34,8 @@ import { ToastHost } from './ui/toast-host';
   template: `
     <a class="skip" href="#main">{{ t()('nav.tournaments') }}</a>
 
-    <header class="header">
+    <!-- view-transition-name: chrome остаётся на месте, анимируется только main. -->
+    <header class="header vt-header">
       <div class="header__inner shell">
         <a class="brand" routerLink="/tournaments">
           <app-ball [size]="30" [motion]="connectionBusy() ? 'spin' : 'none'" />
@@ -68,11 +69,14 @@ import { ToastHost } from './ui/toast-host';
       </div>
     </header>
 
-    <main id="main" class="shell main">
+    <main id="main" class="shell main vt-main">
       <router-outlet />
     </main>
 
-    <nav class="tabbar glass glass--strong" [attr.aria-label]="t()('nav.tournaments')">
+    <nav
+      class="tabbar glass glass--strong vt-tabbar"
+      [attr.aria-label]="t()('nav.tournaments')"
+    >
       <a routerLink="/tournaments" routerLinkActive="is-active" class="tab">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 6h16M4 12h16M4 18h10" />
@@ -146,6 +150,18 @@ import { ToastHost } from './ui/toast-host';
       background: linear-gradient(var(--bg-base) 60%, transparent);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+    }
+
+    .vt-header {
+      view-transition-name: app-header;
+    }
+
+    .vt-main {
+      view-transition-name: app-main;
+    }
+
+    .vt-tabbar {
+      view-transition-name: app-tabbar;
     }
 
     .header__inner {

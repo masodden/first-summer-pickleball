@@ -1047,16 +1047,42 @@ button {
 }
 
 /* ==========================================================================
-   Переходы между страницами
+   Переходы между страницами (View Transitions API)
+   ==========================================================================
+   Best practice для shell-приложений (iOS / liquid glass): chrome не двигается,
+   анимируется только контент — короткий opacity crossfade без translateY.
    ========================================================================== */
 
 @media (prefers-reduced-motion: no-preference) {
+  /* Хедер и таббар — как в нативных табах: без морфа и без fade. */
+  ::view-transition-group(app-header),
+  ::view-transition-group(app-tabbar) {
+    animation: none;
+  }
+
+  ::view-transition-old(app-header),
+  ::view-transition-new(app-header),
+  ::view-transition-old(app-tabbar),
+  ::view-transition-new(app-tabbar) {
+    animation: none;
+  }
+
+  /* Контент: лёгкий кроссфейд, без подъёма всего экрана. */
+  ::view-transition-old(app-main) {
+    animation: fade-in 180ms var(--ease-out) reverse both;
+  }
+
+  ::view-transition-new(app-main) {
+    animation: fade-in 220ms var(--ease-out) both;
+  }
+
+  /* Остаток (тосты и т.п.) — тоже без сдвига. */
   ::view-transition-old(root) {
-    animation: fade-in var(--duration-base) var(--ease-out) reverse;
+    animation: fade-in 160ms var(--ease-out) reverse both;
   }
 
   ::view-transition-new(root) {
-    animation: fade-rise var(--duration-slow) var(--ease-out);
+    animation: fade-in 200ms var(--ease-out) both;
   }
 }
 
