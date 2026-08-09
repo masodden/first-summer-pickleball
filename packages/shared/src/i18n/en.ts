@@ -228,7 +228,7 @@ export const en: Record<TranslationKey, string> = {
   'match.roundWaitingLive': 'Finish the round currently on court first',
   'match.roundSkipped': 'Round skipped',
   'match.roundNotStarted': 'The round has not started yet',
-  'match.scoreAfterFinish': 'Enter the score after finishing the round',
+  'match.scoreAfterFinish': 'Enter the score when the court finishes',
   'match.pause': 'Pause',
   'match.resume': 'Resume',
   'match.finish': 'Finish game',

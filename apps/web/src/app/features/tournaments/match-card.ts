@@ -17,8 +17,8 @@ import { RatingChip } from '../../ui/rating-chip';
 /**
  * Карточка корта.
  *
- * Пока раунд идёт — только состав, счёт не трогаем. После общей кнопки
- * «Завершить раунд» под каждым матчем открываются пресеты, ±1 и «Сохранить».
+ * Счёт можно вводить, пока раунд идёт (running/paused) или уже завершён.
+ * Сохранение на сервере сразу помечает матч finished.
  */
 @Component({
   selector: 'app-match-card',
@@ -97,7 +97,7 @@ import { RatingChip } from '../../ui/rating-chip';
       </div>
 
       @if (scoreEntry()) {
-        <div class="row row--wrap presets">
+        <div class="presets">
           @for (preset of presets; track preset[0] + ':' + preset[1]) {
             <button
               type="button"
@@ -129,10 +129,6 @@ import { RatingChip } from '../../ui/rating-chip';
         }
       } @else if (canManage() && match().status === 'scheduled') {
         <p class="tiny center muted">{{ t()('match.roundNotStarted') }}</p>
-      } @else if (canManage() && match().status === 'running') {
-        <p class="tiny center muted">{{ t()('match.scoreAfterFinish') }}</p>
-      } @else if (canManage() && match().status === 'paused') {
-        <p class="tiny center muted">{{ t()('match.scoreAfterFinish') }}</p>
       } @else if (canManage() && match().status === 'finished' && hasScore()) {
         <button type="button" class="btn btn--sm btn--glass btn--block" (click)="startEditing()">
           {{ t()('score.edit') }}
@@ -250,14 +246,17 @@ import { RatingChip } from '../../ui/rating-chip';
     }
 
     .presets {
+      display: flex;
+      flex-wrap: nowrap;
       gap: var(--space-2);
       justify-content: center;
     }
 
     .preset {
-      min-width: 54px;
+      flex: 1 1 0;
+      min-width: 0;
       min-height: 36px;
-      padding: 6px 12px;
+      padding: 6px 8px;
       border: 1px solid var(--control-border);
       border-radius: var(--radius-full);
       background: var(--control-bg);
@@ -302,23 +301,21 @@ export class MatchCard {
   );
 
   /**
-   * Ввод счёта только после «Завершить раунд»: статус матча finished.
-   * Пока раунд идёт — пресетов и полей нет.
+   * Ввод счёта во время раунда и после него.
+   * У scheduled / skipped — только подсказка или ничего.
    */
-  protected readonly scoreEntry = computed(
-    () =>
-      this.canManage() &&
-      this.match().status === 'finished' &&
-      (this.editing() || !this.hasScore()),
-  );
+  protected readonly scoreEntry = computed(() => {
+    if (!this.canManage()) return false;
+    const status = this.match().status;
+    if (status !== 'running' && status !== 'paused' && status !== 'finished') return false;
+    return this.editing() || !this.hasScore();
+  });
 
-  /** Фиксированный набор: не зависит от pointsToWin в шаблоне — всегда на виду. */
+  /** Компактный ряд пресетов в одну строку. */
   protected readonly presets: readonly [number, number][] = [
     [11, 9],
-    [11, 8],
     [11, 7],
     [7, 11],
-    [8, 11],
     [9, 11],
   ];
 
@@ -332,7 +329,7 @@ export class MatchCard {
     effect(() => {
       const match = this.match();
       if (this.editing()) return;
-      if (match.status === 'finished' && match.teamA.score === null) {
+      if (match.teamA.score === null && match.teamB.score === null) {
         this.draftA.set(11);
         this.draftB.set(0);
         return;

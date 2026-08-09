@@ -224,7 +224,7 @@ export const ru = {
   'match.roundWaitingLive': 'Сначала завершите раунд, который сейчас на кортах',
   'match.roundSkipped': 'Раунд пропущен',
   'match.roundNotStarted': 'Раунд ещё не начали',
-  'match.scoreAfterFinish': 'Счёт можно ввести после завершения раунда',
+  'match.scoreAfterFinish': 'Введите счёт по завершении игры на корте',
   'match.pause': 'Пауза',
   'match.resume': 'Продолжить',
   'match.finish': 'Завершить игру',

@@ -4,13 +4,13 @@ import type { ParticipantDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
-import { SessionStore } from '../../core/session';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
 import { PlayerLine } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { PlayerPicker } from '../players/player-picker';
+import { TournamentJoinPanel } from './tournament-join-panel';
 
 /**
  * Вкладка «Участники»: приём игроков и подтверждение оплаты.
@@ -23,7 +23,7 @@ import { PlayerPicker } from '../players/player-picker';
 @Component({
   selector: 'app-tournament-players',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PlayerLine, RatingChip, PlayerPicker],
+  imports: [RouterLink, PlayerLine, RatingChip, PlayerPicker, TournamentJoinPanel],
   template: `
     @if (tournament(); as item) {
       <div class="stack stack--4">
@@ -59,6 +59,8 @@ import { PlayerPicker } from '../players/player-picker';
             }
           </section>
         }
+
+        <app-tournament-join-panel />
 
         <section class="stack stack--2">
           @if (store.registered().length === 0) {
@@ -274,7 +276,6 @@ export class TournamentPlayersTab {
   private readonly i18n = inject(I18nService);
 
   protected readonly store = inject(TournamentStore);
-  protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
   protected readonly tournament = this.store.tournament;
 
