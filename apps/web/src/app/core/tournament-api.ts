@@ -162,8 +162,8 @@ export class TournamentApi {
     return this.api.post(`/api/tournaments/${id}/reopen`);
   }
 
-  exportCsv(id: string, slug: string): Promise<void> {
-    return this.api.download(`/api/tournaments/${id}/export.csv`, `${slug}.csv`);
+  exportCsv(id: string, filename: string): Promise<void> {
+    return this.api.download(`/api/tournaments/${id}/export.csv`, filename);
   }
 
   setScore(

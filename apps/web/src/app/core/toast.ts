@@ -28,6 +28,7 @@ const ERROR_TITLES: Record<string, TranslationKey> = {
   bootstrap_code_invalid: 'errors.bootstrap_code_invalid',
   invite_invalid: 'errors.invite_invalid',
   tournament_wrong_status: 'errors.tournament_wrong_status',
+  already_in_parallel_tournament: 'errors.already_in_parallel_tournament',
   not_all_confirmed: 'errors.not_all_confirmed',
   not_enough_players: 'errors.not_enough_players',
   schedule_impossible: 'errors.schedule_impossible',

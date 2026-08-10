@@ -1,11 +1,12 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
-import type {
-  MatchDto,
-  ParticipantDto,
-  RoundDto,
-  StandingRowDto,
-  TournamentDto,
-  UpdateTournamentInput,
+import {
+  formatDuprExportFilename,
+  type MatchDto,
+  type ParticipantDto,
+  type RoundDto,
+  type StandingRowDto,
+  type TournamentDto,
+  type UpdateTournamentInput,
 } from '@fsp/shared';
 import { ApiFailure } from './api';
 import { I18nService } from './i18n';
@@ -436,7 +437,8 @@ export class TournamentStore {
     return this.run('export', async () => {
       const tournament = this.tournamentSignal();
       if (!tournament) return;
-      await this.api.exportCsv(tournament.id, `${tournament.publicSlug}-results`);
+      const filename = formatDuprExportFilename(tournament.startsAt, tournament.title);
+      await this.api.exportCsv(tournament.id, filename);
     });
   }
 

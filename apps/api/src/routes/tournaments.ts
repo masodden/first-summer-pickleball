@@ -37,7 +37,11 @@ import {
   broadcastTournamentChanged,
   broadcastTournamentDeleted,
 } from '../realtime/broadcast.js';
-import { buildResultsCsv } from '../services/export.js';
+import {
+  buildResultsCsv,
+  resultsCsvContentDisposition,
+  resultsCsvFilename,
+} from '../services/export.js';
 import { ApiError } from '../lib/errors.js';
 import type { AppContext } from './context.js';
 
@@ -322,12 +326,13 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     requireRole(request, 'moderator');
     const row = await getTournamentRow(db, request.params.id);
     const csv = await buildResultsCsv(db, row);
+    const filename = resultsCsvFilename(row);
     reply.header('content-type', 'text/csv; charset=utf-8');
-    reply.header('content-disposition', `attachment; filename="tournament-${row.publicSlug}.csv"`);
+    reply.header('content-disposition', resultsCsvContentDisposition(filename));
     // Telegram downloadFile на web.telegram.org требует этот origin в CORS.
     reply.header('access-control-allow-origin', 'https://web.telegram.org');
-    // BOM нужен, чтобы Excel открыл русские имена без кракозябр.
-    return `\uFEFF${csv}`;
+    // Без BOM: шаблон DUPR импортирует обычный UTF-8 CSV.
+    return csv;
   });
 }
 

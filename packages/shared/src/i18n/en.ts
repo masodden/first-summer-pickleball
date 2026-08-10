@@ -154,7 +154,7 @@ export const en: Record<TranslationKey, string> = {
   'tournament.finishConfirm':
     'Finish the tournament? Scores can no longer be edited, and medals will appear in the standings.',
   'tournament.finished': 'Tournament finished',
-  'tournament.exportCsv': 'Download results as CSV',
+  'tournament.exportCsv': 'Download CSV for DUPR',
   'tournament.publicLink': 'Public standings link',
   'tournament.appLink': 'Link to tournament in the bot',
   'tournament.appLinkCopied': 'Link copied — share it with players in chat',
@@ -387,6 +387,7 @@ export const en: Record<TranslationKey, string> = {
   'errors.bootstrap_code_invalid': 'Invalid administrator code',
   'errors.invite_invalid': 'The invite link is invalid or already used',
   'errors.tournament_wrong_status': 'This action is unavailable in the current tournament status',
+  'errors.already_in_parallel_tournament': 'Already registered in a parallel tournament',
   'errors.not_all_confirmed': 'Confirm all participants first',
   'errors.not_enough_players': 'This format needs more players',
   'errors.schedule_impossible': 'A schedule cannot be built with these settings',

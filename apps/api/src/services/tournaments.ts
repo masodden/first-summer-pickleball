@@ -372,6 +372,47 @@ export interface AddParticipantResult {
   waitlisted: boolean;
 }
 
+/**
+ * Параллельные турниры — в один календарный день (как бейдж «Параллельно» в списке).
+ * Нельзя быть в составе сразу в двух: на площадке человек физически в одном потоке.
+ */
+async function assertNotInParallelTournament(
+  db: Database,
+  tournament: TournamentRow,
+  playerId: string,
+): Promise<void> {
+  const day = tournament.startsAt.toISOString().slice(0, 10);
+  const rows = await db
+    .select({
+      title: tournaments.title,
+      category: tournaments.category,
+      startsAt: tournaments.startsAt,
+    })
+    .from(tournamentPlayers)
+    .innerJoin(tournaments, eq(tournaments.id, tournamentPlayers.tournamentId))
+    .where(
+      and(
+        eq(tournamentPlayers.playerId, playerId),
+        ne(tournamentPlayers.tournamentId, tournament.id),
+        inArray(tournamentPlayers.status, ['registered', 'waitlisted']),
+        isNull(tournaments.deletedAt),
+        notInArray(tournaments.status, ['finished']),
+      ),
+    );
+
+  const conflict = rows.find((row) => row.startsAt.toISOString().slice(0, 10) === day);
+  if (!conflict) return;
+
+  const label = conflict.category
+    ? `«${conflict.title}» (${conflict.category})`
+    : `«${conflict.title}»`;
+  throw new ApiError(
+    'already_in_parallel_tournament',
+    `Уже есть запись в параллельном турнире ${label}`,
+    { title: conflict.title, category: conflict.category },
+  );
+}
+
 export async function addParticipant(
   db: Database,
   tournamentId: string,
@@ -414,6 +455,8 @@ export async function addParticipant(
       waitlisted: existing.status === 'waitlisted',
     };
   }
+
+  await assertNotInParallelTournament(db, tournament, playerId);
 
   const counts = await loadCounts(db, tournamentId);
   const full = counts.participantCount >= tournament.maxPlayers;
