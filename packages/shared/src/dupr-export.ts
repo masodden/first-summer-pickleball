@@ -3,20 +3,27 @@ import type { MatchDto } from './dto.js';
 /** Префикс события в имени файла и в колонке event. */
 export const DUPR_EVENT_PREFIX = 'FIRST SUMMER PICKLEBALL';
 
+/**
+ * Заголовки ровно как в шаблоне DUPR (club CSV import).
+ * Порядок и наличие *ExternalId обязательны — иначе импортёр пишет
+ * «Missing required columns», даже если данные в файле есть.
+ */
 export const DUPR_CSV_HEADERS = [
   'matchType',
-  'scoreType',
   'event',
   'date',
-  'location',
   'playerA1',
   'playerA1DuprId',
+  'playerA1ExternalId',
   'playerA2',
   'playerA2DuprId',
+  'playerA2ExternalId',
   'playerB1',
   'playerB1DuprId',
+  'playerB1ExternalId',
   'playerB2',
   'playerB2DuprId',
+  'playerB2ExternalId',
   'teamAGame1',
   'teamBGame1',
   'teamAGame2',
@@ -27,6 +34,8 @@ export const DUPR_CSV_HEADERS = [
   'teamBGame4',
   'teamAGame5',
   'teamBGame5',
+  'location',
+  'scoreType',
 ] as const;
 
 export interface DuprExportTournament {
@@ -105,8 +114,8 @@ export function isDuprExportableMatch(match: MatchDto): boolean {
 }
 
 /**
- * CSV для импорта в DUPR: только шапка и строки матчей (без Notes).
- * Всегда doubles + SIDEOUT, один гейм на матч.
+ * CSV для импорта в DUPR: шапка как в их примере, без Notes.
+ * Всегда doubles + SIDEOUT, один гейм; ExternalId оставляем пустыми.
  */
 export function buildDuprResultsCsv(
   tournament: DuprExportTournament,
@@ -124,18 +133,20 @@ export function buildDuprResultsCsv(
     lines.push(
       toCsvRow([
         'D',
-        'SIDEOUT',
         event,
         date,
-        location,
         playerName(a1),
         playerDuprId(a1),
+        '', // playerA1ExternalId
         playerName(a2),
         playerDuprId(a2),
+        '', // playerA2ExternalId
         playerName(b1),
         playerDuprId(b1),
+        '', // playerB1ExternalId
         playerName(b2),
         playerDuprId(b2),
+        '', // playerB2ExternalId
         match.teamA.score,
         match.teamB.score,
         '',
@@ -146,6 +157,8 @@ export function buildDuprResultsCsv(
         '',
         '',
         '',
+        location,
+        'SIDEOUT',
       ]),
     );
   }

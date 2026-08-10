@@ -725,10 +725,10 @@ async function main(): Promise<void> {
   const csvText = await csv.text();
   check(csv.ok && csvText.split('\n').length > 12, 'CSV с результатами выгружается');
   check(
-    csvText.startsWith('matchType,scoreType,event,date,location,'),
+    csvText.startsWith('matchType,event,date,playerA1,playerA1DuprId,playerA1ExternalId,'),
     'CSV в формате DUPR',
   );
-  check(csvText.includes('D,SIDEOUT,'), 'матчи выгружаются как doubles SIDEOUT');
+  check(csvText.includes(',SIDEOUT\n') || csvText.trimEnd().endsWith(',SIDEOUT'), 'scoreType SIDEOUT');
   check(
     csvText.includes('FIRST SUMMER PICKLEBALL'),
     'в event есть префикс клуба',

@@ -86,6 +86,10 @@ function parseCsvRow(line: string): string[] {
   return cells;
 }
 
+/** Официальный пример DUPR (порядок колонок). */
+const OFFICIAL_HEADER =
+  'matchType,event,date,playerA1,playerA1DuprId,playerA1ExternalId,playerA2,playerA2DuprId,playerA2ExternalId,playerB1,playerB1DuprId,playerB1ExternalId,playerB2,playerB2DuprId,playerB2ExternalId,teamAGame1,teamBGame1,teamAGame2,teamBGame2,teamAGame3,teamBGame3,teamAGame4,teamBGame4,teamAGame5,teamBGame5,location,scoreType';
+
 describe('formatDuprEventLabel', () => {
   it('собирает префикс, title и category', () => {
     expect(formatDuprEventLabel('Summer Cup', '3.0')).toBe(
@@ -113,12 +117,10 @@ describe('formatDuprLocation', () => {
 
 describe('formatDuprEventDate', () => {
   it('форматирует YYYY-MM-DD по Москве', () => {
-    // 2026-01-25T12:00Z → тот же день в Москве
     expect(formatDuprEventDate('2026-01-25T12:00:00.000Z')).toBe('2026-01-25');
   });
 
   it('не сдвигает вечернее московское время на следующий UTC-день назад', () => {
-    // 21:00 MSK 25 января = 18:00 UTC
     expect(formatDuprEventDate('2026-01-25T18:00:00.000Z')).toBe('2026-01-25');
   });
 });
@@ -158,30 +160,38 @@ describe('buildDuprResultsCsv', () => {
     venueName: 'First Summer Club, ВДНХ',
   };
 
-  it('пишет шапку DUPR и одну строку doubles/SIDEOUT с одним геймом', () => {
+  it('совпадает с официальной шапкой DUPR', () => {
+    expect(DUPR_CSV_HEADERS.join(',')).toBe(OFFICIAL_HEADER);
+  });
+
+  it('пишет строку в порядке шаблона: ExternalId пустые, location и scoreType в конце', () => {
     const csv = buildDuprResultsCsv(tournament, [match({ scoreA: 11, scoreB: 4 })]);
     const lines = csv.trimEnd().split('\n');
-    expect(lines[0]).toBe(DUPR_CSV_HEADERS.join(','));
+    expect(lines[0]).toBe(OFFICIAL_HEADER);
     expect(lines).toHaveLength(2);
 
     const row = parseCsvRow(lines[1]!);
+    expect(row).toHaveLength(DUPR_CSV_HEADERS.length);
     expect(row[0]).toBe('D');
-    expect(row[1]).toBe('SIDEOUT');
-    expect(row[2]).toBe('FIRST SUMMER PICKLEBALL Summer Cup 3.5');
-    expect(row[3]).toBe('2026-01-25');
-    expect(row[4]).toBe('First Summer Club, ВДНХ, Москва, Россия');
-    expect(row[5]).toBe('Anna One');
-    expect(row[6]).toBe('AAAA11');
-    expect(row[7]).toBe('Anna Two');
-    expect(row[8]).toBe('AAAA22');
+    expect(row[1]).toBe('FIRST SUMMER PICKLEBALL Summer Cup 3.5');
+    expect(row[2]).toBe('2026-01-25');
+    expect(row[3]).toBe('Anna One');
+    expect(row[4]).toBe('AAAA11');
+    expect(row[5]).toBe(''); // ExternalId
+    expect(row[6]).toBe('Anna Two');
+    expect(row[7]).toBe('AAAA22');
+    expect(row[8]).toBe('');
     expect(row[9]).toBe('Boris One');
     expect(row[10]).toBe('BBBB11');
-    expect(row[11]).toBe('Boris Two');
-    expect(row[12]).toBe('BBBB22');
-    expect(row[13]).toBe('11');
-    expect(row[14]).toBe('4');
-    // Геймы 2–5 пустые.
-    expect(row.slice(15)).toEqual(['', '', '', '', '', '', '', '']);
+    expect(row[11]).toBe('');
+    expect(row[12]).toBe('Boris Two');
+    expect(row[13]).toBe('BBBB22');
+    expect(row[14]).toBe('');
+    expect(row[15]).toBe('11');
+    expect(row[16]).toBe('4');
+    expect(row.slice(17, 25)).toEqual(['', '', '', '', '', '', '', '']);
+    expect(row[25]).toBe('First Summer Club, ВДНХ, Москва, Россия');
+    expect(row[26]).toBe('SIDEOUT');
   });
 
   it('пропускает незавершённые матчи и экспортирует несколько сыгранных', () => {
@@ -198,8 +208,10 @@ describe('buildDuprResultsCsv', () => {
     ]);
     const lines = csv.trimEnd().split('\n');
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toContain('11,9');
-    expect(lines[2]).toContain('8,11');
+    expect(parseCsvRow(lines[1]!)[15]).toBe('11');
+    expect(parseCsvRow(lines[1]!)[16]).toBe('9');
+    expect(parseCsvRow(lines[2]!)[15]).toBe('8');
+    expect(parseCsvRow(lines[2]!)[16]).toBe('11');
   });
 
   it('экранирует запятые в location, event и именах', () => {
@@ -221,6 +233,7 @@ describe('buildDuprResultsCsv', () => {
     expect(csv).toContain('"FIRST SUMMER PICKLEBALL Cup, Open"');
     expect(csv).toContain('"First Summer Club, ВДНХ, Москва, Россия"');
     expect(csv).toContain('"Eve, A"');
+    expect(csv.trimEnd().endsWith(',SIDEOUT')).toBe(true);
   });
 
   it('работает для уже сыгранного турнира без category и venue', () => {
@@ -233,9 +246,8 @@ describe('buildDuprResultsCsv', () => {
       },
       [match({ scoreA: 11, scoreB: 8 })],
     );
-    expect(csv.startsWith(DUPR_CSV_HEADERS.join(','))).toBe(true);
+    expect(csv.startsWith(OFFICIAL_HEADER)).toBe(true);
     expect(csv).toContain('FIRST SUMMER PICKLEBALL Американо вечер');
-    expect(csv).toContain('"Москва, Россия"');
-    expect(csv).toMatch(/\nD,SIDEOUT,/);
+    expect(csv).toContain('"Москва, Россия",SIDEOUT');
   });
 });
