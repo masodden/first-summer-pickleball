@@ -15,6 +15,7 @@ export async function buildResultsCsv(db: Database, tournament: TournamentRow): 
       title: tournament.title,
       category: tournament.category,
       startsAt: tournament.startsAt,
+      venueName: tournament.venueName,
     },
     matches,
   );

@@ -724,7 +724,10 @@ async function main(): Promise<void> {
   });
   const csvText = await csv.text();
   check(csv.ok && csvText.split('\n').length > 12, 'CSV с результатами выгружается');
-  check(csvText.startsWith('matchType,scoreType,event,date,'), 'CSV в формате DUPR');
+  check(
+    csvText.startsWith('matchType,scoreType,event,date,location,'),
+    'CSV в формате DUPR',
+  );
   check(csvText.includes('D,SIDEOUT,'), 'матчи выгружаются как doubles SIDEOUT');
   check(
     csvText.includes('FIRST SUMMER PICKLEBALL'),

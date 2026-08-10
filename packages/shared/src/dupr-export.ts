@@ -8,6 +8,7 @@ export const DUPR_CSV_HEADERS = [
   'scoreType',
   'event',
   'date',
+  'location',
   'playerA1',
   'playerA1DuprId',
   'playerA2',
@@ -32,6 +33,8 @@ export interface DuprExportTournament {
   title: string;
   category: string | null;
   startsAt: string | Date;
+  /** Название площадки из карточки турнира. */
+  venueName: string | null;
 }
 
 /** `FIRST SUMMER PICKLEBALL {{ title }} {{ category }}` */
@@ -40,6 +43,12 @@ export function formatDuprEventLabel(title: string, category: string | null | un
   const cat = category?.trim();
   if (cat) parts.push(cat);
   return parts.join(' ');
+}
+
+/** `{{ venueName }}, Москва, Россия` — как в шаблоне DUPR. */
+export function formatDuprLocation(venueName: string | null | undefined): string {
+  const venue = venueName?.trim();
+  return venue ? `${venue}, Москва, Россия` : 'Москва, Россия';
 }
 
 /**
@@ -105,6 +114,7 @@ export function buildDuprResultsCsv(
 ): string {
   const event = formatDuprEventLabel(tournament.title, tournament.category);
   const date = formatDuprEventDate(tournament.startsAt);
+  const location = formatDuprLocation(tournament.venueName);
   const lines = [toCsvRow(DUPR_CSV_HEADERS)];
 
   for (const match of matches) {
@@ -117,6 +127,7 @@ export function buildDuprResultsCsv(
         'SIDEOUT',
         event,
         date,
+        location,
         playerName(a1),
         playerDuprId(a1),
         playerName(a2),
