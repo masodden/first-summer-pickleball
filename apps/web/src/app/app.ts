@@ -223,6 +223,14 @@ import { ToastHost } from './ui/toast-host';
       padding: 6px;
       border-radius: var(--radius-full);
       transform: translateX(-50%);
+      transition: opacity var(--duration-fast) ease;
+    }
+
+    /* Оверлеи из router-outlet (пикер и т.п.) ниже таббара по stacking —
+       пока открыты, навигацию скрываем, чтобы не перекрывала кнопки. */
+    :host-context(html.fsp-overlay-open) .tabbar {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .tab {

@@ -12,6 +12,7 @@ import {
 } from '@fsp/shared';
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
+import { ensureGuestPlayerForAccount, getAccount } from '../services/accounts.js';
 import {
   addParticipant,
   createTournament,
@@ -147,10 +148,15 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
 
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/join', async (request) => {
     const viewer = requireViewer(request);
-    if (!viewer.playerId) {
-      throw new ApiError('forbidden', 'Сначала привяжите свой DUPR');
+    const account = await ensureGuestPlayerForAccount(
+      db,
+      await getAccount(db, viewer.accountId),
+    );
+    if (!account.playerId) {
+      throw new ApiError('forbidden', 'Не удалось создать карточку игрока');
     }
-    const result = await addParticipant(db, request.params.id, viewer.playerId, viewer, {
+    const actor = { ...viewer, playerId: account.playerId };
+    const result = await addParticipant(db, request.params.id, account.playerId, actor, {
       bySelf: true,
     });
     await broadcastParticipants(db, hub, request.params.id);

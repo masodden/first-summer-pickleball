@@ -17,6 +17,7 @@ import {
   playerRatingHistory,
   players,
   tournamentPlayers,
+  trainingPlayers,
   type PlayerRow,
 } from '../db/schema.js';
 import { ApiError, forbidden, notFound } from '../lib/errors.js';
@@ -32,7 +33,7 @@ function normalizeTelegramUsername(value: string | null): string | null {
 }
 
 /** Гостевые карточки живут в том же пространстве ключей, но с явным префиксом. */
-function createGuestId(): string {
+export function createGuestId(): string {
   return `G-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
@@ -304,6 +305,96 @@ export async function resolveRatingConflict(
 }
 
 /**
+ * Переносит заявки/матчи с гостевой карточки на уже существующую цель
+ * (другой гость по invite или настоящий DUPR) и помечает гостя как слитого.
+ */
+export async function adoptGuestIntoPlayer(
+  db: Database,
+  guestId: string,
+  targetId: string,
+): Promise<void> {
+  if (guestId === targetId) return;
+
+  const guest = await getPlayerRow(db, guestId);
+  if (!guest.isGuest) {
+    throw new ApiError('validation_failed', 'У этого игрока уже есть DUPR ID');
+  }
+  const target = await getPlayerRow(db, targetId);
+  if (target.mergedIntoId) {
+    throw new ApiError('validation_failed', 'Целевая карточка уже объединена с другой');
+  }
+
+  await db.transaction(async (tx) => {
+    const guestEntries = await tx
+      .select({ id: tournamentPlayers.id, tournamentId: tournamentPlayers.tournamentId })
+      .from(tournamentPlayers)
+      .where(eq(tournamentPlayers.playerId, guestId));
+
+    for (const entry of guestEntries) {
+      const [clash] = await tx
+        .select({ id: tournamentPlayers.id })
+        .from(tournamentPlayers)
+        .where(
+          and(
+            eq(tournamentPlayers.tournamentId, entry.tournamentId),
+            eq(tournamentPlayers.playerId, targetId),
+          ),
+        )
+        .limit(1);
+      if (clash) {
+        await tx.delete(tournamentPlayers).where(eq(tournamentPlayers.id, entry.id));
+      } else {
+        await tx
+          .update(tournamentPlayers)
+          .set({ playerId: targetId })
+          .where(eq(tournamentPlayers.id, entry.id));
+      }
+    }
+
+    const guestTrainings = await tx
+      .select({ id: trainingPlayers.id, trainingId: trainingPlayers.trainingId })
+      .from(trainingPlayers)
+      .where(eq(trainingPlayers.playerId, guestId));
+
+    for (const entry of guestTrainings) {
+      const [clash] = await tx
+        .select({ id: trainingPlayers.id })
+        .from(trainingPlayers)
+        .where(
+          and(
+            eq(trainingPlayers.trainingId, entry.trainingId),
+            eq(trainingPlayers.playerId, targetId),
+          ),
+        )
+        .limit(1);
+      if (clash) {
+        await tx.delete(trainingPlayers).where(eq(trainingPlayers.id, entry.id));
+      } else {
+        await tx
+          .update(trainingPlayers)
+          .set({ playerId: targetId })
+          .where(eq(trainingPlayers.id, entry.id));
+      }
+    }
+
+    await tx
+      .update(matchPlayers)
+      .set({ playerId: targetId })
+      .where(eq(matchPlayers.playerId, guestId));
+    await tx
+      .update(playerRatingHistory)
+      .set({ playerId: targetId })
+      .where(eq(playerRatingHistory.playerId, guestId));
+    await tx.update(accounts).set({ playerId: targetId }).where(eq(accounts.playerId, guestId));
+    await tx.update(claims).set({ playerId: targetId }).where(eq(claims.playerId, guestId));
+    await tx
+      .update(players)
+      .set({ mergedIntoId: targetId, updatedAt: new Date() })
+      .where(eq(players.id, guestId));
+  });
+}
+
+/**
  * Гость получил настоящий DUPR ID.
  *
  * Ключ игрока поменять нельзя, поэтому создаём или находим карточку с этим ID,
@@ -325,79 +416,32 @@ export async function mergeGuestIntoDupr(
     throw new ApiError('validation_failed', 'У этого игрока уже есть DUPR ID');
   }
 
-  return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(players).where(eq(players.id, duprId)).limit(1);
+  const [existing] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
 
-    let target = existing;
-    if (!target) {
-      const [created] = await tx
-        .insert(players)
-        .values({
-          id: duprId,
-          duprId,
-          firstName: guest.firstName,
-          lastName: guest.lastName,
-          doublesRating: guest.doublesRating,
-          singlesRating: guest.singlesRating,
-          ratingUpdatedAt: guest.ratingUpdatedAt,
-          ratingSource: guest.ratingSource,
-          avatarUrl: guest.avatarUrl,
-          telegramUsername: guest.telegramUsername,
-          nameSource: guest.nameSource,
-          avatarSource: guest.avatarSource,
-        })
-        .returning();
-      target = created as PlayerRow;
-    }
+  let target = existing;
+  if (!target) {
+    const [created] = await db
+      .insert(players)
+      .values({
+        id: duprId,
+        duprId,
+        firstName: guest.firstName,
+        lastName: guest.lastName,
+        doublesRating: guest.doublesRating,
+        singlesRating: guest.singlesRating,
+        ratingUpdatedAt: guest.ratingUpdatedAt,
+        ratingSource: guest.ratingSource,
+        avatarUrl: guest.avatarUrl,
+        telegramUsername: guest.telegramUsername,
+        nameSource: guest.nameSource,
+        avatarSource: guest.avatarSource,
+      })
+      .returning();
+    target = created as PlayerRow;
+  }
 
-    // Переносим историю участия. Уникальные ограничения могут конфликтовать,
-    // если обе карточки участвовали в одном турнире — такие записи удаляем.
-    const guestEntries = await tx
-      .select({ id: tournamentPlayers.id, tournamentId: tournamentPlayers.tournamentId })
-      .from(tournamentPlayers)
-      .where(eq(tournamentPlayers.playerId, guestId));
-
-    for (const entry of guestEntries) {
-      const [clash] = await tx
-        .select({ id: tournamentPlayers.id })
-        .from(tournamentPlayers)
-        .where(
-          and(
-            eq(tournamentPlayers.tournamentId, entry.tournamentId),
-            eq(tournamentPlayers.playerId, target.id),
-          ),
-        )
-        .limit(1);
-      if (clash) {
-        await tx.delete(tournamentPlayers).where(eq(tournamentPlayers.id, entry.id));
-      } else {
-        await tx
-          .update(tournamentPlayers)
-          .set({ playerId: target.id })
-          .where(eq(tournamentPlayers.id, entry.id));
-      }
-    }
-
-    await tx
-      .update(matchPlayers)
-      .set({ playerId: target.id })
-      .where(eq(matchPlayers.playerId, guestId));
-    await tx
-      .update(playerRatingHistory)
-      .set({ playerId: target.id })
-      .where(eq(playerRatingHistory.playerId, guestId));
-
-    // Telegram и заявки на привязку переезжают на карточку с настоящим DUPR.
-    await tx.update(accounts).set({ playerId: target.id }).where(eq(accounts.playerId, guestId));
-    await tx.update(claims).set({ playerId: target.id }).where(eq(claims.playerId, guestId));
-
-    await tx
-      .update(players)
-      .set({ mergedIntoId: target.id, updatedAt: new Date() })
-      .where(eq(players.id, guestId));
-
-    return toPlayerDto(target);
-  });
+  await adoptGuestIntoPlayer(db, guestId, target.id);
+  return toPlayerDto(target);
 }
 
 /**

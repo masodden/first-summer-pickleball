@@ -9,6 +9,7 @@ import {
   buildSession,
   claimDuprId,
   devLogin,
+  ensureGuestPlayerForAccount,
   getAccount,
   loginWithTelegram,
   updateAccountSettings,
@@ -41,7 +42,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     }
     const body = parse(z.object({ initData: z.string().min(1) }), request.body);
     const verified = verifyInitData(body.initData, env.TELEGRAM_BOT_TOKEN);
-    const account = await loginWithTelegram(db, verified);
+    let account = await loginWithTelegram(db, verified);
 
     // Ссылка-приглашение может приехать прямо в deep-link Mini App.
     const startParam = verified.startParam;
@@ -50,6 +51,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       return { token: app.jwt.sign({ sub: account.id }), session };
     }
 
+    account = await ensureGuestPlayerForAccount(db, account);
     return {
       token: app.jwt.sign({ sub: account.id }),
       session: await buildSession(db, account),
@@ -61,11 +63,12 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       throw new ApiError('forbidden', 'Локальный вход выключен');
     }
     const body = parse(devLoginSchema, request.body ?? {});
-    const account = await devLogin(db, {
+    let account = await devLogin(db, {
       telegramId: body.telegramId,
       name: body.name,
       role: body.role,
     });
+    account = await ensureGuestPlayerForAccount(db, account);
     return {
       token: app.jwt.sign({ sub: account.id }),
       session: await buildSession(db, account),
@@ -74,7 +77,8 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
 
   app.get('/api/auth/session', async (request) => {
     if (!request.viewer) return { session: null };
-    const account = await getAccount(db, request.viewer.accountId);
+    let account = await getAccount(db, request.viewer.accountId);
+    account = await ensureGuestPlayerForAccount(db, account);
     return { session: await buildSession(db, account) };
   });
 

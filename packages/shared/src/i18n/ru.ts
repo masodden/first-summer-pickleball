@@ -82,6 +82,9 @@ export const ru = {
   'claim.inviteHint':
     'Отправьте игроку эту ссылку. Открыв её, он привяжет свой Telegram к карточке без ручного подтверждения.',
   'claim.inviteCreate': 'Создать ссылку-приглашение',
+  'claim.inviteCopy': 'Скопировать ссылку',
+  'claim.inviteCopied': 'Ссылка скопирована',
+  'claim.inviteApplied': 'Telegram привязан к карточке',
   'claim.inviteExpires': 'Ссылка действует до {{date}}',
 
   'role.admin': 'Администратор',
@@ -192,8 +195,11 @@ export const ru = {
   'participant.needDupr': 'Чтобы заявиться, привяжите свой DUPR',
   'participant.full': 'Свободных мест нет',
   'participant.searchPlaceholder': 'Имя, фамилия или DUPR ID',
+  'participant.notFound': 'В базе такого игрока нет',
   'participant.guestBadge': 'Гость',
   'participant.guestHint': 'Игрок без DUPR ID. Позже можно указать настоящий ID и слить карточки.',
+  'participant.guestJoinHint': 'Вы участвуете как гость. DUPR можно привязать позже в настройках.',
+  'participant.linkDuprLater': 'Привязать DUPR',
   'participant.selfAdded': 'Заявился сам',
 
   'waitlist.title': 'Лист ожидания',

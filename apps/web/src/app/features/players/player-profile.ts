@@ -67,6 +67,31 @@ import { RatingChip } from '../../ui/rating-chip';
           }
         </section>
 
+        @if (session.isModerator() && !data.player.isClaimed) {
+          <section class="glass card--tight stack stack--3">
+            <h3>{{ t()('claim.inviteTitle') }}</h3>
+            <p class="small muted">{{ t()('claim.inviteHint') }}</p>
+            @if (inviteUrl(); as url) {
+              <input class="input" readonly [value]="url" (focus)="selectInput($event)" />
+              <p class="tiny faint">
+                {{ t()('claim.inviteExpires', { date: i18n.formatDay(inviteExpires()!) }) }}
+              </p>
+              <button type="button" class="btn btn--primary btn--block" (click)="copyInvite()">
+                {{ t()('claim.inviteCopy') }}
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn--primary btn--block"
+                [disabled]="saving()"
+                (click)="createInvite()"
+              >
+                {{ t()('claim.inviteCreate') }}
+              </button>
+            }
+          </section>
+        }
+
         @if (data.canEdit) {
           <section class="glass card--tight stack stack--3">
             <div class="row row--between">
@@ -394,6 +419,8 @@ export class PlayerProfilePage {
   protected readonly telegramUsername = signal('');
   protected readonly mergeId = signal('');
   protected readonly saving = signal(false);
+  protected readonly inviteUrl = signal<string | null>(null);
+  protected readonly inviteExpires = signal<string | null>(null);
 
   constructor() {
     // Черновики полей заполняются один раз на карточку, чтобы правка не сбрасывалась.
@@ -407,6 +434,8 @@ export class PlayerProfilePage {
       this.firstName.set(data.player.firstName);
       this.lastName.set(data.player.lastName);
       this.telegramUsername.set(data.player.telegramUsername ?? '');
+      this.inviteUrl.set(null);
+      this.inviteExpires.set(null);
     });
   }
 
@@ -439,6 +468,35 @@ export class PlayerProfilePage {
 
   protected openTelegram(username: string): void {
     this.telegram.openExternal(`https://t.me/${username}`);
+  }
+
+  protected selectInput(event: Event): void {
+    (event.target as HTMLInputElement).select();
+  }
+
+  protected async createInvite(): Promise<void> {
+    this.saving.set(true);
+    try {
+      const { invite } = await this.api.createInvite(this.id());
+      this.inviteUrl.set(invite.url);
+      this.inviteExpires.set(invite.expiresAt);
+      this.toast.success(this.i18n.translate('claim.inviteCreate'));
+    } catch (error) {
+      this.toast.failure(error, () => void this.createInvite());
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async copyInvite(): Promise<void> {
+    const url = this.inviteUrl();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.toast.success(this.i18n.translate('claim.inviteCopied'));
+    } catch {
+      this.toast.error(this.i18n.translate('errors.network'));
+    }
   }
 
   protected async saveRating(): Promise<void> {

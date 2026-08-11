@@ -95,7 +95,11 @@ async function expectError(
 
 interface Session {
   token: string;
-  session: { accountId: string; role: string; player: { id: string } | null };
+  session: {
+    accountId: string;
+    role: string;
+    player: { id: string; isGuest: boolean; duprId: string | null } | null;
+  };
 }
 
 const login = (role: 'admin' | 'moderator' | 'user', telegramId: string, name: string) =>
@@ -177,7 +181,11 @@ const state = (id: string, token?: string) =>
       courts: number;
       courtNames: string[] | null;
     };
-    participants: { player: { id: string }; confirmedAndPaid: boolean; status: string }[];
+    participants: {
+      player: { id: string; isGuest: boolean };
+      confirmedAndPaid: boolean;
+      status: string;
+    }[];
     rounds: RoundDto[];
     standings: StandingRowDto[];
   }>('GET', `/api/tournaments/${id}/state`, token ? { token } : {});
@@ -491,19 +499,30 @@ async function main(): Promise<void> {
     });
   }
 
-  // Двенадцатый участник заявляется сам: Telegram-аккаунт + привязка DUPR.
+  // Двенадцатый участник заявляется сам: сначала как гость, потом привязывает DUPR.
   const selfPlayer = advancedPlayers[11]!;
   const guest = await login('user', `e2e-self-${RUN_TAG}`, 'Игрок с телефона');
-  await expectError('forbidden', 'без привязки DUPR заявиться нельзя', () =>
-    request('POST', `/api/tournaments/${advanced.id}/join`, { token: guest.token }),
-  );
+  check(guest.session.player?.isGuest === true, 'после входа без DUPR появляется гостевая карточка');
 
-  const claimed = await request<{ session: { claim: { status: string } | null } }>(
-    'POST',
-    '/api/auth/claim',
-    { token: guest.token, body: { duprId: selfPlayer.duprId } },
-  );
+  const guestJoined = await request<{
+    waitlisted: boolean;
+    participant: { player: { id: string; isGuest: boolean } };
+  }>('POST', `/api/tournaments/${advanced.id}/join`, { token: guest.token });
+  check(!guestJoined.waitlisted, 'гость может заявиться на турнир без DUPR');
+  check(guestJoined.participant.player.isGuest === true, 'в составе турнира гость помечен isGuest');
+
+  const claimed = await request<{
+    session: {
+      claim: { status: string } | null;
+      player: { id: string; isGuest: boolean; duprId: string | null } | null;
+    };
+  }>('POST', '/api/auth/claim', {
+    token: guest.token,
+    body: { duprId: selfPlayer.duprId },
+  });
   check(claimed.session.claim?.status === 'pending', 'заявка на привязку DUPR ждёт организатора');
+  check(claimed.session.player?.id === selfPlayer.id, 'claim сливает гостя в карточку с DUPR');
+  check(claimed.session.player?.isGuest === false, 'после claim карточка больше не гостевая');
 
   const pending = await request<{ claims: { id: string; player: { id: string } }[] }>(
     'GET',
@@ -517,18 +536,15 @@ async function main(): Promise<void> {
     body: { approve: true },
   });
 
-  const joined = await request<{ waitlisted: boolean }>(
-    'POST',
-    `/api/tournaments/${advanced.id}/join`,
-    { token: guest.token },
-  );
-  check(!joined.waitlisted, 'игрок заявился сам и попал в основной состав');
-
   const afterJoin = await state(advanced.id, admin.token);
   check(afterJoin.participants.length === 12, 'в advanced 12 участников');
   check(
-    afterJoin.participants.some((item) => item.player.id === selfPlayer.id),
-    'самостоятельная заявка привязана к карточке игрока с этим DUPR ID',
+    afterJoin.participants.some((item) => item.player.id === selfPlayer.id && !item.player.isGuest),
+    'заявка гостя переехала на карточку с DUPR ID',
+  );
+  check(
+    !afterJoin.participants.some((item) => item.player.id === guestJoined.participant.player.id),
+    'старая гостевая карточка больше не в составе',
   );
 
   section('Приём участников и оплата');
@@ -924,6 +940,59 @@ async function main(): Promise<void> {
   await roundAction(admin.token, plain.id, 1, 'finish');
 
   await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
+
+  section('Гость без DUPR: самозапись на тренировку');
+  const trainingGuest = await login('user', `e2e-train-guest-${RUN_TAG}`, 'Гость Тренировки');
+  check(
+    trainingGuest.session.player?.isGuest === true,
+    'для тренировки тоже создаётся гостевая карточка',
+  );
+  const { training: guestTraining } = await request<{ training: { id: string } }>(
+    'POST',
+    '/api/trainings',
+    {
+      token: admin.token,
+      body: {
+        title: `Тренировка для гостей ${RUN_TAG}`,
+        startsAt: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+        maxPlayers: 8,
+        pricePerCourtHour: 1000,
+        courtBlocks: [{ courts: 1, hours: 1 }],
+      },
+    },
+  );
+  const guestTrainingJoin = await request<{
+    waitlisted: boolean;
+    participant: { player: { id: string; isGuest: boolean } };
+  }>('POST', `/api/trainings/${guestTraining.id}/join`, { token: trainingGuest.token });
+  check(!guestTrainingJoin.waitlisted, 'гость сам записывается на тренировку');
+  check(guestTrainingJoin.participant.player.isGuest === true, 'участник тренировки — гость');
+
+  const guestTrainDupr = `T${RUN_TAG}9`.toUpperCase().padEnd(6, '0').slice(0, 6);
+  const guestTrainClaim = await request<{
+    session: { player: { id: string; isGuest: boolean } | null };
+  }>('POST', '/api/auth/claim', {
+    token: trainingGuest.token,
+    body: {
+      duprId: guestTrainDupr,
+      firstName: 'Гость',
+      lastName: 'Тренировки',
+      doublesRating: 2.25,
+    },
+  });
+  check(guestTrainClaim.session.player?.id === guestTrainDupr, 'claim на тренировке сливает гостя');
+  check(guestTrainClaim.session.player?.isGuest === false, 'после claim на тренировке уже не гость');
+
+  const guestTrainingState = await request<{
+    participants: { player: { id: string; isGuest: boolean } }[];
+  }>('GET', `/api/trainings/${guestTraining.id}/state`, { token: admin.token });
+  check(
+    guestTrainingState.participants.some(
+      (row) => row.player.id === guestTrainDupr && !row.player.isGuest,
+    ),
+    'запись на тренировку переехала на DUPR после claim',
+  );
+  await request('DELETE', `/api/trainings/${guestTraining.id}`, { token: admin.token });
 
   section('Тренировка: запись, суммы и финиш');
   // Блоки: 1×1 + 2×2 = 5 корт·ч × 1000 = 5000 → по 1250 на четверых.

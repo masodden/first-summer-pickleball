@@ -314,6 +314,8 @@ export class TournamentStore {
     return this.run('join', async () => {
       const id = this.requireId();
       const result = await this.api.join(id);
+      // Join мог только что завести гостевую карточку — подтянем playerId в сессию.
+      await this.session.refresh();
       await this.load({ silent: true });
       this.toast.success(
         this.i18n.translate(result.waitlisted ? 'waitlist.joined' : 'participant.joined'),

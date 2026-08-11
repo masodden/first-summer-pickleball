@@ -1,9 +1,12 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
+  Injector,
   input,
   output,
   resource,
@@ -36,7 +39,9 @@ import { PlayerLine } from '../../ui/player-line';
         (click)="$event.stopPropagation()"
       >
         <div class="row row--between">
-          <h3>{{ t()('participant.add') }}</h3>
+          <h3>
+            {{ t()(mode() === 'create' ? 'participant.addNew' : 'participant.add') }}
+          </h3>
           <button type="button" class="btn btn--icon btn--ghost" (click)="closed.emit()">
             <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -62,7 +67,20 @@ import { PlayerLine } from '../../ui/player-line';
                 }
               </div>
             } @else if (results().length === 0) {
-              <p class="small muted center">{{ t()('common.empty') }}</p>
+              <div class="empty stack stack--3">
+                <p class="small muted center">
+                  {{
+                    query().trim()
+                      ? t()('participant.notFound')
+                      : t()('common.empty')
+                  }}
+                </p>
+                @if (canCreateCards()) {
+                  <button type="button" class="btn btn--primary btn--block" (click)="openCreate()">
+                    {{ t()('participant.addNew') }}
+                  </button>
+                }
+              </div>
             } @else {
               <div class="stack stack--1">
                 @for (player of results(); track player.id) {
@@ -82,13 +100,15 @@ import { PlayerLine } from '../../ui/player-line';
             }
           </div>
 
-          @if (session.isModerator()) {
-            <button type="button" class="btn btn--glass btn--block" (click)="mode.set('create')">
+          @if (canCreateCards() && results().length > 0) {
+            <button type="button" class="btn btn--glass btn--block" (click)="openCreate()">
               {{ t()('participant.addNew') }}
             </button>
           }
         } @else {
           <div class="stack stack--3">
+            <p class="small muted">{{ t()('participant.guestHint') }}</p>
+
             <div class="row">
               <label class="field grow">
                 <span class="field__label">{{ t()('player.firstName') }}</span>
@@ -112,11 +132,12 @@ import { PlayerLine } from '../../ui/player-line';
                 [value]="duprId()"
                 (input)="duprId.set(value($event).toUpperCase())"
               />
-              <span class="field__hint">{{ t()('participant.guestHint') }}</span>
             </label>
 
             <label class="field">
-              <span class="field__label">{{ t()('rating.doubles') }}</span>
+              <span class="field__label">
+                {{ t()('rating.doubles') }} · {{ t()('common.optional') }}
+              </span>
               <input
                 class="input numeric"
                 type="text"
@@ -150,10 +171,11 @@ import { PlayerLine } from '../../ui/player-line';
     .backdrop {
       position: fixed;
       inset: 0;
-      z-index: 65;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: max(var(--space-4), env(safe-area-inset-top, 0px)) var(--space-4)
+        max(var(--space-4), env(safe-area-inset-bottom, 0px));
       background: rgba(36, 26, 22, 0.42);
       backdrop-filter: blur(4px);
       animation: fade-in var(--duration-fast) ease both;
@@ -164,27 +186,33 @@ import { PlayerLine } from '../../ui/player-line';
       flex-direction: column;
       gap: var(--space-3);
       width: min(100%, 520px);
-      max-height: 86dvh;
-      padding: var(--space-5) var(--space-4) calc(env(safe-area-inset-bottom, 0px) + var(--space-5));
-      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-      animation: sheet-up var(--duration-base) var(--ease-out) both;
+      max-height: min(86dvh, calc(100dvh - 2 * var(--space-4)));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: var(--space-5) var(--space-4);
+      border-radius: var(--radius-xl);
+      animation: pop-in var(--duration-base) var(--ease-out) both;
     }
 
-    @keyframes sheet-up {
+    @keyframes pop-in {
       from {
-        transform: translateY(16px);
+        transform: translateY(10px) scale(0.98);
         opacity: 0.6;
       }
       to {
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
         opacity: 1;
       }
     }
 
     .results {
       min-height: 120px;
-      max-height: 46dvh;
+      max-height: 40dvh;
       overflow-y: auto;
+    }
+
+    .empty {
+      padding: var(--space-4) var(--space-2);
     }
 
     .result {
@@ -228,12 +256,16 @@ export class PlayerPicker {
   private readonly api = inject(TournamentApi);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  private readonly session = inject(SessionStore);
+  private readonly injector = inject(Injector);
 
-  protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
 
   /** Уже добавленные игроки: их видно, но выбрать нельзя. */
   readonly taken = input<Set<string>>(new Set<string>());
+
+  /** Сразу открыть форму создания (кнопка «Создать карточку» в справочнике). */
+  readonly startInCreate = input(false);
 
   readonly picked = output<string>();
   readonly closed = output<void>();
@@ -256,6 +288,9 @@ export class PlayerPicker {
 
   protected readonly results = computed(() => this.players.value());
 
+  /** Турниры ведут модераторы — они же заводят гостевые карточки. */
+  protected readonly canCreateCards = computed(() => this.session.isModerator());
+
   protected readonly duprInvalid = computed(() => {
     const value = this.duprId().trim();
     return value.length > 0 && !isValidDuprId(value);
@@ -271,6 +306,22 @@ export class PlayerPicker {
   private timer: number | null = null;
 
   constructor() {
+    // Пикер живёт внутри <main>, а таббар — снаружи с большим z-index.
+    // Пока диалог открыт, прячем навигацию, чтобы не перехватывала тапы.
+    document.documentElement.classList.add('fsp-overlay-open');
+    inject(DestroyRef).onDestroy(() => {
+      document.documentElement.classList.remove('fsp-overlay-open');
+    });
+
+    afterNextRender(
+      () => {
+        if (this.startInCreate() && this.canCreateCards()) {
+          this.mode.set('create');
+        }
+      },
+      { injector: this.injector },
+    );
+
     // Поиск не дёргает сервер на каждую букву.
     effect((onCleanup) => {
       const value = this.query();
@@ -294,15 +345,34 @@ export class PlayerPicker {
     return sanitizeRatingInput(value);
   }
 
+  /** Открывает создание и подставляет имя из строки поиска, если поля ещё пустые. */
+  protected openCreate(): void {
+    this.prefillNameFromQuery();
+    this.mode.set('create');
+  }
+
+  private prefillNameFromQuery(): void {
+    if (this.firstName().trim() || this.lastName().trim()) return;
+    const parts = this.query().trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return;
+    if (parts.length === 1) {
+      this.firstName.set(parts[0]!);
+      return;
+    }
+    this.firstName.set(parts[0]!);
+    this.lastName.set(parts.slice(1).join(' '));
+  }
+
   protected async create(): Promise<void> {
     if (!this.canCreate()) return;
     this.saving.set(true);
     try {
+      const doublesRating = parseRatingInput(this.rating());
       const { player } = await this.api.createPlayer({
         firstName: this.firstName().trim(),
         lastName: this.lastName().trim(),
         duprId: this.duprId().trim() ? this.duprId().trim() : null,
-        doublesRating: parseRatingInput(this.rating()),
+        ...(doublesRating !== null ? { doublesRating } : {}),
       });
       this.toast.success(this.i18n.translate('player.created'));
       this.picked.emit(player.id);

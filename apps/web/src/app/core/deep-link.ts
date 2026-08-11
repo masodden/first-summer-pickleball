@@ -31,6 +31,26 @@ export function readTournamentDeepLink(startParam: string | null): string | null
   return null;
 }
 
+/**
+ * Токен приглашения: `invite_<token>` в start_param или `?invite=` в URL
+ * (кнопка бота после /start).
+ */
+export function readInviteDeepLink(startParam: string | null): string | null {
+  if (startParam?.startsWith('invite_')) {
+    const token = startParam.slice('invite_'.length).trim();
+    if (token.length > 0) return token;
+  }
+
+  try {
+    const fromQuery = new URLSearchParams(window.location.search).get('invite');
+    if (fromQuery && fromQuery.trim().length > 0) return fromQuery.trim();
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
 /** Достаёт id тренировки из `tr_<uuid>` или `?training=`. */
 export function readTrainingDeepLink(startParam: string | null): string | null {
   if (startParam?.startsWith('tr_')) {

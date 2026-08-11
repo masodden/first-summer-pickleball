@@ -84,6 +84,9 @@ export const en: Record<TranslationKey, string> = {
   'claim.inviteHint':
     'Send this link to the player. Opening it links their Telegram to the profile with no manual approval.',
   'claim.inviteCreate': 'Create invite link',
+  'claim.inviteCopy': 'Copy link',
+  'claim.inviteCopied': 'Link copied',
+  'claim.inviteApplied': 'Telegram linked to this profile',
   'claim.inviteExpires': 'Link valid until {{date}}',
 
   'role.admin': 'Administrator',
@@ -195,9 +198,12 @@ export const en: Record<TranslationKey, string> = {
   'participant.needDupr': 'Link your DUPR to enter tournaments',
   'participant.full': 'No spots left',
   'participant.searchPlaceholder': 'First name, last name or DUPR ID',
+  'participant.notFound': 'No such player in the database',
   'participant.guestBadge': 'Guest',
   'participant.guestHint':
     'Player without a DUPR ID. You can set the real ID later and merge the profiles.',
+  'participant.guestJoinHint': 'You are joining as a guest. You can link DUPR later in Settings.',
+  'participant.linkDuprLater': 'Link DUPR',
   'participant.selfAdded': 'Self-entered',
 
   'waitlist.title': 'Waiting list',

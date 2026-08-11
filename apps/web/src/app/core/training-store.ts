@@ -114,6 +114,8 @@ export class TrainingStore {
   join(): Promise<void> {
     return this.run('join', async () => {
       const result = await this.api.join(this.requireId());
+      // Join мог только что завести гостевую карточку — подтянем playerId в сессию.
+      await this.session.refresh();
       this.toast.success(
         this.i18n.translate(result.waitlisted ? 'waitlist.joined' : 'training.joined'),
       );

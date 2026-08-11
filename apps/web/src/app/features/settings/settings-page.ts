@@ -32,6 +32,8 @@ import { RatingChip } from '../../ui/rating-chip';
               <span class="tiny muted">{{ roleLabel() }}</span>
               @if (player.duprId) {
                 <span class="tiny faint">{{ t()('claim.duprId') }}: {{ player.duprId }}</span>
+              } @else if (player.isGuest) {
+                <span class="chip chip--pink">{{ t()('participant.guestBadge') }}</span>
               }
             </div>
             <app-rating-chip [player]="player" />
@@ -40,7 +42,7 @@ import { RatingChip } from '../../ui/rating-chip';
             {{ t()('player.profile') }}
           </a>
           <a class="btn btn--sm btn--glass btn--block" routerLink="/claim">
-            {{ t()('claim.changeSubmit') }}
+            {{ t()(player.isGuest ? 'claim.submit' : 'claim.changeSubmit') }}
           </a>
         } @else if (session.isAuthenticated()) {
           <div class="stack stack--2">

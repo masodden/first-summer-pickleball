@@ -1,6 +1,6 @@
 {
   "name": "first-summer-pickleball",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "private": true,
   "description": "FIRST SUMMER PICKLEBALL — приложение для проведения локальных турниров по пиклболу",
   "packageManager": "pnpm@11.20.0",
@@ -12,7 +12,7 @@
     "dev:api": "pnpm --filter @fsp/api dev",
     "dev:web": "pnpm --parallel --filter @fsp/shared --filter @fsp/web dev",
     "build": "pnpm --filter @fsp/shared build && pnpm --filter @fsp/engine build && pnpm --filter @fsp/api build && pnpm --filter @fsp/web build",
-    "test": "pnpm --filter @fsp/engine test && pnpm --filter @fsp/shared test",
+    "test": "pnpm --filter @fsp/engine test && pnpm --filter @fsp/shared test && pnpm --filter @fsp/api test",
     "e2e:scenario": "pnpm --filter @fsp/api exec tsx ../../scripts/e2e-scenario.ts",
     "lint": "prettier --check .",
     "format": "prettier --write .",

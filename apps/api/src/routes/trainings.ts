@@ -9,6 +9,7 @@ import {
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
 import { ApiError } from '../lib/errors.js';
+import { ensureGuestPlayerForAccount, getAccount } from '../services/accounts.js';
 import {
   addTrainingParticipant,
   createTraining,
@@ -89,10 +90,15 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
 
   app.post<{ Params: { id: string } }>('/api/trainings/:id/join', async (request) => {
     const viewer = requireViewer(request);
-    if (!viewer.playerId) {
-      throw new ApiError('forbidden', 'Сначала привяжите свой DUPR');
+    const account = await ensureGuestPlayerForAccount(
+      db,
+      await getAccount(db, viewer.accountId),
+    );
+    if (!account.playerId) {
+      throw new ApiError('forbidden', 'Не удалось создать карточку игрока');
     }
-    return addTrainingParticipant(db, request.params.id, viewer.playerId, viewer, {
+    const actor = { ...viewer, playerId: account.playerId };
+    return addTrainingParticipant(db, request.params.id, account.playerId, actor, {
       bySelf: true,
     });
   });
@@ -100,7 +106,7 @@ export function registerTrainingRoutes(app: FastifyInstance, ctx: AppContext): v
   app.post<{ Params: { id: string } }>('/api/trainings/:id/leave', async (request) => {
     const viewer = requireViewer(request);
     if (!viewer.playerId) {
-      throw new ApiError('forbidden', 'Сначала привяжите свой DUPR');
+      throw new ApiError('forbidden', 'Заявки нет');
     }
     await removeTrainingParticipant(db, request.params.id, viewer.playerId, viewer, {
       bySelf: true,

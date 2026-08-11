@@ -8,8 +8,10 @@ import {
   type SessionDto,
 } from '@fsp/shared';
 import { ApiClient, ApiFailure } from './api';
+import { readInviteDeepLink } from './deep-link';
 import { I18nService } from './i18n';
 import { TelegramService } from './telegram';
+import { ToastService } from './toast';
 
 interface SessionResponse {
   session: SessionDto | null;
@@ -27,6 +29,7 @@ export class SessionStore {
   private readonly api = inject(ApiClient);
   private readonly telegram = inject(TelegramService);
   private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
 
   private readonly sessionSignal = signal<SessionDto | null>(null);
   private readonly readySignal = signal(false);
@@ -44,10 +47,8 @@ export class SessionStore {
   readonly isAdmin = computed(() => this.role() === 'admin');
   readonly player = computed(() => this.sessionSignal()?.player ?? null);
   readonly playerId = computed(() => this.sessionSignal()?.player?.id ?? null);
-  /** Нужно ли предложить привязать DUPR перед заявкой на турнир. */
-  readonly needsDuprLink = computed(
-    () => this.isAuthenticated() && this.sessionSignal()?.player === null,
-  );
+  /** Гостевая карточка без DUPR — заявиться можно, бейдж «Гость» в списках. */
+  readonly isGuestPlayer = computed(() => this.sessionSignal()?.player?.isGuest === true);
   readonly canJoinTournaments = computed(() => this.playerId() !== null);
   readonly telegramAvailable = this.telegram.available;
   /** После «Выйти» можно восстановить сессию без свежей подписи Telegram. */
@@ -66,6 +67,7 @@ export class SessionStore {
       } else if (this.api.hasPausedToken()) {
         this.pausedSignInSignal.set(true);
       }
+      await this.consumeInviteDeepLink();
     } catch (error) {
       // Не смогли войти — остаёмся наблюдателем, приложение всё равно работает.
       if (error instanceof ApiFailure && error.code === 'unauthorized') {
@@ -75,6 +77,46 @@ export class SessionStore {
       if (this.api.hasPausedToken()) this.pausedSignInSignal.set(true);
     } finally {
       this.readySignal.set(true);
+    }
+  }
+
+  /**
+   * Ссылка-приглашение: `invite_<token>` уже применилась на /api/auth/telegram,
+   * а `?invite=` из кнопки бота нужно принять отдельно.
+   */
+  private async consumeInviteDeepLink(): Promise<void> {
+    const token = readInviteDeepLink(this.telegram.startParam);
+    if (!token) return;
+
+    const fromTelegramStart = Boolean(this.telegram.startParam?.startsWith('invite_'));
+    this.clearInviteQuery();
+
+    if (!this.api.token()) return;
+
+    if (fromTelegramStart) {
+      // Сервер уже привязал карточку при логине.
+      if (this.playerId()) {
+        this.toast.success(this.i18n.translate('claim.inviteApplied'));
+      }
+      return;
+    }
+
+    try {
+      await this.useInvite(token);
+      this.toast.success(this.i18n.translate('claim.inviteApplied'));
+    } catch (error) {
+      this.toast.failure(error);
+    }
+  }
+
+  private clearInviteQuery(): void {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('invite')) return;
+      url.searchParams.delete('invite');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // ignore
     }
   }
 

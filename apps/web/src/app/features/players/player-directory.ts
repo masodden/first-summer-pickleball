@@ -74,7 +74,11 @@ import { PlayerPicker } from './player-picker';
     </div>
 
     @if (picker()) {
-      <app-player-picker (closed)="picker.set(false)" (picked)="onCreated()" />
+      <app-player-picker
+        [startInCreate]="true"
+        (closed)="picker.set(false)"
+        (picked)="onCreated()"
+      />
     }
   `,
   styles: `

@@ -184,7 +184,10 @@ export class ClaimPage {
   protected readonly busy = signal(false);
 
   protected readonly currentClaim = computed(() => this.session.session()?.claim ?? null);
-  protected readonly changing = computed(() => this.session.playerId() !== null);
+  /** Смена уже привязанного DUPR; для гостя это первая привязка. */
+  protected readonly changing = computed(
+    () => this.session.playerId() !== null && !this.session.isGuestPlayer(),
+  );
   protected readonly needsBootstrapCode = computed(() => isBootstrapAdminDupr(this.duprId()));
 
   protected readonly players = resource({

@@ -8,6 +8,9 @@ import { Racket } from '../../ui/ball';
 /**
  * Самостоятельная запись / отмена заявки.
  * Используется на вкладках «Информация» и «Участники».
+ *
+ * DUPR не обязателен: без него аккаунт — гость, заявиться можно сразу.
+ * Привязать настоящий ID можно позже в настройках /claim.
  */
 @Component({
   selector: 'app-tournament-join-panel',
@@ -20,13 +23,6 @@ import { Racket } from '../../ui/ball';
           <div class="stack stack--2">
             <h3>{{ t()('auth.notInTelegram') }}</h3>
             <p class="small muted">{{ t()('auth.notInTelegramHint') }}</p>
-          </div>
-        } @else if (session.needsDuprLink()) {
-          <div class="stack stack--2">
-            <h3>{{ t()('participant.needDupr') }}</h3>
-            <a class="btn btn--primary btn--block" routerLink="/claim">
-              {{ t()('claim.submit') }}
-            </a>
           </div>
         } @else if (participation(); as mine) {
           <div class="row">
@@ -42,6 +38,9 @@ import { Racket } from '../../ui/ball';
               } @else if (mine.confirmedAndPaid) {
                 <span class="tiny muted">{{ t()('checkin.paid') }}</span>
               }
+              @if (session.isGuestPlayer()) {
+                <span class="chip chip--pink">{{ t()('participant.guestBadge') }}</span>
+              }
             </div>
             @if (canLeave()) {
               <button
@@ -54,6 +53,11 @@ import { Racket } from '../../ui/ball';
               </button>
             }
           </div>
+          @if (session.isGuestPlayer()) {
+            <a class="btn btn--sm btn--glass btn--block" routerLink="/claim">
+              {{ t()('participant.linkDuprLater') }}
+            </a>
+          }
         } @else if (item.status === 'registration') {
           <button
             type="button"
@@ -65,6 +69,9 @@ import { Racket } from '../../ui/ball';
           </button>
           @if (store.isFull()) {
             <p class="tiny center muted">{{ t()('participant.full') }}</p>
+          }
+          @if (session.isGuestPlayer()) {
+            <p class="tiny center muted">{{ t()('participant.guestJoinHint') }}</p>
           }
         } @else {
           <p class="small muted center">{{ t()('status.registration_closed') }}</p>

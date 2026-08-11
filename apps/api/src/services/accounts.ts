@@ -25,7 +25,12 @@ import { toPlayerDto } from './mappers.js';
 import type { Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
 import type { VerifiedInitData } from '../auth/telegram.js';
-import { getPlayerRow } from './players.js';
+import {
+  adoptGuestIntoPlayer,
+  createGuestId,
+  getPlayerRow,
+  mergeGuestIntoDupr,
+} from './players.js';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -97,7 +102,8 @@ export async function buildSession(db: Database, account: AccountRow): Promise<S
  * Вход из Telegram Mini App.
  *
  * Личность подтверждает сам Telegram своей подписью, поэтому паролей нет.
- * DUPR ID — отдельная сущность: его игрок привязывает к аккаунту после входа.
+ * Гостевую карточку заводим отдельно после входа (см. ensureGuestPlayerForAccount),
+ * чтобы invite мог сразу привязать настоящий DUPR без сиротской G-карточки.
  */
 export async function loginWithTelegram(
   db: Database,
@@ -141,6 +147,44 @@ export async function loginWithTelegram(
     .returning();
   if (!created) throw new ApiError('internal', 'Не удалось создать аккаунт');
   return created;
+}
+
+/**
+ * У аккаунта без карточки — гость с именем из Telegram.
+ * Уже привязанный DUPR / гость не трогаем.
+ */
+export async function ensureGuestPlayerForAccount(
+  db: Database,
+  account: AccountRow,
+): Promise<AccountRow> {
+  if (account.playerId) return account;
+
+  const firstName =
+    account.telegramFirstName?.trim() ||
+    account.telegramUsername?.trim() ||
+    'Игрок';
+  const lastName = account.telegramLastName?.trim() || 'Гость';
+  const id = createGuestId();
+
+  await db.insert(players).values({
+    id,
+    duprId: null,
+    firstName,
+    lastName,
+    isGuest: true,
+    nameSource: 'self',
+    telegramUsername: account.telegramUsername,
+    avatarUrl: account.telegramPhotoUrl,
+    avatarSource: account.telegramPhotoUrl ? 'self' : null,
+  });
+
+  const [updated] = await db
+    .update(accounts)
+    .set({ playerId: id, updatedAt: new Date() })
+    .where(eq(accounts.id, account.id))
+    .returning();
+
+  return updated as AccountRow;
 }
 
 /** Локальный вход без Telegram: включается только переменной ALLOW_DEV_LOGIN. */
@@ -210,10 +254,9 @@ async function ensurePlayerForClaim(
 /**
  * Привязка DUPR ID к аккаунту.
  *
- * Привязка действует сразу, чтобы игрок мог заявиться на турнир, но остаётся
- * помеченной как неподтверждённая: организатор сверяет DUPR при приёме
- * участников и ставит галочку. Так живой турнир не блокируется ожиданием, но и
- * чужой ID тихо забрать нельзя.
+ * Если раньше была гостевая карточка — все заявки и матчи переезжают на DUPR.
+ * Привязка действует сразу, но остаётся неподтверждённой, пока организатор
+ * не сверит ID при приёме.
  */
 export async function claimDuprId(
   db: Database,
@@ -245,6 +288,25 @@ export async function claimDuprId(
     throw new ApiError('dupr_id_already_claimed', 'Этот DUPR ID уже привязан к другому аккаунту');
   }
 
+  const previousPlayerId = account.playerId;
+  if (previousPlayerId && previousPlayerId !== player.id) {
+    const previous = await getPlayerRow(db, previousPlayerId);
+    if (previous.isGuest) {
+      await mergeGuestIntoDupr(db, previousPlayerId, duprId, viewerFromAccount(account));
+    } else if (account.telegramUsername) {
+      // Смена одного настоящего DUPR на другой: старый @username не должен залипать.
+      await db
+        .update(players)
+        .set({ telegramUsername: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(players.id, previousPlayerId),
+            eq(players.telegramUsername, account.telegramUsername),
+          ),
+        );
+    }
+  }
+
   // Роль живёт на карточке DUPR; при входе аккаунт её подхватывает.
   if (isBootstrapAdminDupr(duprId) && player.clubRole !== 'admin') {
     await db
@@ -253,19 +315,6 @@ export async function claimDuprId(
       .where(eq(players.id, player.id));
   }
   const role: Role = isBootstrapAdminDupr(duprId) ? 'admin' : player.clubRole;
-
-  // Старая карточка не должна выглядеть «привязанной» по залипшему @username.
-  if (account.playerId && account.playerId !== player.id && account.telegramUsername) {
-    await db
-      .update(players)
-      .set({ telegramUsername: null, updatedAt: new Date() })
-      .where(
-        and(
-          eq(players.id, account.playerId),
-          eq(players.telegramUsername, account.telegramUsername),
-        ),
-      );
-  }
 
   const [updated] = await db
     .update(accounts)
@@ -303,7 +352,8 @@ export async function claimDuprId(
     payload: {
       duprId,
       autoApproved: isBootstrapAdminDupr(duprId),
-      previousPlayerId: account.playerId,
+      previousPlayerId,
+      mergedGuest: Boolean(previousPlayerId && previousPlayerId !== player.id),
     },
   });
 
@@ -399,6 +449,18 @@ export async function createInvite(
 ): Promise<InviteDto> {
   const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   if (!player) throw notFound('Игрок не найден');
+  if (player.mergedIntoId) {
+    throw new ApiError('validation_failed', 'Эта карточка уже объединена с другой');
+  }
+
+  const [alreadyLinked] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(eq(accounts.playerId, playerId))
+    .limit(1);
+  if (alreadyLinked) {
+    throw new ApiError('dupr_id_already_claimed', 'К этой карточке уже привязан Telegram');
+  }
 
   const token = randomBytes(16).toString('base64url');
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
@@ -411,9 +473,10 @@ export async function createInvite(
   });
 
   // start= надёжнее startapp: не требует Main Mini App в BotFather.
+  // Без бота — query-параметр, его подхватит Mini App при открытии.
   const url = botUsername
     ? `https://t.me/${botUsername}?start=invite_${token}`
-    : `${webUrl.replace(/\/$/, '')}/invite/${token}`;
+    : `${webUrl.replace(/\/$/, '')}/?invite=${encodeURIComponent(token)}`;
 
   await recordAudit(db, actor, {
     action: 'invite.created',
@@ -449,6 +512,23 @@ export async function useInvite(
   }
 
   const player = await getPlayerRow(db, invite.playerId);
+  if (player.mergedIntoId) {
+    throw new ApiError('invite_invalid', 'Карточка из приглашения больше недоступна');
+  }
+
+  // Автогость с прошлого визита: переносим его заявки на карточку из invite.
+  if (account.playerId && account.playerId !== invite.playerId) {
+    const previous = await getPlayerRow(db, account.playerId);
+    if (previous.isGuest) {
+      await adoptGuestIntoPlayer(db, previous.id, invite.playerId);
+    } else {
+      throw new ApiError(
+        'dupr_id_already_claimed',
+        'К вашему Telegram уже привязана другая карточка игрока',
+      );
+    }
+  }
+
   const role = effectiveRole(account, player);
 
   const [updated] = await db
@@ -456,6 +536,13 @@ export async function useInvite(
     .set({ playerId: invite.playerId, role, updatedAt: new Date() })
     .where(eq(accounts.id, account.id))
     .returning();
+
+  if (account.telegramUsername) {
+    await db
+      .update(players)
+      .set({ telegramUsername: account.telegramUsername, updatedAt: new Date() })
+      .where(eq(players.id, invite.playerId));
+  }
 
   await db
     .update(invites)

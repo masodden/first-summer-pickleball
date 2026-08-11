@@ -65,13 +65,6 @@ import { Racket } from '../../ui/ball';
               <h3>{{ t()('auth.notInTelegram') }}</h3>
               <p class="small muted">{{ t()('auth.notInTelegramHint') }}</p>
             </div>
-          } @else if (session.needsDuprLink()) {
-            <div class="stack stack--2">
-              <h3>{{ t()('training.needDupr') }}</h3>
-              <a class="btn btn--primary btn--block" routerLink="/claim">
-                {{ t()('claim.submit') }}
-              </a>
-            </div>
           } @else if (participation(); as mine) {
             <div class="row">
               <app-racket [size]="34" />
@@ -86,6 +79,9 @@ import { Racket } from '../../ui/ball';
                 } @else if (mine.confirmedAndPaid) {
                   <span class="tiny muted">{{ t()('checkin.paid') }}</span>
                 }
+                @if (session.isGuestPlayer()) {
+                  <span class="chip chip--pink">{{ t()('participant.guestBadge') }}</span>
+                }
               </div>
               @if (store.canLeave()) {
                 <button
@@ -98,6 +94,11 @@ import { Racket } from '../../ui/ball';
                 </button>
               }
             </div>
+            @if (session.isGuestPlayer()) {
+              <a class="btn btn--sm btn--glass btn--block" routerLink="/claim">
+                {{ t()('participant.linkDuprLater') }}
+              </a>
+            }
           } @else if (store.isActive()) {
             <button
               type="button"
@@ -109,6 +110,9 @@ import { Racket } from '../../ui/ball';
             </button>
             @if (store.isFull()) {
               <p class="tiny center muted">{{ t()('participant.full') }}</p>
+            }
+            @if (session.isGuestPlayer()) {
+              <p class="tiny center muted">{{ t()('participant.guestJoinHint') }}</p>
             }
           } @else {
             <p class="small muted center">{{ t()('training.finished') }}</p>
