@@ -197,8 +197,10 @@ export const ru = {
   'participant.searchPlaceholder': 'Имя, фамилия или DUPR ID',
   'participant.notFound': 'В базе такого игрока нет',
   'participant.guestBadge': 'Гость',
-  'participant.guestHint': 'Игрок без DUPR ID. Позже можно указать настоящий ID и слить карточки.',
-  'participant.guestJoinHint': 'Вы участвуете как гость. DUPR можно привязать позже в настройках.',
+  'participant.guestHint':
+    'Лучше сразу указать DUPR ID — так рейтинг и статистика будут на месте. Если ID ещё нет, поле можно оставить пустым и добавить позже.',
+  'participant.guestJoinHint':
+    'DUPR лучше привязать сразу в настройках — так рейтинг подтянется сам. Можно сделать и позже.',
   'participant.linkDuprLater': 'Привязать DUPR',
   'participant.selfAdded': 'Заявился сам',
 

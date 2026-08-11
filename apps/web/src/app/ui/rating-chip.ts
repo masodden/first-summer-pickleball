@@ -12,19 +12,25 @@ import { I18nService } from '../core/i18n';
 @Component({
   selector: 'app-rating-chip',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    // Гость без рейтинга: чип «НР» рядом с бейджем «Гость» только шумит.
+    '[hidden]': 'hideForGuest()',
+  },
   template: `
-    <span
-      class="rating-chip"
-      [class.rating-chip--compact]="compact()"
-      [class.rating-chip--stale]="player().ratingStale && player().doublesRating !== null"
-      [class.rating-chip--none]="player().doublesRating === null"
-      [title]="hint()"
-    >
-      @if (showLabel()) {
-        <span class="rating-chip__label">DUPR</span>
-      }
-      <span>{{ value() }}</span>
-    </span>
+    @if (!hideForGuest()) {
+      <span
+        class="rating-chip"
+        [class.rating-chip--compact]="compact()"
+        [class.rating-chip--stale]="player().ratingStale && player().doublesRating !== null"
+        [class.rating-chip--none]="player().doublesRating === null"
+        [title]="hint()"
+      >
+        @if (showLabel()) {
+          <span class="rating-chip__label">DUPR</span>
+        }
+        <span>{{ value() }}</span>
+      </span>
+    }
   `,
 })
 export class RatingChip {
@@ -34,6 +40,10 @@ export class RatingChip {
   readonly showLabel = input(true);
   /** Мельче и уже: для строк матча, где главное — имя, а рейтинг рядом справкой. */
   readonly compact = input(false);
+
+  protected readonly hideForGuest = computed(
+    () => this.player().isGuest && this.player().doublesRating === null,
+  );
 
   protected readonly value = computed(() => {
     const rating = this.player().doublesRating;

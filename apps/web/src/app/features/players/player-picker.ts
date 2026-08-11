@@ -132,6 +132,7 @@ import { PlayerLine } from '../../ui/player-line';
                 [value]="duprId()"
                 (input)="duprId.set(value($event).toUpperCase())"
               />
+              <span class="field__hint">{{ t()('claim.duprIdHint') }}</span>
             </label>
 
             <label class="field">

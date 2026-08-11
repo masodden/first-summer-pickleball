@@ -201,8 +201,9 @@ export const en: Record<TranslationKey, string> = {
   'participant.notFound': 'No such player in the database',
   'participant.guestBadge': 'Guest',
   'participant.guestHint':
-    'Player without a DUPR ID. You can set the real ID later and merge the profiles.',
-  'participant.guestJoinHint': 'You are joining as a guest. You can link DUPR later in Settings.',
+    'Prefer adding a DUPR ID now so rating and stats stay in sync. If they do not have one yet, leave it blank and add it later.',
+  'participant.guestJoinHint':
+    'Link your DUPR in Settings when you can — rating will follow. You can also do it later.',
   'participant.linkDuprLater': 'Link DUPR',
   'participant.selfAdded': 'Self-entered',
 
