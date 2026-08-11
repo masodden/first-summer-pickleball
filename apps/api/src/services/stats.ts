@@ -3,7 +3,13 @@ import { isBootstrapAdminDupr, type PlayerProfileDto, type PlayerStatsDto } from
 import type { Database } from '../db/index.js';
 import { accounts, tournaments } from '../db/schema.js';
 import { toPlayerDto } from './mappers.js';
-import { canEditPlayer, getPlayerRow, getPlayerStats, getRatingHistory } from './players.js';
+import {
+  canEditPlayer,
+  getPlayerRow,
+  getPlayerStats,
+  getRatingHistory,
+  restoreContactsFromMergedGuests,
+} from './players.js';
 import { computeTournamentStandings } from './state.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
 
@@ -18,7 +24,8 @@ export async function getPlayerProfile(
   playerId: string,
   viewer: Viewer | null,
 ): Promise<PlayerProfileDto> {
-  const player = await getPlayerRow(db, playerId);
+  // Лечит старые слияния, где Telegram/фото остались на гостевой карточке.
+  const player = await restoreContactsFromMergedGuests(db, playerId);
   const raw = await getPlayerStats(db, playerId);
 
   const finishedRows =

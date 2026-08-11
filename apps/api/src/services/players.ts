@@ -385,13 +385,110 @@ export async function adoptGuestIntoPlayer(
       .update(playerRatingHistory)
       .set({ playerId: targetId })
       .where(eq(playerRatingHistory.playerId, guestId));
+    // Фото может быть только на аккаунте (telegramPhotoUrl), а не на карточке гостя.
+    const [guestAccount] = await tx
+      .select({
+        telegramUsername: accounts.telegramUsername,
+        telegramPhotoUrl: accounts.telegramPhotoUrl,
+      })
+      .from(accounts)
+      .where(eq(accounts.playerId, guestId))
+      .limit(1);
+
     await tx.update(accounts).set({ playerId: targetId }).where(eq(accounts.playerId, guestId));
     await tx.update(claims).set({ playerId: targetId }).where(eq(claims.playerId, guestId));
+
+    // Имя/фамилия: то, что уже есть на DUPR, не затираем гостем («Гость» и т.п.).
+    const firstName = pickNonEmpty(target.firstName, guest.firstName) ?? target.firstName;
+    const lastName = pickPreservedLastName(target.lastName, guest.lastName);
+
+    // Контакты: предпочитаем данные гостя/аккаунта, иначе оставляем целевые.
+    const telegramUsername =
+      guest.telegramUsername ??
+      guestAccount?.telegramUsername ??
+      target.telegramUsername;
+    const guestAvatar = guest.avatarUrl ?? guestAccount?.telegramPhotoUrl ?? null;
+    const avatarUrl = guestAvatar ?? target.avatarUrl;
+    const avatarSource = guestAvatar
+      ? (guest.avatarSource ?? 'self')
+      : target.avatarSource;
+
+    await tx
+      .update(players)
+      .set({
+        firstName,
+        lastName,
+        telegramUsername,
+        avatarUrl,
+        avatarSource,
+        updatedAt: new Date(),
+      })
+      .where(eq(players.id, targetId));
+
     await tx
       .update(players)
       .set({ mergedIntoId: targetId, updatedAt: new Date() })
       .where(eq(players.id, guestId));
   });
+}
+
+function pickNonEmpty(
+  preferred: string | null | undefined,
+  fallback: string | null | undefined,
+): string | null {
+  const a = preferred?.trim();
+  if (a) return a;
+  const b = fallback?.trim();
+  return b || null;
+}
+
+/** Фамилию с DUPR сохраняем; «Гость»/«Guest» с гостя на пустую цель не переносим. */
+function pickPreservedLastName(targetLastName: string, guestLastName: string): string {
+  if (targetLastName.trim()) return targetLastName.trim();
+  const guest = guestLastName.trim();
+  if (!guest || isPlaceholderLastName(guest)) return targetLastName;
+  return guest;
+}
+
+function isPlaceholderLastName(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'гость' || normalized === 'guest';
+}
+
+/**
+ * Если DUPR-карточка пустая по контактам, а слитый гость ещё хранит @username/фото —
+ * переносим их (лечит старые слияния до фикса adoptGuestIntoPlayer).
+ */
+export async function restoreContactsFromMergedGuests(
+  db: Database,
+  playerId: string,
+): Promise<PlayerRow> {
+  const player = await getPlayerRow(db, playerId);
+  if (player.telegramUsername && player.avatarUrl) return player;
+
+  const guests = await db
+    .select()
+    .from(players)
+    .where(eq(players.mergedIntoId, playerId));
+
+  const withTelegram = guests.find((row) => row.telegramUsername);
+  const withAvatar = guests.find((row) => row.avatarUrl);
+  if (!withTelegram && !withAvatar) return player;
+
+  const telegramUsername = player.telegramUsername ?? withTelegram?.telegramUsername ?? null;
+  const avatarUrl = player.avatarUrl ?? withAvatar?.avatarUrl ?? null;
+  const avatarSource = player.avatarUrl
+    ? player.avatarSource
+    : withAvatar
+      ? (withAvatar.avatarSource ?? 'self')
+      : player.avatarSource;
+
+  const [updated] = await db
+    .update(players)
+    .set({ telegramUsername, avatarUrl, avatarSource, updatedAt: new Date() })
+    .where(eq(players.id, playerId))
+    .returning();
+  return updated ?? player;
 }
 
 /**
@@ -441,7 +538,8 @@ export async function mergeGuestIntoDupr(
   }
 
   await adoptGuestIntoPlayer(db, guestId, target.id);
-  return toPlayerDto(target);
+  const merged = await getPlayerRow(db, target.id);
+  return toPlayerDto(merged);
 }
 
 /**

@@ -22,7 +22,11 @@ import {
   useInvite,
   viewerFromAccount,
 } from './accounts.js';
-import { createPlayer } from './players.js';
+import {
+  createPlayer,
+  mergeGuestIntoDupr,
+  restoreContactsFromMergedGuests,
+} from './players.js';
 import { createTournament, addParticipant, listParticipants } from './tournaments.js';
 import { createTraining, addTrainingParticipant, listTrainingParticipants } from './trainings.js';
 
@@ -259,5 +263,131 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
 
     const [player] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
     expect(player?.isGuest).toBe(false);
+  });
+
+  it('merge в уже существующий DUPR переносит Telegram и фото, фамилию DUPR не затирает', async () => {
+    const adminAccount = await insertAccount('MergeАдмин');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const duprId = `M${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Андрей',
+      lastName: 'Иванов',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const guest = await createPlayer(
+      db,
+      { firstName: 'Андрей', lastName: 'Гость', duprId: null },
+      admin,
+    );
+    const avatarUrl = `https://example.com/andrey-${tag}.jpg`;
+    await db
+      .update(players)
+      .set({
+        telegramUsername: `andrey_${tag}`.slice(0, 32),
+        avatarUrl,
+        avatarSource: 'self',
+      })
+      .where(eq(players.id, guest.id));
+
+    const account = await insertAccount('Андрей');
+    await db.update(accounts).set({ playerId: guest.id }).where(eq(accounts.id, account.id));
+
+    const merged = await mergeGuestIntoDupr(db, guest.id, duprId, admin);
+    expect(merged.id).toBe(duprId);
+    expect(merged.firstName).toBe('Андрей');
+    expect(merged.lastName).toBe('Иванов');
+    expect(merged.telegramUsername).toBe(`andrey_${tag}`.slice(0, 32));
+    expect(merged.avatarUrl).toBe(avatarUrl);
+
+    const [duprRow] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
+    expect(duprRow?.lastName).toBe('Иванов');
+    expect(duprRow?.avatarUrl).toBe(avatarUrl);
+    expect(duprRow?.avatarSource).toBe('self');
+
+    const [guestRow] = await db.select().from(players).where(eq(players.id, guest.id)).limit(1);
+    expect(guestRow?.mergedIntoId).toBe(duprId);
+
+    const [accountRow] = await db.select().from(accounts).where(eq(accounts.id, account.id)).limit(1);
+    expect(accountRow?.playerId).toBe(duprId);
+  });
+
+  it('merge подтягивает avatarUrl с telegramPhotoUrl аккаунта, если на госте пусто', async () => {
+    const adminAccount = await insertAccount('PhotoАдмин');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const duprId = `P${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Павел',
+      lastName: 'Сидоров',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const guest = await createPlayer(
+      db,
+      { firstName: 'Павел', lastName: 'Гость', duprId: null },
+      admin,
+    );
+
+    const photoUrl = `https://t.me/i/userpic/320/pavel-${tag}.jpg`;
+    const account = await insertAccount('Павел');
+    await db
+      .update(accounts)
+      .set({ playerId: guest.id, telegramPhotoUrl: photoUrl })
+      .where(eq(accounts.id, account.id));
+
+    const merged = await mergeGuestIntoDupr(db, guest.id, duprId, admin);
+    expect(merged.lastName).toBe('Сидоров');
+    expect(merged.avatarUrl).toBe(photoUrl);
+
+    const [duprRow] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
+    expect(duprRow?.avatarUrl).toBe(photoUrl);
+  });
+
+  it('restoreContactsFromMergedGuests чинит старое слияние без контактов на DUPR', async () => {
+    const duprId = `R${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Олег',
+      lastName: 'DUPR',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const guestId = `G-R${tag.slice(0, 6)}`;
+    await db.insert(players).values({
+      id: guestId,
+      duprId: null,
+      firstName: 'Олег',
+      lastName: 'Гость',
+      isGuest: true,
+      telegramUsername: `oleg_${tag}`.slice(0, 32),
+      avatarUrl: 'https://example.com/oleg.jpg',
+      avatarSource: 'self',
+      mergedIntoId: duprId,
+      nameSource: 'telegram',
+    });
+
+    const restored = await restoreContactsFromMergedGuests(db, duprId);
+    expect(restored.telegramUsername).toBe(`oleg_${tag}`.slice(0, 32));
+    expect(restored.avatarUrl).toBe('https://example.com/oleg.jpg');
   });
 });

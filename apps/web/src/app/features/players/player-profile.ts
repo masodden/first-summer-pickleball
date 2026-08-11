@@ -590,9 +590,10 @@ export class PlayerProfilePage {
   protected async merge(): Promise<void> {
     this.saving.set(true);
     try {
-      await this.api.mergeGuest(this.id(), this.mergeId().trim());
+      const { player } = await this.api.mergeGuest(this.id(), this.mergeId().trim());
       this.toast.success(this.i18n.translate('player.merged'));
-      this.profile.reload();
+      // Гостевая карточка скрыта после слияния — сразу открываем DUPR.
+      await this.router.navigate(['/players', player.id]);
     } catch (error) {
       this.toast.failure(error, () => void this.merge());
     } finally {
