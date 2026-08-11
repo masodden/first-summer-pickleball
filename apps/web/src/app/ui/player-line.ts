@@ -11,7 +11,14 @@ import { RatingChip } from './rating-chip';
   host: { '[style.--avatar-size.px]': 'size()' },
   template: `
     @if (player().avatarUrl) {
-      <img [src]="player().avatarUrl" [alt]="player().fullName" loading="lazy" />
+      <img
+        [src]="player().avatarUrl"
+        [alt]="player().fullName"
+        [width]="size()"
+        [height]="size()"
+        loading="lazy"
+        decoding="async"
+      />
     } @else {
       <span aria-hidden="true">{{ initials() }}</span>
     }
@@ -43,6 +50,7 @@ import { RatingChip } from './rating-chip';
 })
 export class Avatar {
   readonly player = input.required<PlayerDto>();
+  /** Логический размер в CSS-пикселях; URL с Telegram обычно уже ~160–320px. */
   readonly size = input(40);
 
   protected readonly initials = computed(() => {

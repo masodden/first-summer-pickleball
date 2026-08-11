@@ -19,6 +19,7 @@ import {
   claimDuprId,
   createInvite,
   ensureGuestPlayerForAccount,
+  syncPlayerProfileFromTelegram,
   useInvite,
   viewerFromAccount,
 } from './accounts.js';
@@ -359,6 +360,54 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
 
     const [duprRow] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
     expect(duprRow?.avatarUrl).toBe(photoUrl);
+  });
+
+  it('syncPlayerProfileFromTelegram копирует фото на карточку и не затирает manual', async () => {
+    const duprId = `S${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Саша',
+      lastName: 'Тестов',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const photoUrl = `https://t.me/i/userpic/320/sasha-${tag}.jpg`;
+    const [account] = await db
+      .insert(accounts)
+      .values({
+        telegramId: `guest-test-${tag}-sasha`,
+        telegramFirstName: 'Саша',
+        telegramUsername: `sasha_${tag}`.slice(0, 32),
+        telegramPhotoUrl: photoUrl,
+        role: 'user',
+        playerId: duprId,
+      })
+      .returning();
+
+    await syncPlayerProfileFromTelegram(db, account as AccountRow);
+    const [filled] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
+    expect(filled?.avatarUrl).toBe(photoUrl);
+    expect(filled?.avatarSource).toBe('self');
+    expect(filled?.telegramUsername).toBe(`sasha_${tag}`.slice(0, 32));
+
+    const manualUrl = `https://example.com/manual-${tag}.jpg`;
+    await db
+      .update(players)
+      .set({ avatarUrl: manualUrl, avatarSource: 'manual' })
+      .where(eq(players.id, duprId));
+
+    await db
+      .update(accounts)
+      .set({ telegramPhotoUrl: `https://t.me/i/userpic/320/new-${tag}.jpg` })
+      .where(eq(accounts.id, account!.id));
+    const [fresh] = await db.select().from(accounts).where(eq(accounts.id, account!.id)).limit(1);
+
+    await syncPlayerProfileFromTelegram(db, fresh as AccountRow);
+    const [kept] = await db.select().from(players).where(eq(players.id, duprId)).limit(1);
+    expect(kept?.avatarUrl).toBe(manualUrl);
+    expect(kept?.avatarSource).toBe('manual');
   });
 
   it('restoreContactsFromMergedGuests чинит старое слияние без контактов на DUPR', async () => {

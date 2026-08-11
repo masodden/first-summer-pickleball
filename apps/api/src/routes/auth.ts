@@ -12,6 +12,7 @@ import {
   ensureGuestPlayerForAccount,
   getAccount,
   loginWithTelegram,
+  syncPlayerProfileFromTelegram,
   updateAccountSettings,
   useInvite,
 } from '../services/accounts.js';
@@ -48,10 +49,16 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     const startParam = verified.startParam;
     if (startParam?.startsWith('invite_')) {
       const session = await useInvite(db, startParam.slice('invite_'.length), account);
-      return { token: app.jwt.sign({ sub: account.id }), session };
+      account = await getAccount(db, account.id);
+      await syncPlayerProfileFromTelegram(db, account);
+      return {
+        token: app.jwt.sign({ sub: account.id }),
+        session: await buildSession(db, account),
+      };
     }
 
     account = await ensureGuestPlayerForAccount(db, account);
+    await syncPlayerProfileFromTelegram(db, account);
     return {
       token: app.jwt.sign({ sub: account.id }),
       session: await buildSession(db, account),
@@ -69,6 +76,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       role: body.role,
     });
     account = await ensureGuestPlayerForAccount(db, account);
+    await syncPlayerProfileFromTelegram(db, account);
     return {
       token: app.jwt.sign({ sub: account.id }),
       session: await buildSession(db, account),
@@ -79,6 +87,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     if (!request.viewer) return { session: null };
     let account = await getAccount(db, request.viewer.accountId);
     account = await ensureGuestPlayerForAccount(db, account);
+    await syncPlayerProfileFromTelegram(db, account);
     return { session: await buildSession(db, account) };
   });
 

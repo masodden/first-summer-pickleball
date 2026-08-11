@@ -187,6 +187,44 @@ export async function ensureGuestPlayerForAccount(
   return updated as AccountRow;
 }
 
+/**
+ * Подтягивает @username и фото с Telegram-аккаунта на карточку игрока.
+ *
+ * Ручной аватар (`manual`) не трогаем. Пустой или ранее взятый из Telegram (`self`)
+ * обновляем при каждом входе — иначе фото остаётся только в `accounts`.
+ */
+export async function syncPlayerProfileFromTelegram(
+  db: Database,
+  account: AccountRow,
+): Promise<void> {
+  if (!account.playerId) return;
+
+  const player = await getPlayerRow(db, account.playerId);
+  const patch: Partial<PlayerRow> & { updatedAt: Date } = { updatedAt: new Date() };
+  let dirty = false;
+
+  if (account.telegramUsername && account.telegramUsername !== player.telegramUsername) {
+    patch.telegramUsername = account.telegramUsername;
+    dirty = true;
+  }
+
+  const photo = account.telegramPhotoUrl?.trim() || null;
+  const canWriteAvatar =
+    Boolean(photo) &&
+    (player.avatarSource === null ||
+      player.avatarSource === 'self' ||
+      !player.avatarUrl);
+  if (canWriteAvatar && photo !== player.avatarUrl) {
+    patch.avatarUrl = photo;
+    patch.avatarSource = 'self';
+    dirty = true;
+  }
+
+  if (!dirty) return;
+
+  await db.update(players).set(patch).where(eq(players.id, player.id));
+}
+
 /** Локальный вход без Telegram: включается только переменной ALLOW_DEV_LOGIN. */
 export async function devLogin(
   db: Database,
@@ -338,12 +376,7 @@ export async function claimDuprId(
     decidedAt: isBootstrapAdminDupr(duprId) ? new Date() : null,
   });
 
-  if (account.telegramUsername) {
-    await db
-      .update(players)
-      .set({ telegramUsername: account.telegramUsername, updatedAt: new Date() })
-      .where(eq(players.id, player.id));
-  }
+  await syncPlayerProfileFromTelegram(db, updated as AccountRow);
 
   await recordAudit(db, viewerFromAccount(updated as AccountRow), {
     action: 'claim.created',
