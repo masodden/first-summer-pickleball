@@ -17,7 +17,6 @@ import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
 import { TelegramBackNavigation } from '../../core/telegram-back';
 import { consumeFirstVisit } from '../../core/motion';
-import { bindGlassListRepaint } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { PlayerPicker } from '../players/player-picker';
@@ -400,13 +399,6 @@ export class TournamentPlayersTab {
   constructor() {
     const destroyRef = inject(DestroyRef);
     const backNav = inject(TelegramBackNavigation);
-
-    bindGlassListRepaint({
-      destroyRef,
-      paused: () =>
-        this.editing() !== null || this.picker() || this.replacing() !== null || this.savingRating(),
-      itemCount: () => this.store.registered().length + this.store.waitlisted().length,
-    });
 
     // Как у player-picker: sheet внутри main, таббар снаружи с большим z-index —
     // пока открыта замена, прячем навигацию, чтобы не перехватывала тапы.

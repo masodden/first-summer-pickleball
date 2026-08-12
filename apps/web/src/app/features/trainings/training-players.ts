@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
@@ -10,7 +9,6 @@ import type { TrainingParticipantDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { TrainingStore } from '../../core/training-store';
-import { bindGlassListRepaint } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { PlayerPicker } from '../players/player-picker';
 
@@ -308,14 +306,6 @@ export class TrainingPlayersTab {
   protected readonly takenIds = computed(
     () => new Set(this.store.participants().map((item) => item.player.id)),
   );
-
-  constructor() {
-    bindGlassListRepaint({
-      destroyRef: inject(DestroyRef),
-      paused: () => this.editingAmount() !== null || this.picker(),
-      itemCount: () => this.store.registered().length,
-    });
-  }
 
   protected inputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;

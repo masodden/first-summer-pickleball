@@ -192,6 +192,7 @@ html,
 body {
   height: 100%;
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -325,10 +326,6 @@ button {
 .glass--plain::after,
 .person.glass::after {
   content: none;
-}
-
-.person.glass.is-glass-flush {
-  backface-visibility: hidden;
 }
 
 .card {
@@ -1142,40 +1139,43 @@ button {
 }
 
 /* --- Свайп табов (как в Telegram) --- */
-/* 100vw, не 100%: колонка уже колонки, страница должна уехать за край экрана. */
+html[data-tab-swipe] .tabbar.vt-tabbar {
+  view-transition-name: none;
+}
+
 @keyframes tab-swipe-out-left {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(-100vw);
+    transform: translate3d(calc(var(--tab-swipe-x, 100vw) * -1), 0, 0);
   }
 }
 
 @keyframes tab-swipe-in-right {
   from {
-    transform: translateX(100vw);
+    transform: translate3d(var(--tab-swipe-x, 100vw), 0, 0);
   }
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes tab-swipe-out-right {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(100vw);
+    transform: translate3d(var(--tab-swipe-x, 100vw), 0, 0);
   }
 }
 
 @keyframes tab-swipe-in-left {
   from {
-    transform: translateX(-100vw);
+    transform: translate3d(calc(var(--tab-swipe-x, 100vw) * -1), 0, 0);
   }
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -1192,11 +1192,11 @@ button {
 }
 
 .tab-swipe-main--prep.tab-swipe-main--forward {
-  transform: translateX(100vw);
+  transform: translate3d(var(--tab-swipe-x, 100vw), 0, 0);
 }
 
 .tab-swipe-main--prep.tab-swipe-main--back {
-  transform: translateX(-100vw);
+  transform: translate3d(calc(var(--tab-swipe-x, 100vw) * -1), 0, 0);
 }
 
 .tab-swipe-main--run.tab-swipe-main--forward {
@@ -1470,11 +1470,6 @@ button {
 .tabs::-webkit-scrollbar-track {
   background: transparent;
   margin-inline: 12px;
-}
-
-.tabs::-webkit-scrollbar-track {
-  /* Капсула табов: бар не доезжает до скруглений. */
-  margin-inline: 35px;
 }
 
 .scroll-x::-webkit-scrollbar-thumb,

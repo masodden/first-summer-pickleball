@@ -124,7 +124,7 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
       width: min(100% - 24px, 420px);
       padding: 6px;
       border-radius: var(--radius-full);
-      transform: translateX(-50%);
+      transform: translate3d(-50%, 0, 0);
       transition: opacity var(--duration-fast) ease;
     }
 
@@ -145,9 +145,19 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
       color: var(--text-muted);
       font-size: 10.5px;
       font-weight: 600;
+      -webkit-tap-highlight-color: transparent;
       transition:
         background var(--duration-fast) ease,
         color var(--duration-fast) ease;
+    }
+
+    .tab:focus {
+      outline: none;
+    }
+
+    .tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
     }
 
     .tab:hover {
@@ -223,6 +233,7 @@ export class TabBar {
 
   protected onTabClick(event: Event, target: string): void {
     event.preventDefault();
+    (event.currentTarget as HTMLElement | null)?.blur();
     if (this.tabSwipeBusy) return;
 
     const current = this.url().split('?')[0] ?? '';

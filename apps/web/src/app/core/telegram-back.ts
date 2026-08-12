@@ -5,8 +5,8 @@ import { filter } from 'rxjs';
 import { ConfirmService } from './confirm';
 import { TelegramService } from './telegram';
 
-/** Корневые экраны таббара — здесь «назад» должна закрывать Mini App. */
-const ROOT_PATHS = new Set(['/tournaments', '/trainings', '/players', '/admin']);
+/** Корневые экраны таббара: BackButton скрыт, Android back сворачивает Mini App. */
+const ROOT_PATHS = new Set(['/tournaments', '/trainings', '/players', '/admin', '/settings']);
 
 /**
  * Нативная «назад» в Telegram Mini App.
@@ -134,7 +134,6 @@ export class TelegramBackNavigation {
     if (path.startsWith('/tournaments/')) return '/tournaments';
     if (path.startsWith('/trainings/')) return '/trainings';
     if (path.startsWith('/players/')) return '/players';
-    if (path.startsWith('/settings')) return '/players';
     if (path.startsWith('/claim')) return '/settings';
     return '/tournaments';
   }

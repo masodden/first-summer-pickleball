@@ -82,8 +82,9 @@ function afterRender(injector: Injector): Promise<void> {
 
 /**
  * Telegram-like горизонтальный свайп между табами без View Transitions.
- * Старый main клонируется как ghost и уезжает; новый въезжает навстречу.
- * Фон — body (один раз); ghost прозрачный.
+ * Оба слоя (ghost и новый main) — position:fixed, чтобы translateX(+) не
+ * расширял документ. Иначе на Android WebView появляется горизонтальный
+ * скролл только «вперёд» и прыгает safe-area / таббар.
  */
 export async function swipeToTab(
   router: Router,
@@ -105,26 +106,34 @@ export async function swipeToTab(
   markTabSwipeActive(true);
 
   const rect = main.getBoundingClientRect();
+  const header = document.querySelector('header.header');
+  const slotTop = header?.getBoundingClientRect().bottom ?? Math.max(rect.top, 0);
+  const slotHeight = Math.max(window.innerHeight - slotTop, 0);
+  document.documentElement.style.setProperty(
+    '--tab-swipe-x',
+    `${Math.round(window.innerWidth)}px`,
+  );
+
   const ghost = main.cloneNode(true) as HTMLElement;
   ghost.removeAttribute('id');
   ghost.setAttribute('aria-hidden', 'true');
   ghost.classList.remove('vt-main');
   ghost.classList.add('tab-swipe-ghost', `tab-swipe-ghost--${direction}`);
-  Object.assign(ghost.style, {
-    position: 'fixed',
-    top: `${rect.top}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    margin: '0',
-    zIndex: '35',
-    pointerEvents: 'none',
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    viewTransitionName: 'none',
-  });
+  pinSwipeLayer(ghost, rect.top, rect.left, rect.width, rect.height, '35');
+  ghost.style.pointerEvents = 'none';
+  ghost.style.overflow = 'hidden';
+  ghost.style.viewTransitionName = 'none';
   document.body.appendChild(ghost);
 
+  const spacer = document.createElement('div');
+  spacer.setAttribute('aria-hidden', 'true');
+  spacer.style.height = `${main.offsetHeight}px`;
+  spacer.style.pointerEvents = 'none';
+  main.insertAdjacentElement('afterend', spacer);
+
+  pinSwipeLayer(main, slotTop, rect.left, rect.width, slotHeight, '36');
+  main.style.overflow = 'hidden';
+  main.style.viewTransitionName = 'none';
   main.classList.add('tab-swipe-main', `tab-swipe-main--${direction}`, 'tab-swipe-main--prep');
 
   try {
@@ -139,6 +148,10 @@ export async function swipeToTab(
     await Promise.all([waitAnimation(main), waitAnimation(ghost)]);
   } finally {
     ghost.remove();
+    spacer.remove();
+    unpinSwipeLayer(main);
+    main.style.removeProperty('overflow');
+    main.style.removeProperty('view-transition-name');
     main.classList.remove(
       'tab-swipe-main',
       'tab-swipe-main--forward',
@@ -146,6 +159,38 @@ export async function swipeToTab(
       'tab-swipe-main--prep',
       'tab-swipe-main--run',
     );
+    document.documentElement.style.removeProperty('--tab-swipe-x');
     markTabSwipeActive(false);
   }
+}
+
+function pinSwipeLayer(
+  el: HTMLElement,
+  top: number,
+  left: number,
+  width: number,
+  height: number,
+  zIndex: string,
+): void {
+  Object.assign(el.style, {
+    position: 'fixed',
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+    margin: '0',
+    zIndex,
+    boxSizing: 'border-box',
+  });
+}
+
+function unpinSwipeLayer(el: HTMLElement): void {
+  el.style.removeProperty('position');
+  el.style.removeProperty('top');
+  el.style.removeProperty('left');
+  el.style.removeProperty('width');
+  el.style.removeProperty('height');
+  el.style.removeProperty('margin');
+  el.style.removeProperty('z-index');
+  el.style.removeProperty('box-sizing');
 }
