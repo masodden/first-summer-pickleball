@@ -11,6 +11,7 @@ import {
   type Team,
 } from '@fsp/engine';
 import type { StandingsSortKey } from '@fsp/shared';
+import { isTournamentClosed } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
   matchPlayers,
@@ -164,7 +165,7 @@ export async function startTournament(
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
   if (tournament.status === 'running') throw wrongStatus('Турнир уже идёт');
-  if (tournament.status === 'finished') throw wrongStatus('Турнир уже завершён');
+  if (isTournamentClosed(tournament.status)) throw wrongStatus('Турнир уже завершён');
 
   const roster = await loadRoster(db, tournamentId);
   if (roster.length < 4) {

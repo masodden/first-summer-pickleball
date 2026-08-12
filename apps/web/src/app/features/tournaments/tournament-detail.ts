@@ -168,7 +168,7 @@ import { StatusBadge } from '../../ui/status-badge';
               <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
                 {{ t()('common.edit') }}
               </a>
-              @if (item.status === 'finished') {
+              @if (item.status === 'finished' || item.status === 'archived') {
                 <button
                   type="button"
                   class="btn btn--sm btn--glass"
@@ -176,6 +176,26 @@ import { StatusBadge } from '../../ui/status-badge';
                   (click)="store.exportCsv()"
                 >
                   {{ t()('tournament.exportCsv') }}
+                </button>
+              }
+              @if (session.isAdmin() && item.status === 'finished') {
+                <button
+                  type="button"
+                  class="btn btn--sm btn--glass"
+                  [disabled]="store.isBusy('archive')"
+                  (click)="store.archive()"
+                >
+                  {{ t()('tournament.archive') }}
+                </button>
+              }
+              @if (session.isAdmin() && item.status === 'archived') {
+                <button
+                  type="button"
+                  class="btn btn--sm btn--glass"
+                  [disabled]="store.isBusy('unarchive')"
+                  (click)="store.unarchive()"
+                >
+                  {{ t()('tournament.unarchive') }}
                 </button>
               }
               @if (item.canDelete) {

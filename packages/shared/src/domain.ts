@@ -56,8 +56,19 @@ export const TOURNAMENT_STATUSES = [
   'registration_closed',
   'running',
   'finished',
+  'archived',
 ] as const;
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
+
+/** Регистрация или игра — то, что видно во вкладке «Активные». */
+export function isTournamentActive(status: TournamentStatus): boolean {
+  return status === 'registration' || status === 'registration_closed' || status === 'running';
+}
+
+/** Завершён или в архиве: состав/счёт больше не правят как у живого турнира. */
+export function isTournamentClosed(status: TournamentStatus): boolean {
+  return status === 'finished' || status === 'archived';
+}
 
 /**
  * Тренировка: сразу активна (`running` = «Идёт»), затем `finished`.
@@ -171,7 +182,7 @@ export function isBootstrapAdminDupr(raw: string | null | undefined): boolean {
   return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(normalizeDuprId(raw));
 }
 
-/** Итоговый статус матча зависит от счёта, а он вводится вручную после игры. */
+/** Итоговый статус турнира: завершён или убран в архив. */
 export function isTerminalTournamentStatus(status: TournamentStatus): boolean {
-  return status === 'finished';
+  return status === 'finished' || status === 'archived';
 }

@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { TournamentSummaryDto } from '@fsp/shared';
+import { isTournamentActive } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TournamentApi } from '../../core/tournament-api';
@@ -15,14 +16,14 @@ import { Ball, Racket } from '../../ui/ball';
 import { DomainSwitch } from '../../ui/domain-switch';
 import { StatusBadge } from '../../ui/status-badge';
 
-type Filter = 'active' | 'finished';
+type Filter = 'active' | 'finished' | 'archived';
 
 function compareTournaments(
   a: TournamentSummaryDto,
   b: TournamentSummaryDto,
-  finished: boolean,
+  closed: boolean,
 ): number {
-  if (finished) {
+  if (closed) {
     return b.startsAt.localeCompare(a.startsAt) || b.createdAt.localeCompare(a.createdAt);
   }
   const rank = (status: TournamentSummaryDto['status']): number =>
@@ -61,7 +62,7 @@ function compareTournaments(
           [class.chip--accent]="filter() === 'active'"
           (click)="filter.set('active')"
         >
-          {{ t()('status.running') }} · {{ t()('status.registration') }}
+          {{ t()('status.activeFilter') }}
         </button>
         <button
           type="button"
@@ -69,8 +70,18 @@ function compareTournaments(
           [class.chip--accent]="filter() === 'finished'"
           (click)="filter.set('finished')"
         >
-          {{ t()('status.finished') }}
+          {{ t()('status.finishedFilter') }}
         </button>
+        @if (session.isAdmin()) {
+          <button
+            type="button"
+            class="chip chip--ghost"
+            [class.chip--accent]="filter() === 'archived'"
+            (click)="filter.set('archived')"
+          >
+            {{ t()('status.archiveFilter') }}
+          </button>
+        }
       </div>
 
       @if (tournaments.isLoading()) {
@@ -87,16 +98,26 @@ function compareTournaments(
           </button>
         </div>
       } @else if (groups().length === 0) {
-        <div class="glass card empty-state">
-          <app-racket [size]="56" [swing]="true" />
-          <h3>{{ t()('tournament.empty') }}</h3>
-          @if (session.isModerator()) {
-            <p class="small">{{ t()('tournament.emptyHint') }}</p>
-            <a class="btn btn--primary" routerLink="/tournaments/new">
-              {{ t()('tournament.create') }}
-            </a>
-          }
-        </div>
+        @if (filter() === 'active') {
+          <div class="glass card empty-state">
+            <app-racket [size]="56" [swing]="true" />
+            <h3>{{ t()('tournament.empty') }}</h3>
+            @if (session.isModerator()) {
+              <p class="small">{{ t()('tournament.emptyHint') }}</p>
+              <a class="btn btn--primary" routerLink="/tournaments/new">
+                {{ t()('tournament.create') }}
+              </a>
+            }
+          </div>
+        } @else {
+          <p class="center small muted">
+            {{
+              filter() === 'archived'
+                ? t()('tournament.emptyArchive')
+                : t()('tournament.emptyFinished')
+            }}
+          </p>
+        }
       } @else {
         @for (group of groups(); track group.day) {
           <section class="stack stack--3">
@@ -264,8 +285,12 @@ export class TournamentListPage {
   });
 
   private readonly visible = computed(() => {
-    const finished = this.filter() === 'finished';
-    return this.tournaments.value().filter((item) => (item.status === 'finished') === finished);
+    const mode = this.filter();
+    return this.tournaments.value().filter((item) => {
+      if (mode === 'active') return isTournamentActive(item.status);
+      if (mode === 'finished') return item.status === 'finished';
+      return item.status === 'archived';
+    });
   });
 
   /**
@@ -273,8 +298,8 @@ export class TournamentListPage {
    * Порядок: сначала идущие, затем ближайшие по дате; в архиве — свежие сверху.
    */
   protected readonly groups = computed(() => {
-    const finished = this.filter() === 'finished';
-    const sorted = [...this.visible()].sort((a, b) => compareTournaments(a, b, finished));
+    const closed = this.filter() !== 'active';
+    const sorted = [...this.visible()].sort((a, b) => compareTournaments(a, b, closed));
 
     const byDay = new Map<string, TournamentSummaryDto[]>();
     for (const item of sorted) {
@@ -286,7 +311,7 @@ export class TournamentListPage {
 
     return [...byDay.entries()].map(([day, items]) => ({
       day,
-      items: items.sort((a, b) => compareTournaments(a, b, finished)),
+      items: items.sort((a, b) => compareTournaments(a, b, closed)),
     }));
   });
 

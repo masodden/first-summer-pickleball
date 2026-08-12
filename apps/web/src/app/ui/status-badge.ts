@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import type { TournamentStatus, TrainingStatus } from '@fsp/shared';
 import { I18nService } from '../core/i18n';
 
-/** Статус турнира или тренировки: «Идёт регистрация», «Идёт», «Завершён»/«Завершена». */
+/** Статус турнира или тренировки: «Идёт регистрация», «Идёт», «Завершён»/«Архив». */
 @Component({
   selector: 'app-status-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,6 +26,8 @@ export class StatusBadge {
         return this.i18n.translate(
           this.entity() === 'training' ? 'training.statusFinished' : 'status.finished',
         );
+      case 'archived':
+        return this.i18n.translate('status.archived');
     }
   });
 }

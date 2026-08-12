@@ -671,6 +671,18 @@ button {
   color: var(--accent-strong);
 }
 
+.chip--ghost {
+  background: transparent;
+  color: var(--text-faint);
+  border-color: color-mix(in srgb, var(--ink-900) 18%, transparent);
+}
+
+.chip--ghost.chip--accent {
+  background: color-mix(in srgb, var(--ink-900) 6%, transparent);
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
 .chip--go {
   background: var(--success-soft);
   border-color: transparent;
@@ -771,6 +783,16 @@ button {
 .badge-status--finished {
   background: var(--glass-bg-subtle);
   color: var(--text-muted);
+}
+
+.badge-status--archived {
+  background: transparent;
+  color: var(--text-faint);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-900) 18%, transparent);
+}
+
+.badge-status--archived::before {
+  opacity: 0.45;
 }
 
 @keyframes pulse-dot {

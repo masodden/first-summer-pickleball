@@ -64,6 +64,13 @@
       "when": 1785970000000,
       "tag": "0008_role_organizer",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785974000000,
+      "tag": "0009_tournament_archived",
+      "breakpoints": true
     }
   ]
 }

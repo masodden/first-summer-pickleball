@@ -23,6 +23,7 @@ export const tournamentStatusEnum = pgEnum('tournament_status', [
   'registration_closed',
   'running',
   'finished',
+  'archived',
 ]);
 export const tieRuleEnum = pgEnum('tie_rule', ['draw', 'golden_point']);
 export const participantStatusEnum = pgEnum('participant_status', [

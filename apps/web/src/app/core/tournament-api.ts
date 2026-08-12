@@ -163,6 +163,14 @@ export class TournamentApi {
     return this.api.post(`/api/tournaments/${id}/reopen`);
   }
 
+  archive(id: string): Promise<{ tournament: TournamentDto }> {
+    return this.api.post(`/api/tournaments/${id}/archive`);
+  }
+
+  unarchive(id: string): Promise<{ tournament: TournamentDto }> {
+    return this.api.post(`/api/tournaments/${id}/unarchive`);
+  }
+
   exportCsv(id: string, filename: string): Promise<void> {
     return this.api.download(`/api/tournaments/${id}/export.csv`, filename);
   }

@@ -204,7 +204,10 @@ export async function computeTournamentStandings(
 
   const keys = sortKeys ?? (tournament.standingsSort as StandingsSortKey[]);
   const rows = computeStandings([...playerById.keys()], results, keys);
-  const medals = tournament.status === 'finished' ? resolveMedals(rows) : rows.map(() => null);
+  const medals =
+    tournament.status === 'finished' || tournament.status === 'archived'
+      ? resolveMedals(rows)
+      : rows.map(() => null);
 
   return rows.map((row, index) => {
     const player = playerById.get(row.playerId);

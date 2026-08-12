@@ -435,6 +435,22 @@ export class TournamentStore {
     });
   }
 
+  archive(): Promise<void> {
+    return this.run('archive', async () => {
+      const { tournament } = await this.api.archive(this.requireId());
+      this.tournamentSignal.set(tournament);
+      this.toast.success(this.i18n.translate('tournament.archived'));
+    });
+  }
+
+  unarchive(): Promise<void> {
+    return this.run('unarchive', async () => {
+      const { tournament } = await this.api.unarchive(this.requireId());
+      this.tournamentSignal.set(tournament);
+      this.toast.success(this.i18n.translate('tournament.unarchived'));
+    });
+  }
+
   exportCsv(): Promise<void> {
     return this.run('export', async () => {
       const tournament = this.tournamentSignal();

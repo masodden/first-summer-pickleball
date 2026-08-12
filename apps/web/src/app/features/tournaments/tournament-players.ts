@@ -52,7 +52,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
 
             <p class="tiny faint">{{ t()('checkin.hint') }}</p>
 
-            @if (item.status !== 'finished' && item.status !== 'running') {
+            @if (item.status !== 'finished' && item.status !== 'archived' && item.status !== 'running') {
               <button type="button" class="btn btn--primary btn--block" (click)="picker.set(true)">
                 {{ t()('participant.add') }}
               </button>
@@ -121,7 +121,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
                       <input
                         type="checkbox"
                         [checked]="participant.confirmedAndPaid"
-                        [disabled]="item.status === 'finished'"
+                        [disabled]="item.status === 'finished' || item.status === 'archived'"
                         (change)="togglePaid(participant, $event)"
                       />
                       <span class="checkbox__box"></span>
@@ -171,7 +171,12 @@ import { TournamentJoinPanel } from './tournament-join-panel';
           </section>
         }
 
-        @if (store.canManage() && item.status !== 'running' && item.status !== 'finished') {
+        @if (
+          store.canManage() &&
+          item.status !== 'running' &&
+          item.status !== 'finished' &&
+          item.status !== 'archived'
+        ) {
           <section class="glass card--tight stack stack--2">
             @if (store.allConfirmed()) {
               <p class="small strong center">{{ t()('checkin.allConfirmed') }}</p>

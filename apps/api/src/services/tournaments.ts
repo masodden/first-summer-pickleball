@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, asc, count, desc, eq, inArray, isNull, max, ne, notInArray, sql } from 'drizzle-orm';
 import {
+  isTournamentClosed,
   normalizeCourtNames,
   type CreateTournamentInput,
   type ParticipantDto,
@@ -125,7 +126,7 @@ export async function listTournaments(
 ): Promise<TournamentSummaryDto[]> {
   void viewer;
 
-  // Приоритет: идущие → остальные активные → завершённые; внутри — ближайшая дата.
+  // Приоритет: идущие → остальные активные → завершённые → архив; внутри — дата.
   const rows = await db
     .select()
     .from(tournaments)
@@ -134,10 +135,11 @@ export async function listTournaments(
       sql`case ${tournaments.status}
         when 'running' then 0
         when 'finished' then 2
+        when 'archived' then 3
         else 1
       end`,
-      sql`case when ${tournaments.status} = 'finished' then ${tournaments.startsAt} end desc nulls last`,
-      sql`case when ${tournaments.status} <> 'finished' then ${tournaments.startsAt} end asc nulls last`,
+      sql`case when ${tournaments.status} in ('finished', 'archived') then ${tournaments.startsAt} end desc nulls last`,
+      sql`case when ${tournaments.status} not in ('finished', 'archived') then ${tournaments.startsAt} end asc nulls last`,
       desc(tournaments.createdAt),
     );
 
@@ -283,7 +285,7 @@ export async function updateTournament(
 ): Promise<TournamentDto> {
   const current = await getTournamentRow(db, id);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (current.status === 'finished') {
+  if (isTournamentClosed(current.status)) {
     throw wrongStatus('Завершённый турнир изменить нельзя');
   }
 
@@ -396,7 +398,7 @@ async function assertNotInParallelTournament(
         ne(tournamentPlayers.tournamentId, tournament.id),
         inArray(tournamentPlayers.status, ['registered', 'waitlisted']),
         isNull(tournaments.deletedAt),
-        notInArray(tournaments.status, ['finished']),
+        notInArray(tournaments.status, ['finished', 'archived']),
       ),
     );
 
@@ -428,7 +430,7 @@ export async function addParticipant(
     }
   } else if (!canManageTournaments(actor)) {
     throw forbidden('Добавлять игроков может организатор');
-  } else if (tournament.status === 'finished') {
+  } else if (isTournamentClosed(tournament.status)) {
     throw wrongStatus('Турнир уже завершён');
   }
 
@@ -508,13 +510,13 @@ export async function removeParticipant(
     if (actor.playerId !== playerId) throw forbidden('Отменить можно только свою заявку');
     // Самим можно сняться, пока турнир не стартовал — и при открытой, и при
     // закрытой регистрации. После галочки подтверждения — только через организатора.
-    if (tournament.status === 'running' || tournament.status === 'finished') {
+    if (tournament.status === 'running' || isTournamentClosed(tournament.status)) {
       throw wrongStatus('Турнир уже идёт, обратитесь к организатору');
     }
   } else if (!canManageTournaments(actor)) {
     throw forbidden();
   }
-  if (tournament.status === 'running' || tournament.status === 'finished') {
+  if (tournament.status === 'running' || isTournamentClosed(tournament.status)) {
     throw wrongStatus('Состав уже зафиксирован расписанием');
   }
 
@@ -577,7 +579,7 @@ export async function setParticipantPaid(
 ): Promise<ParticipantDto> {
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (tournament.status === 'finished') throw wrongStatus('Турнир уже завершён');
+  if (isTournamentClosed(tournament.status)) throw wrongStatus('Турнир уже завершён');
 
   const [row] = await db
     .update(tournamentPlayers)
@@ -663,7 +665,7 @@ export async function setRegistrationOpen(
 ): Promise<TournamentDto> {
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (tournament.status === 'running' || tournament.status === 'finished') {
+  if (tournament.status === 'running' || isTournamentClosed(tournament.status)) {
     throw wrongStatus('Турнир уже идёт или завершён');
   }
 
@@ -760,6 +762,60 @@ export async function reopenTournament(
 
   await recordAudit(db, actor, {
     action: 'tournament.reopened',
+    entityType: 'tournament',
+    entityId: tournamentId,
+    tournamentId,
+  });
+
+  return getTournamentDto(db, tournamentId, actor);
+}
+
+/** Скрыть завершённый турнир в архив (только админ). Обратно — unarchive. */
+export async function archiveTournament(
+  db: Database,
+  tournamentId: string,
+  actor: Viewer,
+): Promise<TournamentDto> {
+  const tournament = await getTournamentRow(db, tournamentId);
+  if (!isAdmin(actor)) throw forbidden();
+  if (tournament.status !== 'finished') {
+    throw wrongStatus('В архив можно убрать только завершённый турнир');
+  }
+
+  await db
+    .update(tournaments)
+    .set({ status: 'archived', updatedAt: new Date() })
+    .where(eq(tournaments.id, tournamentId));
+
+  await recordAudit(db, actor, {
+    action: 'tournament.archived',
+    entityType: 'tournament',
+    entityId: tournamentId,
+    tournamentId,
+  });
+
+  return getTournamentDto(db, tournamentId, actor);
+}
+
+/** Вернуть турнир из архива в «Завершён». */
+export async function unarchiveTournament(
+  db: Database,
+  tournamentId: string,
+  actor: Viewer,
+): Promise<TournamentDto> {
+  const tournament = await getTournamentRow(db, tournamentId);
+  if (!isAdmin(actor)) throw forbidden();
+  if (tournament.status !== 'archived') {
+    throw wrongStatus('Турнир не в архиве');
+  }
+
+  await db
+    .update(tournaments)
+    .set({ status: 'finished', updatedAt: new Date() })
+    .where(eq(tournaments.id, tournamentId));
+
+  await recordAudit(db, actor, {
+    action: 'tournament.unarchived',
     entityType: 'tournament',
     entityId: tournamentId,
     tournamentId,

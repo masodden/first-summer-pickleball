@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { courtLabel, isMatchClosed, type MatchDto, type MatchStatus } from '@fsp/shared';
+import { courtLabel, isMatchClosed, isTournamentClosed, type MatchDto, type MatchStatus } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
   matchPlayers,
@@ -108,7 +108,7 @@ async function applyMatchPatch(
 
 function assertEditable(tournament: TournamentRow, actor: Viewer): void {
   if (!canManageTournaments(actor)) throw forbidden('Вести матч может организатор');
-  if (tournament.status === 'finished') {
+  if (isTournamentClosed(tournament.status)) {
     throw wrongStatus('Турнир завершён, изменения недоступны');
   }
   if (tournament.status !== 'running') {

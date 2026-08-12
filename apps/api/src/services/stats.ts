@@ -37,7 +37,7 @@ export async function getPlayerProfile(
           .where(
             and(
               inArray(tournaments.id, raw.tournamentIds),
-              eq(tournaments.status, 'finished'),
+              inArray(tournaments.status, ['finished', 'archived']),
               isNull(tournaments.deletedAt),
             ),
           );

@@ -15,6 +15,7 @@ import { requireRole, requireViewer } from '../auth/context.js';
 import { ensureGuestPlayerForAccount, getAccount } from '../services/accounts.js';
 import {
   addParticipant,
+  archiveTournament,
   createTournament,
   deleteTournament,
   finishTournament,
@@ -26,6 +27,7 @@ import {
   reopenTournament,
   setParticipantPaid,
   setRegistrationOpen,
+  unarchiveTournament,
   unstartTournament,
   updateTournament,
 } from '../services/tournaments.js';
@@ -324,6 +326,20 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/reopen', async (request) => {
     const viewer = requireRole(request, 'moderator');
     const tournament = await reopenTournament(db, request.params.id, viewer);
+    broadcastTournamentChanged(hub, request.params.id);
+    return { tournament };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/tournaments/:id/archive', async (request) => {
+    const viewer = requireRole(request, 'admin');
+    const tournament = await archiveTournament(db, request.params.id, viewer);
+    broadcastTournamentChanged(hub, request.params.id);
+    return { tournament };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/tournaments/:id/unarchive', async (request) => {
+    const viewer = requireRole(request, 'admin');
+    const tournament = await unarchiveTournament(db, request.params.id, viewer);
     broadcastTournamentChanged(hub, request.params.id);
     return { tournament };
   });
