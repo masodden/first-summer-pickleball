@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   signal,
@@ -17,12 +16,10 @@ function safeText(value: string | null | undefined): string {
 }
 
 /**
- * Аватар игрока: инициалы всегда на месте, фото появляется после успешной
- * загрузки. Битый URL с Telegram не ломает карточку — остаёмся на буквах.
+ * Аватар: инициалы сразу, фото после успешного load.
  *
- * Важно: при WS-обновлении состава объект player пересоздаётся с тем же URL.
- * Нельзя из‑за этого сбрасывать loaded — иначе картинка мигает и в WebView
- * Telegram иногда «глотает» всю строку игрока.
+ * URL берём из computed по player(), без effect в конструкторе — иначе в
+ * zoneless на первом тике можно уронить всю строку игрока.
  */
 @Component({
   selector: 'app-avatar',
@@ -36,10 +33,9 @@ function safeText(value: string | null | undefined): string {
       <img
         class="avatar__img"
         [src]="src"
-        [alt]="player().fullName || ''"
+        alt=""
         [width]="size()"
         [height]="size()"
-        loading="lazy"
         decoding="async"
         referrerpolicy="no-referrer"
         [class.is-ready]="photoReady()"
@@ -90,14 +86,9 @@ function safeText(value: string | null | undefined): string {
 })
 export class Avatar {
   readonly player = input.required<PlayerDto>();
-  /** Логический размер в CSS-пикселях; URL с Telegram обычно уже ~160–320px. */
   readonly size = input(40);
 
-  /** Актуальный URL с карточки (может приходить снова при каждом WS-тике). */
-  private readonly sourceUrl = signal<string | null>(null);
-  /** URL, который уже успешно показан. */
   private readonly loadedUrl = signal<string | null>(null);
-  /** URL, который уже упал — не пытаемся снова, пока не сменится. */
   private readonly failedUrl = signal<string | null>(null);
 
   protected readonly initials = computed(() => {
@@ -107,8 +98,9 @@ export class Avatar {
     return `${first}${last}`.toUpperCase() || '?';
   });
 
+  /** URL с карточки; упавшие не ретраим, пока не сменится. */
   protected readonly displayUrl = computed(() => {
-    const url = this.sourceUrl();
+    const url = safeText(this.player().avatarUrl) || null;
     if (!url || url === this.failedUrl()) return null;
     return url;
   });
@@ -117,19 +109,6 @@ export class Avatar {
     const url = this.displayUrl();
     return url !== null && this.loadedUrl() === url;
   });
-
-  constructor() {
-    effect(() => {
-      const url = safeText(this.player().avatarUrl) || null;
-      if (url === this.sourceUrl()) return;
-      this.sourceUrl.set(url);
-      // Новый URL — даём ещё один шанс, даже если старый падал.
-      if (url !== this.failedUrl()) {
-        // loadedUrl оставляем: если совпадёт с новым — photoReady сразу true;
-        // если нет — покажем инициалы, пока не придёт load.
-      }
-    });
-  }
 
   protected onLoad(src: string): void {
     this.loadedUrl.set(src);
@@ -144,9 +123,6 @@ export class Avatar {
 
 /**
  * Строка игрока: аватар, имя и рейтинг.
- *
- * Одна и та же строка используется в списке участников, на кортах и в таблице,
- * поэтому рейтинг виден везде, где важно понимать уровень игрока.
  */
 @Component({
   selector: 'app-player-line',
@@ -181,11 +157,18 @@ export class Avatar {
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
     .line {
       display: flex;
       align-items: center;
       gap: var(--space-3);
       min-width: 0;
+      width: 100%;
     }
 
     .line__text {

@@ -21,8 +21,8 @@ import { I18nService } from '../core/i18n';
       <span
         class="rating-chip"
         [class.rating-chip--compact]="compact()"
-        [class.rating-chip--stale]="player().ratingStale && player().doublesRating !== null"
-        [class.rating-chip--none]="player().doublesRating === null"
+        [class.rating-chip--stale]="player().ratingStale && rating() !== null"
+        [class.rating-chip--none]="rating() === null"
         [title]="hint()"
       >
         @if (showLabel()) {
@@ -41,21 +41,26 @@ export class RatingChip {
   /** Мельче и уже: для строк матча, где главное — имя, а рейтинг рядом справкой. */
   readonly compact = input(false);
 
+  protected readonly rating = computed(() => {
+    const value = this.player().doublesRating;
+    if (value === null || value === undefined) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  });
+
   protected readonly hideForGuest = computed(
-    () => this.player().isGuest && this.player().doublesRating === null,
+    () => this.player().isGuest && this.rating() === null,
   );
 
   protected readonly value = computed(() => {
-    const rating = this.player().doublesRating;
-    if (rating === null || rating === undefined || Number.isNaN(Number(rating))) {
-      return this.i18n.translate('rating.noneShort');
-    }
-    return Number(rating).toFixed(3);
+    const rating = this.rating();
+    return rating === null ? this.i18n.translate('rating.noneShort') : rating.toFixed(3);
   });
 
   protected readonly hint = computed(() => {
     const player = this.player();
-    if (player.doublesRating === null) return this.i18n.translate('rating.noneHint');
+    const rating = this.rating();
+    if (rating === null) return this.i18n.translate('rating.noneHint');
 
     const parts = [this.i18n.translate('rating.doubles')];
     if (player.ratingUpdatedAt) {
