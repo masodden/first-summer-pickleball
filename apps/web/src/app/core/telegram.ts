@@ -55,7 +55,11 @@ declare global {
 export class TelegramService {
   private readonly app = window.Telegram?.WebApp;
 
-  readonly available = Boolean(this.app?.initData && this.app.initData.length > 0);
+  /** Есть ли живой Telegram WebApp с initData (пересчитываем — скрипт может ожить позже). */
+  get available(): boolean {
+    return Boolean(this.app?.initData && this.app.initData.length > 0);
+  }
+
   readonly colorScheme = signal<'light' | 'dark'>(this.app?.colorScheme ?? 'light');
 
   get initData(): string | null {
@@ -119,17 +123,25 @@ export class TelegramService {
    */
   setBackButtonVisible(visible: boolean): void {
     const button = this.app?.BackButton;
-    if (!button) return;
-    if (visible) button.show();
-    else button.hide();
+    if (!button?.show || !button?.hide) return;
+    try {
+      if (visible) button.show();
+      else button.hide();
+    } catch {
+      // Старые клиенты без BackButton API.
+    }
   }
 
   /** Подписка на BackButton / Android system back. Возвращает отписку. */
   onBackButton(handler: () => void): () => void {
     const button = this.app?.BackButton;
-    if (!button) return () => undefined;
-    button.onClick(handler);
-    return () => button.offClick(handler);
+    if (button?.onClick && button?.offClick) {
+      button.onClick(handler);
+      return () => button.offClick(handler);
+    }
+    // Fallback на событие WebApp.
+    this.app?.onEvent?.('backButtonClicked', handler);
+    return () => this.app?.offEvent?.('backButtonClicked', handler);
   }
 
   tap(style: 'light' | 'medium' | 'heavy' = 'light'): void {

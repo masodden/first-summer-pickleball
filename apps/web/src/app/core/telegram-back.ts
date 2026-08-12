@@ -12,8 +12,7 @@ const ROOT_PATHS = new Set(['/tournaments', '/trainings', '/players', '/admin'])
  * Нативная «назад» в Telegram Mini App.
  *
  * Пока виден WebApp.BackButton, Android system back вызывает его, а не сворачивает
- * приложение. Сначала закрываем confirm/оверлей, иначе шаг назад по нашему стеку
- * (не browser history — после deep-link history.back() часто закрывает Mini App).
+ * приложение. Сначала закрываем confirm/оверлей, иначе шаг назад по нашему стеку.
  */
 @Injectable({ providedIn: 'root' })
 export class TelegramBackNavigation {
@@ -23,26 +22,28 @@ export class TelegramBackNavigation {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly url = signal(normalizePath(this.router.url));
+  private readonly started = signal(false);
   /** Открытые sheet/picker — back сначала закрывает их. */
   private readonly overlayDepth = signal(0);
   private stack: string[] = [normalizePath(this.router.url)];
   private navigatingBack = false;
-  private started = false;
 
   constructor() {
-    // effect в конструкторе — injection context гарантирован (после await в initializer теряется).
+    // Важно: сигналы читаем ДО early-return, иначе effect не подпишется на url
+    // и после перехода в турнир BackButton так и не появится.
     effect(() => {
-      if (!this.started) return;
       this.url();
       this.overlayDepth();
       this.confirm.request();
+      const ready = this.started();
+      if (!ready) return;
       untracked(() => this.syncButton());
     });
   }
 
   start(): void {
-    if (this.started || !this.telegram.available) return;
-    this.started = true;
+    if (this.started() || !this.telegram.available) return;
+    this.started.set(true);
 
     const stop = this.telegram.onBackButton(() => this.handleBack());
     this.destroyRef.onDestroy(() => {
@@ -59,8 +60,11 @@ export class TelegramBackNavigation {
         const next = normalizePath(event.urlAfterRedirects);
         this.url.set(next);
         this.pushUrl(next);
+        // Дублируем sync: надёжнее, чем ждать только effect (zoneless).
+        this.syncButton();
       });
 
+    this.url.set(normalizePath(this.router.url));
     this.syncButton();
   }
 
