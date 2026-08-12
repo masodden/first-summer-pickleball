@@ -16,6 +16,7 @@ import { isValidDuprId, type PlayerDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { SessionStore } from '../../core/session';
+import { TelegramBackNavigation } from '../../core/telegram-back';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { PlayerLine } from '../../ui/player-line';
@@ -310,8 +311,13 @@ export class PlayerPicker {
     // Пикер живёт внутри <main>, а таббар — снаружи с большим z-index.
     // Пока диалог открыт, прячем навигацию, чтобы не перехватывала тапы.
     document.documentElement.classList.add('fsp-overlay-open');
+    const releaseOverlay = inject(TelegramBackNavigation).acquireOverlay();
+    const onBack = (): void => this.closed.emit();
+    document.addEventListener('fsp:back', onBack);
     inject(DestroyRef).onDestroy(() => {
       document.documentElement.classList.remove('fsp-overlay-open');
+      document.removeEventListener('fsp:back', onBack);
+      releaseOverlay();
     });
 
     afterNextRender(

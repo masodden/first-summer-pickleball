@@ -6,12 +6,21 @@ interface TelegramHaptics {
   selectionChanged(): void;
 }
 
+interface TelegramBackButton {
+  isVisible: boolean;
+  show(): void;
+  hide(): void;
+  onClick(callback: () => void): void;
+  offClick(callback: () => void): void;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe?: { start_param?: string; user?: { language_code?: string } };
   colorScheme?: 'light' | 'dark';
   version?: string;
   platform?: string;
+  BackButton?: TelegramBackButton;
   ready(): void;
   expand(): void;
   disableVerticalSwipes?(): void;
@@ -26,6 +35,7 @@ interface TelegramWebApp {
   isVersionAtLeast?(version: string): boolean;
   HapticFeedback?: TelegramHaptics;
   onEvent?(event: string, handler: () => void): void;
+  offEvent?(event: string, handler: () => void): void;
 }
 
 declare global {
@@ -101,6 +111,25 @@ export class TelegramService {
     this.app.onEvent?.('themeChanged', () => {
       this.colorScheme.set(this.app?.colorScheme ?? 'light');
     });
+  }
+
+  /**
+   * Кнопка «назад» в шапке Telegram.
+   * Пока видна — системная «назад» на Android тоже уходит сюда, а не закрывает Mini App.
+   */
+  setBackButtonVisible(visible: boolean): void {
+    const button = this.app?.BackButton;
+    if (!button) return;
+    if (visible) button.show();
+    else button.hide();
+  }
+
+  /** Подписка на BackButton / Android system back. Возвращает отписку. */
+  onBackButton(handler: () => void): () => void {
+    const button = this.app?.BackButton;
+    if (!button) return () => undefined;
+    button.onClick(handler);
+    return () => button.offClick(handler);
   }
 
   tap(style: 'light' | 'medium' | 'heavy' = 'light'): void {

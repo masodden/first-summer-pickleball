@@ -10,7 +10,7 @@ import type { TrainingParticipantDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { TrainingStore } from '../../core/training-store';
-import { bindGlassListRemount } from '../../ui/glass-list-remount';
+import { bindGlassListRepaint } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { PlayerPicker } from '../players/player-picker';
 
@@ -96,11 +96,7 @@ import { PlayerPicker } from '../players/player-picker';
             </div>
           }
 
-          @for (
-            participant of store.registered();
-            track listGen() + ':' + participant.id;
-            let index = $index
-          ) {
+          @for (participant of store.registered(); track participant.id; let index = $index) {
             <div
               class="glass card--tight person"
               [class.person--confirmed]="participant.confirmedAndPaid"
@@ -308,15 +304,13 @@ export class TrainingPlayersTab {
   protected readonly picker = signal(false);
   protected readonly editingAmount = signal<string | null>(null);
   protected readonly draftAmount = signal('');
-  /** Бамп после скролла — remount glass-строк (см. bindGlassListRemount). */
-  protected readonly listGen = signal(0);
 
   protected readonly takenIds = computed(
     () => new Set(this.store.participants().map((item) => item.player.id)),
   );
 
   constructor() {
-    bindGlassListRemount(this.listGen, {
+    bindGlassListRepaint({
       destroyRef: inject(DestroyRef),
       paused: () => this.editingAmount() !== null || this.picker(),
       itemCount: () => this.store.registered().length,

@@ -15,7 +15,8 @@ import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
-import { bindGlassListRemount } from '../../ui/glass-list-remount';
+import { TelegramBackNavigation } from '../../core/telegram-back';
+import { bindGlassListRepaint } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { PlayerPicker } from '../players/player-picker';
@@ -79,11 +80,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
           }
 
           <div class="stack stack--2">
-            @for (
-              participant of store.registered();
-              track listGen() + ':' + participant.id;
-              let index = $index
-            ) {
+            @for (participant of store.registered(); track participant.id; let index = $index) {
               <div
                 class="glass person"
                 [class.person--confirmed]="participant.confirmedAndPaid"
@@ -163,7 +160,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
         @if (store.waitlisted().length > 0) {
           <section class="stack stack--2">
             <h3>{{ t()('waitlist.title') }}</h3>
-            @for (participant of store.waitlisted(); track listGen() + ':' + participant.id) {
+            @for (participant of store.waitlisted(); track participant.id) {
               <div class="glass glass--subtle card--tight person">
                 <span class="person__index tiny faint numeric">
                   {{ participant.waitlistPosition }}
@@ -381,8 +378,6 @@ export class TournamentPlayersTab {
   protected readonly editing = signal<string | null>(null);
   protected readonly draftRating = signal('');
   protected readonly savingRating = signal(false);
-  /** Бамп после скролла — remount glass-строк (см. bindGlassListRemount). */
-  protected readonly listGen = signal(0);
 
   protected readonly takenIds = computed(
     () => new Set(this.store.participants().map((item) => item.player.id)),
@@ -393,8 +388,9 @@ export class TournamentPlayersTab {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const backNav = inject(TelegramBackNavigation);
 
-    bindGlassListRemount(this.listGen, {
+    bindGlassListRepaint({
       destroyRef,
       paused: () =>
         this.editing() !== null || this.picker() || this.replacing() !== null || this.savingRating(),
@@ -403,12 +399,25 @@ export class TournamentPlayersTab {
 
     // Как у player-picker: sheet внутри main, таббар снаружи с большим z-index —
     // пока открыта замена, прячем навигацию, чтобы не перехватывала тапы.
+    let releaseOverlay: (() => void) | null = null;
+    const onBack = (): void => this.replacing.set(null);
+    document.addEventListener('fsp:back', onBack);
+
     effect(() => {
       const open = this.replacing() !== null;
       document.documentElement.classList.toggle('fsp-overlay-open', open);
+      if (open && !releaseOverlay) {
+        releaseOverlay = backNav.acquireOverlay();
+      } else if (!open && releaseOverlay) {
+        releaseOverlay();
+        releaseOverlay = null;
+      }
     });
+
     destroyRef.onDestroy(() => {
       document.documentElement.classList.remove('fsp-overlay-open');
+      document.removeEventListener('fsp:back', onBack);
+      releaseOverlay?.();
     });
   }
 

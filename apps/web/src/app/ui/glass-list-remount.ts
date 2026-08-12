@@ -1,34 +1,30 @@
-import { DestroyRef, type WritableSignal } from '@angular/core';
+import { DestroyRef } from '@angular/core';
 
 /**
- * После остановки скролла бампит generation — чтобы @for с track
- * `${generation}:${id}` пересоздал DOM строк. В Telegram WebView это
- * сбрасывает залипший backdrop-filter на нижних glass-карточках
- * без полной перезагрузки и без сети.
+ * Telegram WebView + backdrop-filter: нижние glass-строки иногда «залипают»
+ * (полупрозрачная плёнка, особенно поверх аватарки). Клик по карточке чинит —
+ * значит достаточно инвалидации paint, без Angular remount.
  *
- * Слушатели и debounce-таймер снимаются в destroyRef — утечек нет.
- * Короткие списки и страницы без реального скролла пропускаются.
+ * После остановки скролла у низа страницы коротко форсируем композитинг
+ * на `.person.glass`. Remount `@for` не делаем: он тяжелее и заново рвёт <img>.
  */
-export function bindGlassListRemount(
-  generation: WritableSignal<number>,
+export function bindGlassListRepaint(
   options: {
     destroyRef: DestroyRef;
-    /** Не перемонтировать во время редактирования / оверлея. */
     paused?: () => boolean;
-    /** Сколько строк в списке сейчас (registered + waitlist). */
     itemCount?: () => number;
-    /** Ниже этого числа remount не нужен — баг только у доскролла. */
     minItems?: number;
-    minScrollY?: number;
+    /** Насколько близко к низу страницы считаем «доскроллили». */
+    bottomSlackPx?: number;
     cooldownMs?: number;
   },
 ): void {
-  const minScrollY = options.minScrollY ?? 48;
   const minItems = options.minItems ?? 7;
-  const cooldownMs = options.cooldownMs ?? 500;
+  const bottomSlackPx = options.bottomSlackPx ?? 160;
+  const cooldownMs = options.cooldownMs ?? 700;
   let debounceTimer: number | null = null;
   let dirty = false;
-  let lastRemountAt = 0;
+  let lastFlushAt = 0;
 
   const clearTimer = (): void => {
     if (debounceTimer !== null) {
@@ -37,27 +33,45 @@ export function bindGlassListRemount(
     }
   };
 
+  const nearBottom = (): boolean => {
+    const doc = document.documentElement;
+    const remaining = doc.scrollHeight - (window.scrollY + window.innerHeight);
+    return remaining <= bottomSlackPx;
+  };
+
   const shouldSkip = (): boolean => {
     if (options.paused?.()) return true;
-    if (window.scrollY < minScrollY) return true;
-    const overflow = document.documentElement.scrollHeight - window.innerHeight;
-    if (overflow < minScrollY) return true;
     if ((options.itemCount?.() ?? minItems) < minItems) return true;
+    const overflow = document.documentElement.scrollHeight - window.innerHeight;
+    if (overflow < 80) return true;
+    if (!nearBottom()) return true;
     return false;
   };
 
-  const remount = (): void => {
+  const flush = (): void => {
     if (!dirty) return;
     dirty = false;
     clearTimer();
     if (shouldSkip()) return;
     const now = Date.now();
-    if (now - lastRemountAt < cooldownMs) return;
-    lastRemountAt = now;
+    if (now - lastFlushAt < cooldownMs) return;
+    lastFlushAt = now;
+
     requestAnimationFrame(() => {
+      if (shouldSkip()) return;
+      const rows = document.querySelectorAll<HTMLElement>('.person.glass');
+      if (rows.length === 0) return;
+
+      for (const row of rows) {
+        row.classList.add('is-glass-flush');
+      }
+      // Чтение layout — типичный способ сбросить залипший слой в WebKit.
+      void document.documentElement.offsetHeight;
+
       requestAnimationFrame(() => {
-        if (shouldSkip()) return;
-        generation.update((value) => value + 1);
+        for (const row of rows) {
+          row.classList.remove('is-glass-flush');
+        }
       });
     });
   };
@@ -65,19 +79,17 @@ export function bindGlassListRemount(
   const onScroll = (): void => {
     dirty = true;
     clearTimer();
-    // scrollend есть не везде (особенно iOS / Telegram) — debounce как запасной.
-    debounceTimer = window.setTimeout(remount, 160);
+    debounceTimer = window.setTimeout(flush, 180);
   };
 
   window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('scrollend', remount, { passive: true });
-  // Отпускание пальца после жеста скролла — раньше, чем дождёмся debounce.
-  window.addEventListener('touchend', remount, { passive: true });
+  window.addEventListener('scrollend', flush, { passive: true });
+  window.addEventListener('touchend', flush, { passive: true });
 
   options.destroyRef.onDestroy(() => {
     clearTimer();
     window.removeEventListener('scroll', onScroll);
-    window.removeEventListener('scrollend', remount);
-    window.removeEventListener('touchend', remount);
+    window.removeEventListener('scrollend', flush);
+    window.removeEventListener('touchend', flush);
   });
 }

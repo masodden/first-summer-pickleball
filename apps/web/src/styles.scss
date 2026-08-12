@@ -316,6 +316,12 @@ button {
   box-shadow: none;
 }
 
+/* Краткий пинок композитору после доскролла (Telegram WebView + backdrop-filter). */
+.person.glass.is-glass-flush {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 .card {
   padding: var(--space-5);
 }
