@@ -18,13 +18,15 @@ import { Racket } from '../../ui/ball';
   imports: [RouterLink, Racket],
   template: `
     @if (tournament(); as item) {
-      <section class="glass card--tight stack stack--3">
-        @if (!session.isAuthenticated()) {
+      @if (!session.isAuthenticated()) {
+        <section class="glass card--tight stack stack--3">
           <div class="stack stack--2">
             <h3>{{ t()('auth.notInTelegram') }}</h3>
             <p class="small muted">{{ t()('auth.notInTelegramHint') }}</p>
           </div>
-        } @else if (participation(); as mine) {
+        </section>
+      } @else if (participation(); as mine) {
+        <section class="glass card--tight stack stack--3">
           <div class="row">
             <app-racket [size]="34" />
             <div class="grow stack stack--1">
@@ -58,7 +60,9 @@ import { Racket } from '../../ui/ball';
               {{ t()('participant.linkDuprLater') }}
             </a>
           }
-        } @else if (item.status === 'registration') {
+        </section>
+      } @else if (item.status === 'registration') {
+        <section class="glass card--tight stack stack--3">
           <button
             type="button"
             class="btn btn--go btn--block btn--lg"
@@ -73,10 +77,12 @@ import { Racket } from '../../ui/ball';
           @if (session.isGuestPlayer()) {
             <p class="tiny center muted">{{ t()('participant.guestJoinHint') }}</p>
           }
-        } @else {
+        </section>
+      } @else if (item.status === 'registration_closed') {
+        <section class="glass card--tight stack stack--3">
           <p class="small muted center">{{ t()('status.registration_closed') }}</p>
-        }
-      </section>
+        </section>
+      }
     }
   `,
 })

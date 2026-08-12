@@ -4,6 +4,7 @@ import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TelegramService } from '../../core/telegram';
 import { TrainingStore } from '../../core/training-store';
+import { consumeFirstVisit } from '../../core/motion';
 import { Racket } from '../../ui/ball';
 
 @Component({
@@ -12,7 +13,7 @@ import { Racket } from '../../ui/ball';
   imports: [RouterLink, Racket],
   template: `
     @if (training(); as item) {
-      <div class="stack stack--4 stagger">
+      <div class="stack stack--4" [class.stagger]="stagger">
         <section class="glass card--tight stack stack--3">
           <div class="grid">
             <div class="cell">
@@ -145,6 +146,7 @@ export class TrainingInfoTab {
   protected readonly session = inject(SessionStore);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('training-info');
 
   protected readonly training = this.store.training;
   protected readonly participation = computed(() => this.training()?.myParticipation ?? null);

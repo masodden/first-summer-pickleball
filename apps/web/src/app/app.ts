@@ -1,12 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  NavigationEnd,
-  Router,
-  RouterLink,
-  RouterLinkActive,
-  RouterOutlet,
-} from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, take } from 'rxjs';
 import { ApiClient } from './core/api';
 import { readTournamentDeepLink, readTrainingDeepLink } from './core/deep-link';
@@ -18,6 +12,7 @@ import { TelegramService } from './core/telegram';
 import { ToastService } from './core/toast';
 import { Ball } from './ui/ball';
 import { ConfirmHost } from './ui/confirm-host';
+import { TabBar } from './ui/tab-bar';
 import { ToastHost } from './ui/toast-host';
 
 /**
@@ -30,11 +25,10 @@ import { ToastHost } from './ui/toast-host';
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Ball, ToastHost, ConfirmHost],
+  imports: [RouterOutlet, RouterLink, Ball, TabBar, ToastHost, ConfirmHost],
   template: `
     <a class="skip" href="#main">{{ t()('nav.tournaments') }}</a>
 
-    <!-- view-transition-name: chrome остаётся на месте, анимируется только main. -->
     <header class="header vt-header">
       <div class="header__inner shell">
         <a class="brand" routerLink="/tournaments">
@@ -73,43 +67,7 @@ import { ToastHost } from './ui/toast-host';
       <router-outlet />
     </main>
 
-    <nav
-      class="tabbar glass glass--strong vt-tabbar"
-      [attr.aria-label]="t()('nav.tournaments')"
-    >
-      <a routerLink="/tournaments" routerLinkActive="is-active" class="tab">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 6h16M4 12h16M4 18h10" />
-        </svg>
-        <span>{{ t()('nav.tournaments') }}</span>
-      </a>
-      <a routerLink="/players" routerLinkActive="is-active" class="tab">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="9" cy="8" r="3.2" />
-          <path
-            d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M16 11.2a2.8 2.8 0 100-5.6M17 19h3.5c-.3-2.2-1.4-3.8-3-4.5"
-          />
-        </svg>
-        <span>{{ t()('nav.players') }}</span>
-      </a>
-      @if (session.isAdmin()) {
-        <a routerLink="/admin" routerLinkActive="is-active" class="tab">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3l7 3v5.5c0 4-2.9 7.6-7 9.5-4.1-1.9-7-5.5-7-9.5V6l7-3z" />
-          </svg>
-          <span>{{ t()('nav.admin') }}</span>
-        </a>
-      }
-      <a routerLink="/settings" routerLinkActive="is-active" class="tab">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M12 3.5v2M12 18.5v2M4.9 7.5l1.7 1M17.4 15.5l1.7 1M4.9 16.5l1.7-1M17.4 8.5l1.7-1"
-          />
-        </svg>
-        <span>{{ t()('nav.settings') }}</span>
-      </a>
-    </nav>
+    <app-tab-bar />
 
     <app-toast-host />
     <app-confirm-host />
@@ -150,18 +108,6 @@ import { ToastHost } from './ui/toast-host';
       background: linear-gradient(var(--bg-base) 60%, transparent);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-    }
-
-    .vt-header {
-      view-transition-name: app-header;
-    }
-
-    .vt-main {
-      view-transition-name: app-main;
-    }
-
-    .vt-tabbar {
-      view-transition-name: app-tabbar;
     }
 
     .header__inner {
@@ -208,65 +154,11 @@ import { ToastHost } from './ui/toast-host';
     }
 
     .main {
+      position: relative;
+      z-index: 1;
       padding-top: var(--space-4);
       padding-bottom: var(--space-6);
-    }
-
-    .tabbar {
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-      z-index: 50;
-      display: flex;
-      gap: var(--space-1);
-      width: min(100% - 24px, 420px);
-      padding: 6px;
-      border-radius: var(--radius-full);
-      transform: translateX(-50%);
-      transition: opacity var(--duration-fast) ease;
-    }
-
-    /* Оверлеи из router-outlet (пикер и т.п.) ниже таббара по stacking —
-       пока открыты, навигацию скрываем, чтобы не перекрывала кнопки. */
-    :host-context(html.fsp-overlay-open) .tabbar {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .tab {
-      display: flex;
-      flex: 1 1 0;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      padding: 7px 4px 6px;
-      border-radius: var(--radius-full);
-      color: var(--text-muted);
-      font-size: 10.5px;
-      font-weight: 600;
-      transition:
-        background var(--duration-fast) ease,
-        color var(--duration-fast) ease;
-    }
-
-    .tab:hover {
-      text-decoration: none;
-      color: var(--text-strong);
-    }
-
-    .tab svg {
-      width: 21px;
-      height: 21px;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.8;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .tab.is-active {
-      background: var(--accent-soft);
-      color: var(--accent-strong);
+      background: transparent;
     }
   `,
 })

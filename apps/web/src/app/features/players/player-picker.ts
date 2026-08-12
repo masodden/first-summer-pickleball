@@ -20,6 +20,7 @@ import { TelegramBackNavigation } from '../../core/telegram-back';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { PlayerLine } from '../../ui/player-line';
+import { SheetDismiss } from '../../ui/motion';
 
 /**
  * Выбор игрока из базы или создание карточки на месте.
@@ -30,13 +31,15 @@ import { PlayerLine } from '../../ui/player-line';
 @Component({
   selector: 'app-player-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PlayerLine],
+  imports: [PlayerLine, SheetDismiss],
   template: `
     <div class="backdrop" (click)="closed.emit()">
       <div
         class="sheet glass glass--strong"
         role="dialog"
         aria-modal="true"
+        appSheetDismiss
+        (dismissed)="closed.emit()"
         (click)="$event.stopPropagation()"
       >
         <div class="row row--between">
@@ -174,8 +177,9 @@ import { PlayerLine } from '../../ui/player-line';
       position: fixed;
       inset: 0;
       z-index: 100;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
       padding: max(var(--space-4), env(safe-area-inset-top, 0px)) var(--space-4)
         max(var(--space-4), env(safe-area-inset-bottom, 0px));
       background: rgba(36, 26, 22, 0.42);
@@ -193,18 +197,7 @@ import { PlayerLine } from '../../ui/player-line';
       overscroll-behavior: contain;
       padding: var(--space-5) var(--space-4);
       border-radius: var(--radius-xl);
-      animation: pop-in var(--duration-base) var(--ease-out) both;
-    }
-
-    @keyframes pop-in {
-      from {
-        transform: translateY(10px) scale(0.98);
-        opacity: 0.6;
-      }
-      to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-      }
+      animation: sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     .results {

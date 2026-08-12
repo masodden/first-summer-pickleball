@@ -1,0 +1,151 @@
+import { afterNextRender, Injector } from '@angular/core';
+import type { Router } from '@angular/router';
+
+/** Порядок табов слева направо (тренировки — тот же слот, что турниры). */
+const TAB_ORDER = ['tournaments', 'players', 'admin', 'settings'] as const;
+
+type TabKey = (typeof TAB_ORDER)[number];
+
+export type TabDirection = 'forward' | 'back';
+
+const SWIPE_MS = 320;
+
+function rootSegmentFromUrl(url: string): string {
+  const path = url.split('?')[0]?.split('#')[0] ?? '';
+  return path.replace(/^\//, '').split('/')[0] ?? '';
+}
+
+function tabIndex(rootSegment: string): number {
+  if (rootSegment === 'trainings') return 0;
+  return TAB_ORDER.indexOf(rootSegment as TabKey);
+}
+
+export function tabDirection(
+  fromUrlOrSegment: string,
+  toUrlOrSegment: string,
+): TabDirection | null {
+  const fromRoot = fromUrlOrSegment.includes('/')
+    ? rootSegmentFromUrl(fromUrlOrSegment)
+    : fromUrlOrSegment;
+  const toRoot = toUrlOrSegment.includes('/')
+    ? rootSegmentFromUrl(toUrlOrSegment)
+    : toUrlOrSegment;
+  const fromIdx = tabIndex(fromRoot);
+  const toIdx = tabIndex(toRoot);
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return null;
+  return toIdx > fromIdx ? 'forward' : 'back';
+}
+
+/** Флаг для withViewTransitions: на табах пропускаем VT (иначе остаётся fade). */
+export function markTabSwipeActive(active: boolean): void {
+  if (active) document.documentElement.dataset['tabSwipe'] = '1';
+  else delete document.documentElement.dataset['tabSwipe'];
+}
+
+export function isTabSwipeActive(): boolean {
+  return document.documentElement.dataset['tabSwipe'] === '1';
+}
+
+function reducedMotion(): boolean {
+  return (
+    document.documentElement.dataset['reducedMotion'] === 'true' ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function waitFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left <= 0) resolve();
+      else requestAnimationFrame(() => step(left - 1));
+    };
+    step(count);
+  });
+}
+
+function waitAnimation(el: HTMLElement): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      el.removeEventListener('animationend', done);
+      resolve();
+    };
+    el.addEventListener('animationend', done);
+    window.setTimeout(done, SWIPE_MS + 80);
+  });
+}
+
+function afterRender(injector: Injector): Promise<void> {
+  return new Promise((resolve) => {
+    afterNextRender(() => resolve(), { injector });
+  });
+}
+
+/**
+ * Telegram-like горизонтальный свайп между табами без View Transitions.
+ * Старый main клонируется как ghost и уезжает; новый въезжает навстречу.
+ * Фон — body (один раз); ghost прозрачный.
+ */
+export async function swipeToTab(
+  router: Router,
+  injector: Injector,
+  target: string,
+  direction: TabDirection,
+): Promise<void> {
+  const main = document.getElementById('main');
+  if (!main || reducedMotion()) {
+    markTabSwipeActive(true);
+    try {
+      await router.navigateByUrl(target);
+    } finally {
+      markTabSwipeActive(false);
+    }
+    return;
+  }
+
+  markTabSwipeActive(true);
+
+  const rect = main.getBoundingClientRect();
+  const ghost = main.cloneNode(true) as HTMLElement;
+  ghost.removeAttribute('id');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.classList.remove('vt-main');
+  ghost.classList.add('tab-swipe-ghost', `tab-swipe-ghost--${direction}`);
+  Object.assign(ghost.style, {
+    position: 'fixed',
+    top: `${rect.top}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    margin: '0',
+    zIndex: '35',
+    pointerEvents: 'none',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    viewTransitionName: 'none',
+  });
+  document.body.appendChild(ghost);
+
+  main.classList.add('tab-swipe-main', `tab-swipe-main--${direction}`, 'tab-swipe-main--prep');
+
+  try {
+    await router.navigateByUrl(target);
+    await afterRender(injector);
+    await waitFrames(2);
+
+    main.classList.remove('tab-swipe-main--prep');
+    main.classList.add('tab-swipe-main--run');
+    ghost.classList.add('tab-swipe-ghost--run');
+
+    await Promise.all([waitAnimation(main), waitAnimation(ghost)]);
+  } finally {
+    ghost.remove();
+    main.classList.remove(
+      'tab-swipe-main',
+      'tab-swipe-main--forward',
+      'tab-swipe-main--back',
+      'tab-swipe-main--prep',
+      'tab-swipe-main--run',
+    );
+    markTabSwipeActive(false);
+  }
+}

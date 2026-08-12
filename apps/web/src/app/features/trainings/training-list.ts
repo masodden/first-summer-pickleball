@@ -14,6 +14,7 @@ import { TrainingApi } from '../../core/training-api';
 import { Ball, Racket } from '../../ui/ball';
 import { DomainSwitch } from '../../ui/domain-switch';
 import { StatusBadge } from '../../ui/status-badge';
+import { consumeFirstVisit } from '../../core/motion';
 
 type Filter = 'active' | 'finished';
 
@@ -89,7 +90,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
         @for (group of groups(); track group.day) {
           <section class="stack stack--3">
             <h2>{{ group.day }}</h2>
-            <div class="stack stack--3 stagger">
+            <div class="stack stack--3" [class.stagger]="stagger">
               @for (item of group.items; track item.id) {
                 <a class="glass card--tight tile" [routerLink]="['/trainings', item.id]">
                   <div class="row row--between">
@@ -98,7 +99,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
                   </div>
 
                   <div class="row">
-                    <div class="grow stack stack--1">
+                    <div class="grow stack tile__body">
                       <h3 class="truncate">{{ item.title }}</h3>
                       <div class="row row--wrap tile__meta">
                         <span class="chip">
@@ -161,8 +162,13 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
 
     .tile:hover {
       text-decoration: none;
-      transform: translateY(-2px);
+      /* Без translateY: с backdrop-filter даёт фантомные линии на web. */
       box-shadow: var(--glass-shadow-lg);
+    }
+
+    .tile__body {
+      gap: var(--space-2);
+      min-width: 0;
     }
 
     .tile__meta {
@@ -191,6 +197,7 @@ export class TrainingListPage {
   protected readonly i18n = inject(I18nService);
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('training-list');
 
   protected readonly filter = signal<Filter>('active');
 

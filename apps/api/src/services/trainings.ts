@@ -384,6 +384,26 @@ async function nextWaitlistPosition(db: Database, trainingId: string): Promise<n
   return (row?.value ?? 0) + 1;
 }
 
+/** После promote/remove позиции листа ожидания снова 1…n. */
+async function renumberWaitlist(db: Database, trainingId: string): Promise<void> {
+  const rows = await db
+    .select({ id: trainingPlayers.id })
+    .from(trainingPlayers)
+    .where(
+      and(eq(trainingPlayers.trainingId, trainingId), eq(trainingPlayers.status, 'waitlisted')),
+    )
+    .orderBy(asc(trainingPlayers.waitlistPosition), asc(trainingPlayers.createdAt));
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (!row) continue;
+    await db
+      .update(trainingPlayers)
+      .set({ waitlistPosition: index + 1, updatedAt: new Date() })
+      .where(eq(trainingPlayers.id, row.id));
+  }
+}
+
 export async function addTrainingParticipant(
   db: Database,
   trainingId: string,
@@ -529,6 +549,10 @@ export async function removeTrainingParticipant(
     }
   }
 
+  if (existing.status === 'waitlisted' || existing.status === 'registered') {
+    await renumberWaitlist(db, trainingId);
+  }
+
   await recordAudit(db, actor, {
     action: options.bySelf ? 'training.participant.left' : 'training.participant.removed',
     entityType: 'training_participant',
@@ -637,12 +661,23 @@ export async function promoteTrainingFromWaitlist(
     .returning();
   if (!row) throw notFound('Заявка не найдена');
 
+  await renumberWaitlist(db, trainingId);
+
   const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
+  const [fresh] = await db
+    .select()
+    .from(trainingPlayers)
+    .where(eq(trainingPlayers.id, row.id))
+    .limit(1);
   const nextCounts = await loadCounts(db, trainingId);
   const blocks = toBlockDtos(await loadBlocks(db, trainingId));
   const { totalCost } = moneyFromBlocks(blocks, training.pricePerCourtHour);
   const suggested = trainingSuggestedShare(totalCost, nextCounts.participantCount);
-  return toTrainingParticipantDto(row, toPlayerDto(player as PlayerRow), suggested);
+  return toTrainingParticipantDto(
+    (fresh ?? row) as typeof row,
+    toPlayerDto(player as PlayerRow),
+    suggested,
+  );
 }
 
 export async function listTrainingParticipants(

@@ -299,7 +299,7 @@ export const en: Record<TranslationKey, string> = {
   'standings.points': 'Points',
   'standings.pointsAgainst': 'Conceded',
   'standings.diff': 'Difference',
-  'standings.live': 'Updating live',
+  'standings.live': 'Live',
   'standings.empty': 'No games played yet',
   'standings.sortBy': 'Sort by',
   'standings.sortHint': 'Tap to sort; tap again to reverse',

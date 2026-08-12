@@ -296,7 +296,7 @@ export const ru = {
   'standings.points': 'Очки',
   'standings.pointsAgainst': 'Пропущено',
   'standings.diff': 'Разница',
-  'standings.live': 'Обновляется в прямом эфире',
+  'standings.live': 'Live',
   'standings.empty': 'Пока нет сыгранных матчей',
   'standings.sortBy': 'Сортировать по',
   'standings.sortHint': 'Нажмите, чтобы отсортировать; повторно — в обратном порядке',

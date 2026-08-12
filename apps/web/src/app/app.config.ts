@@ -14,8 +14,15 @@ import {
 import { routes } from './app.routes';
 import { RealtimeService } from './core/realtime';
 import { SessionStore } from './core/session';
+import { isTabSwipeActive } from './core/tab-view-transition';
 import { TelegramService } from './core/telegram';
 import { TelegramBackNavigation } from './core/telegram-back';
+import {
+  applyNavViewTransition,
+  clearNavViewTransition,
+  pathFromSnapshot,
+  reducedMotion,
+} from './core/motion';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,8 +31,18 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(
       routes,
-      // View Transitions: chrome (хедер/таббар) зафиксирован в CSS, кроссфейд только у main.
-      withViewTransitions({ skipInitialTransition: true }),
+      // View Transitions: табы — свой свайп; список→деталь — push/pop; вкладки турнира — короткий слайд.
+      withViewTransitions({
+        skipInitialTransition: true,
+        onViewTransitionCreated: ({ transition, from, to }) => {
+          if (isTabSwipeActive() || reducedMotion() || !from || !to) {
+            transition.skipTransition();
+            return;
+          }
+          applyNavViewTransition(pathFromSnapshot(from), pathFromSnapshot(to));
+          void transition.finished.finally(() => clearNavViewTransition());
+        },
+      }),
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),

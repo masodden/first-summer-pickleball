@@ -44,7 +44,8 @@ export function bindGlassListRepaint(
     if ((options.itemCount?.() ?? minItems) < minItems) return true;
     const overflow = document.documentElement.scrollHeight - window.innerHeight;
     if (overflow < 80) return true;
-    if (!nearBottom()) return true;
+    // После любого заметного скролла; у низа — всегда.
+    if (window.scrollY < 24 && !nearBottom()) return true;
     return false;
   };
 

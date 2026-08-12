@@ -4,6 +4,7 @@ import type { StandingRowDto, StandingsSortKey } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { TournamentStore } from '../../core/tournament-store';
 import { Avatar } from '../../ui/player-line';
+import { FlipMove } from '../../ui/motion';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -23,13 +24,13 @@ interface Column {
 @Component({
   selector: 'app-tournament-standings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Avatar],
+  imports: [RouterLink, Avatar, FlipMove],
   template: `
     <div class="stack stack--3">
       <div class="row row--between">
         <h2>{{ t()('standings.title') }}</h2>
         @if (tournament()?.status === 'running') {
-          <span class="chip chip--go">{{ t()('standings.live') }}</span>
+          <span class="chip chip--go chip--live">{{ t()('standings.live') }}</span>
         }
       </div>
 
@@ -68,8 +69,8 @@ interface Column {
                 </tr>
               </thead>
               <tbody>
-                @for (row of rows(); track row.player.id) {
-                  <tr>
+                @for (row of rows(); track row.player.id; let index = $index) {
+                  <tr [appFlipMove]="row.player.id" [appFlipIndex]="index">
                     <td>
                       @if (row.medal) {
                         <span

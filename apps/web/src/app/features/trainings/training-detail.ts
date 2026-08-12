@@ -102,17 +102,21 @@ import { StatusBadge } from '../../ui/status-badge';
           </div>
         </header>
 
-        <nav class="tabs glass glass--subtle" [attr.aria-label]="t()('training.info')">
-          <a class="tab" routerLinkActive="is-active" [routerLink]="['./info']">
-            {{ t()('training.info') }}
-          </a>
-          <a class="tab" routerLinkActive="is-active" [routerLink]="['./players']">
-            {{ t()('training.players') }}
-            <span class="tab__count numeric">{{ store.registered().length }}</span>
-          </a>
+        <nav class="tabs-wrap glass glass--subtle" [attr.aria-label]="t()('training.info')">
+          <div class="tabs">
+            <a class="tab" routerLinkActive="is-active" [routerLink]="['./info']">
+              {{ t()('training.info') }}
+            </a>
+            <a class="tab" routerLinkActive="is-active" [routerLink]="['./players']">
+              {{ t()('training.players') }}
+              <span class="tab__count numeric">{{ store.registered().length }}</span>
+            </a>
+          </div>
         </nav>
 
-        <router-outlet />
+        <div class="vt-sub">
+          <router-outlet />
+        </div>
       </div>
     }
   `,
@@ -121,12 +125,19 @@ import { StatusBadge } from '../../ui/status-badge';
       gap: var(--space-2);
     }
 
+    .tabs-wrap {
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
     .tabs {
       display: flex;
       gap: 2px;
       padding: 4px;
-      border-radius: var(--radius-full);
       overflow-x: auto;
+      overflow-y: hidden;
+      flex-wrap: nowrap;
+      overscroll-behavior-x: none;
     }
 
     .tab {

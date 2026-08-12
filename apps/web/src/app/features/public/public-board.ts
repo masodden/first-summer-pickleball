@@ -14,6 +14,7 @@ import { Ball } from '../../ui/ball';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { StatusBadge } from '../../ui/status-badge';
+import { FlipMove, ScoreTick } from '../../ui/motion';
 
 /**
  * Публичное табло по короткой ссылке.
@@ -24,7 +25,7 @@ import { StatusBadge } from '../../ui/status-badge';
 @Component({
   selector: 'app-public-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball],
+  imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball, ScoreTick, FlipMove],
   template: `
     @if (board.isLoading() && !board.hasValue()) {
       <div class="stack stack--3">
@@ -51,29 +52,31 @@ import { StatusBadge } from '../../ui/status-badge';
         </header>
 
         @if (currentRound(); as round) {
-          <section class="stack stack--2">
-            <h2>{{ t()('match.round', { index: round.index + 1 }) }}</h2>
-            @for (match of round.matches; track match.id) {
-              <div class="glass card--tight stack stack--2">
-                <div class="row row--between">
-                  <span class="tiny faint">{{ i18n.court(match.courtName) }}</span>
-                  <span class="tiny faint">
-                    {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
-                  </span>
-                </div>
-                @for (team of [match.teamA, match.teamB]; track $index) {
-                  <div class="row team">
-                    <div class="grow stack stack--1">
-                      @for (player of team.players; track player.id) {
-                        <span class="truncate small strong">{{ player.fullName }}</span>
-                      }
-                    </div>
-                    <span class="score numeric">{{ team.score ?? '—' }}</span>
+          @for (key of [round.index]; track key) {
+            <section class="stack stack--2 round-in">
+              <h2>{{ t()('match.round', { index: round.index + 1 }) }}</h2>
+              @for (match of round.matches; track match.id) {
+                <div class="glass card--tight stack stack--2">
+                  <div class="row row--between">
+                    <span class="tiny faint">{{ i18n.court(match.courtName) }}</span>
+                    <span class="tiny faint">
+                      {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
+                    </span>
                   </div>
-                }
-              </div>
-            }
-          </section>
+                  @for (team of [match.teamA, match.teamB]; track $index) {
+                    <div class="row team">
+                      <div class="grow stack stack--1">
+                        @for (player of team.players; track player.id) {
+                          <span class="truncate small strong">{{ player.fullName }}</span>
+                        }
+                      </div>
+                      <app-score-tick class="score" [value]="team.score" />
+                    </div>
+                  }
+                </div>
+              }
+            </section>
+          }
         }
 
         <section class="stack stack--2">
@@ -99,8 +102,8 @@ import { StatusBadge } from '../../ui/status-badge';
                     </tr>
                   </thead>
                   <tbody>
-                    @for (row of data.standings; track row.player.id) {
-                      <tr>
+                    @for (row of data.standings; track row.player.id; let index = $index) {
+                      <tr [appFlipMove]="row.player.id" [appFlipIndex]="index">
                         <td>
                           @if (row.medal) {
                             <span class="medal" [class]="'medal--' + row.medal">{{ row.rank }}</span>
@@ -153,6 +156,15 @@ import { StatusBadge } from '../../ui/status-badge';
       font-weight: 800;
       color: var(--text-strong);
       font-variant-numeric: tabular-nums;
+    }
+
+    .score :deep(.score-tick) {
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .round-in {
+      animation: round-in-fwd 300ms var(--ease-out) both;
     }
 
     .player {

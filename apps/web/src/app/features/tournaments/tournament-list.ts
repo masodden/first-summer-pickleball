@@ -15,6 +15,7 @@ import { TournamentApi } from '../../core/tournament-api';
 import { Ball, Racket } from '../../ui/ball';
 import { DomainSwitch } from '../../ui/domain-switch';
 import { StatusBadge } from '../../ui/status-badge';
+import { consumeFirstVisit } from '../../core/motion';
 
 type Filter = 'active' | 'finished' | 'archived';
 
@@ -128,7 +129,7 @@ function compareTournaments(
               }
             </div>
 
-            <div class="stack stack--3 stagger">
+            <div class="stack stack--3" [class.stagger]="stagger">
               @for (item of group.items; track item.id) {
                 <a class="glass card--tight tile" [routerLink]="['/tournaments', item.id]">
                   <div class="row row--between">
@@ -220,7 +221,7 @@ function compareTournaments(
 
     .tile:hover {
       text-decoration: none;
-      transform: translateY(-2px);
+      /* Без translateY: с backdrop-filter даёт фантомные линии на web. */
       box-shadow: var(--glass-shadow-lg);
     }
 
@@ -276,6 +277,7 @@ export class TournamentListPage {
   protected readonly i18n = inject(I18nService);
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('tournament-list');
 
   protected readonly filter = signal<Filter>('active');
 

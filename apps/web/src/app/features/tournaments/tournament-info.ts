@@ -8,6 +8,7 @@ import {
 import { I18nService } from '../../core/i18n';
 import { TelegramService } from '../../core/telegram';
 import { TournamentStore } from '../../core/tournament-store';
+import { consumeFirstVisit } from '../../core/motion';
 import { TournamentJoinPanel } from './tournament-join-panel';
 
 /**
@@ -22,7 +23,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
   imports: [TournamentJoinPanel],
   template: `
     @if (tournament(); as item) {
-      <div class="stack stack--4 stagger">
+      <div class="stack stack--4" [class.stagger]="stagger">
         <section class="glass card--tight stack stack--3">
           <div class="grid">
             @if (item.category) {
@@ -143,6 +144,7 @@ export class TournamentInfoTab {
   protected readonly store = inject(TournamentStore);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('tournament-info');
 
   protected readonly tournament = this.store.tournament;
 

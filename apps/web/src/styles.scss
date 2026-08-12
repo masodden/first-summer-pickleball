@@ -199,23 +199,16 @@ body {
   font-size: 15px;
   line-height: 1.5;
   color: var(--text-base);
-  background: var(--bg-base);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  overscroll-behavior-y: none;
-}
-
-/* Тёплое «поле» под стеклом: три размытых пятна вместо тяжёлой картинки. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
+  /* Единственная подложка: при свайпе табов виден этот фон, без дублей в DOM. */
+  background-color: var(--bg-base);
+  background-image:
     radial-gradient(58% 44% at 12% 4%, var(--bg-gradient-1), transparent 68%),
     radial-gradient(48% 38% at 92% 12%, var(--bg-gradient-2), transparent 66%),
     radial-gradient(60% 50% at 70% 96%, var(--bg-gradient-3), transparent 70%);
-  pointer-events: none;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
 }
 
 h1,
@@ -316,9 +309,25 @@ button {
   box-shadow: none;
 }
 
-/* Краткий пинок композитору после доскролла (Telegram WebView + backdrop-filter). */
-.person.glass.is-glass-flush {
+/*
+ * Плоское «стекло»: рамка и заливка без blur и без блика.
+ * Нужно строкам игроков и панели раунда — blur в WebView даёт плиты и плёнку.
+ */
+.glass--plain,
+.person.glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
+  isolation: isolate;
   transform: translateZ(0);
+}
+
+.glass--plain::after,
+.person.glass::after {
+  content: none;
+}
+
+.person.glass.is-glass-flush {
   backface-visibility: hidden;
 }
 
@@ -378,6 +387,40 @@ button {
   box-shadow:
     0 14px 32px -10px rgba(168, 72, 43, 0.8),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/*
+ * Панель .glass с яркой CTA: при hover по списку ниже WebKit
+ * «печатает» оранжевый прямоугольник под кнопкой (баг backdrop-filter).
+ * На таких панелях отключаем blur/блик; у кнопки — без внешней тени.
+ */
+.glass:has(.btn--primary),
+.glass:has(.btn--go),
+.glass:has(.btn--accent) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--glass-bg-strong);
+}
+
+.glass:has(.btn--primary)::after,
+.glass:has(.btn--go)::after,
+.glass:has(.btn--accent)::after {
+  content: none;
+}
+
+.glass .btn--primary,
+.glass .btn--go,
+.glass .btn--accent {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.glass .btn--primary:hover:not(:disabled),
+.glass .btn--go:hover:not(:disabled),
+.glass .btn--accent:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  filter: brightness(1.05);
 }
 
 .btn--go {
@@ -1075,14 +1118,104 @@ button {
 }
 
 /* ==========================================================================
-   Переходы между страницами (View Transitions API)
+   Переходы между страницами
    ==========================================================================
-   Best practice для shell-приложений (iOS / liquid glass): chrome не двигается,
-   анимируется только контент — короткий opacity crossfade без translateY.
+   Табы: свой DOM-свайп (.tab-swipe-*), без View Transitions.
+   Остальные маршруты: короткий VT-кроссфейд только у main.
    ========================================================================== */
 
+.vt-header {
+  view-transition-name: app-header;
+}
+
+.vt-main {
+  view-transition-name: app-main;
+}
+
+.vt-sub {
+  view-transition-name: app-sub;
+}
+
+/* Имя VT на таббаре — в глобальных стилях (encapsulated CSS часто игнорируется). */
+.tabbar.vt-tabbar {
+  view-transition-name: app-tabbar;
+}
+
+/* --- Свайп табов (как в Telegram) --- */
+/* 100vw, не 100%: колонка уже колонки, страница должна уехать за край экрана. */
+@keyframes tab-swipe-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100vw);
+  }
+}
+
+@keyframes tab-swipe-in-right {
+  from {
+    transform: translateX(100vw);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes tab-swipe-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+
+@keyframes tab-swipe-in-left {
+  from {
+    transform: translateX(-100vw);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.tab-swipe-ghost {
+  /* Прозрачный: снизу всегда app-underlay, без чёрной дыры между панелями. */
+  background: transparent;
+  will-change: transform;
+}
+
+.tab-swipe-main {
+  will-change: transform;
+  overflow: hidden;
+  background: transparent;
+}
+
+.tab-swipe-main--prep.tab-swipe-main--forward {
+  transform: translateX(100vw);
+}
+
+.tab-swipe-main--prep.tab-swipe-main--back {
+  transform: translateX(-100vw);
+}
+
+.tab-swipe-main--run.tab-swipe-main--forward {
+  animation: tab-swipe-in-right 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.tab-swipe-main--run.tab-swipe-main--back {
+  animation: tab-swipe-in-left 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.tab-swipe-ghost--run.tab-swipe-ghost--forward {
+  animation: tab-swipe-out-left 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.tab-swipe-ghost--run.tab-swipe-ghost--back {
+  animation: tab-swipe-out-right 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  /* Хедер и таббар — как в нативных табах: без морфа и без fade. */
   ::view-transition-group(app-header),
   ::view-transition-group(app-tabbar) {
     animation: none;
@@ -1095,7 +1228,6 @@ button {
     animation: none;
   }
 
-  /* Контент: лёгкий кроссфейд, без подъёма всего экрана. */
   ::view-transition-old(app-main) {
     animation: fade-in 180ms var(--ease-out) reverse both;
   }
@@ -1104,7 +1236,6 @@ button {
     animation: fade-in 220ms var(--ease-out) both;
   }
 
-  /* Остаток (тосты и т.п.) — тоже без сдвига. */
   ::view-transition-old(root) {
     animation: fade-in 160ms var(--ease-out) reverse both;
   }
@@ -1112,6 +1243,189 @@ button {
   ::view-transition-new(root) {
     animation: fade-in 200ms var(--ease-out) both;
   }
+
+  /* Список → деталь: push. Назад: pop. Chrome стоит. */
+  html.vt-push ::view-transition-old(root),
+  html.vt-push ::view-transition-new(root),
+  html.vt-pop ::view-transition-old(root),
+  html.vt-pop ::view-transition-new(root),
+  html.vt-inner-forward ::view-transition-old(root),
+  html.vt-inner-forward ::view-transition-new(root),
+  html.vt-inner-back ::view-transition-old(root),
+  html.vt-inner-back ::view-transition-new(root),
+  html.vt-inner-forward ::view-transition-old(app-main),
+  html.vt-inner-forward ::view-transition-new(app-main),
+  html.vt-inner-back ::view-transition-old(app-main),
+  html.vt-inner-back ::view-transition-new(app-main),
+  html.vt-push ::view-transition-old(app-sub),
+  html.vt-push ::view-transition-new(app-sub),
+  html.vt-pop ::view-transition-old(app-sub),
+  html.vt-pop ::view-transition-new(app-sub) {
+    animation: none !important;
+  }
+
+  html.vt-push ::view-transition-old(app-main),
+  html.vt-push ::view-transition-new(app-main),
+  html.vt-pop ::view-transition-old(app-main),
+  html.vt-pop ::view-transition-new(app-main),
+  html.vt-inner-forward ::view-transition-old(app-sub),
+  html.vt-inner-forward ::view-transition-new(app-sub),
+  html.vt-inner-back ::view-transition-old(app-sub),
+  html.vt-inner-back ::view-transition-new(app-sub) {
+    mix-blend-mode: normal !important;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+  }
+
+  html.vt-push ::view-transition-old(app-main) {
+    animation: vt-push-out 280ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+  }
+
+  html.vt-push ::view-transition-new(app-main) {
+    animation: vt-push-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+    z-index: 2;
+  }
+
+  html.vt-pop ::view-transition-old(app-main) {
+    animation: vt-pop-out 280ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+    z-index: 2;
+  }
+
+  html.vt-pop ::view-transition-new(app-main) {
+    animation: vt-pop-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+  }
+
+  html.vt-inner-forward ::view-transition-old(app-sub) {
+    animation: vt-inner-out 240ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+  }
+
+  html.vt-inner-forward ::view-transition-new(app-sub) {
+    animation: vt-inner-in 240ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+    z-index: 2;
+  }
+
+  html.vt-inner-back ::view-transition-old(app-sub) {
+    animation: vt-inner-in 240ms cubic-bezier(0.32, 0.72, 0, 1) reverse both !important;
+    z-index: 2;
+  }
+
+  html.vt-inner-back ::view-transition-new(app-sub) {
+    animation: vt-inner-out 240ms cubic-bezier(0.32, 0.72, 0, 1) reverse both !important;
+  }
+}
+
+@keyframes vt-push-out {
+  to {
+    transform: translateX(-28%);
+  }
+}
+
+@keyframes vt-push-in {
+  from {
+    transform: translateX(100vw);
+  }
+}
+
+@keyframes vt-pop-out {
+  to {
+    transform: translateX(100vw);
+  }
+}
+
+@keyframes vt-pop-in {
+  from {
+    transform: translateX(-28%);
+  }
+}
+
+@keyframes vt-inner-out {
+  to {
+    transform: translateX(-36%);
+    opacity: 0;
+  }
+}
+
+@keyframes vt-inner-in {
+  from {
+    transform: translateX(36%);
+    opacity: 0;
+  }
+}
+
+/* Live-чип: едва дышит, только пока турнир идёт. */
+.chip--live {
+  animation: live-breathe 2s ease-in-out infinite;
+}
+
+@keyframes live-breathe {
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes match-start {
+  from {
+    transform: scale(0.98);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes winner-in {
+  from {
+    transform: scale(0.98);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes round-in-fwd {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes round-in-back {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes list-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list-enter {
+  animation: list-enter 240ms var(--ease-out) both;
 }
 
 /* Уважает и системную настройку, и переключатель в настройках приложения. */
@@ -1137,10 +1451,36 @@ button {
    Прочее
    ========================================================================== */
 
-.scroll-x {
+.scroll-x,
+.tabs {
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-faint) 45%, transparent) transparent;
+}
+
+.scroll-x::-webkit-scrollbar,
+.tabs::-webkit-scrollbar {
+  height: 2px;
+}
+
+.scroll-x::-webkit-scrollbar-track,
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+  margin-inline: 12px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  /* Капсула табов: бар не доезжает до скруглений. */
+  margin-inline: 35px;
+}
+
+.scroll-x::-webkit-scrollbar-thumb,
+.tabs::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  border-radius: var(--radius-full);
 }
 
 /**
@@ -1155,15 +1495,6 @@ button {
 .table-shell .scroll-x {
   padding-block: var(--space-2);
   padding-inline: var(--space-2);
-}
-
-.scroll-x::-webkit-scrollbar {
-  height: 6px;
-}
-
-.scroll-x::-webkit-scrollbar-thumb {
-  background: var(--glass-border-strong);
-  border-radius: var(--radius-full);
 }
 
 .empty-state {

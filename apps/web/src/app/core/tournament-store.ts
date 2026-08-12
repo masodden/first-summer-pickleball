@@ -56,7 +56,9 @@ export class TournamentStore {
   readonly connection = this.realtime.state;
 
   readonly registered = computed(() =>
-    this.participantsSignal().filter((item) => item.status === 'registered'),
+    this.participantsSignal()
+      .filter((item) => item.status === 'registered')
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   );
   readonly waitlisted = computed(() =>
     this.participantsSignal()

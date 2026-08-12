@@ -13,6 +13,7 @@ import { TelegramService } from '../../core/telegram';
 import { TournamentStore } from '../../core/tournament-store';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
+import { ScoreTick } from '../../ui/motion';
 
 /**
  * Карточка корта.
@@ -23,11 +24,14 @@ import { RatingChip } from '../../ui/rating-chip';
 @Component({
   selector: 'app-match-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Avatar, RatingChip],
-  host: { '[class.card--live]': "match().status === 'running'" },
+  imports: [Avatar, RatingChip, ScoreTick],
+  host: {
+    '[class.card--live]': "match().status === 'running'",
+    '[class.card--done]': "match().status === 'finished' || match().status === 'skipped'",
+  },
   template: `
     <div
-      class="glass card--tight court"
+      class="glass glass--plain card--tight court"
       [class.court--finished]="match().status === 'finished' || match().status === 'skipped'"
     >
       <div class="row row--between">
@@ -36,7 +40,7 @@ import { RatingChip } from '../../ui/rating-chip';
         <div class="row court__status">
           @switch (match().status) {
             @case ('running') {
-              <span class="chip chip--go">{{ t()('match.started') }}</span>
+              <span class="chip chip--go animate-pop">{{ t()('match.started') }}</span>
             }
             @case ('paused') {
               <span class="chip chip--accent">{{ t()('match.paused') }}</span>
@@ -77,7 +81,7 @@ import { RatingChip } from '../../ui/rating-chip';
                 >
                   −
                 </button>
-                <span class="score numeric">{{ first ? draftA() : draftB() }}</span>
+                <app-score-tick class="score" [value]="first ? draftA() : draftB()" />
                 <button
                   type="button"
                   class="step"
@@ -88,9 +92,11 @@ import { RatingChip } from '../../ui/rating-chip';
                 </button>
               </div>
             } @else {
-              <span class="score numeric" [class.score--empty]="team.score === null">
-                {{ team.score ?? '—' }}
-              </span>
+              <app-score-tick
+                class="score"
+                [class.score--empty]="team.score === null"
+                [value]="team.score"
+              />
             }
           </div>
         }
@@ -145,6 +151,12 @@ import { RatingChip } from '../../ui/rating-chip';
 
     :host(.card--live) .court {
       border-color: color-mix(in srgb, var(--success) 50%, transparent);
+      animation: match-start 320ms var(--ease-spring) both;
+    }
+
+    :host(.card--done) .team:not(.team--winner) {
+      opacity: 0.55;
+      transition: opacity 280ms var(--ease-out);
     }
 
     .court--finished {
@@ -181,6 +193,7 @@ import { RatingChip } from '../../ui/rating-chip';
 
     .team--winner {
       background: var(--success-soft);
+      animation: winner-in 300ms var(--ease-spring) both;
     }
 
     .team__players {
@@ -214,6 +227,11 @@ import { RatingChip } from '../../ui/rating-chip';
       min-width: 40px;
       text-align: center;
       font-variant-numeric: tabular-nums;
+    }
+
+    .score :deep(.score-tick) {
+      font-size: inherit;
+      color: inherit;
     }
 
     .score--empty {

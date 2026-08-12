@@ -17,6 +17,7 @@ import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
+import { consumeFirstVisit } from '../../core/motion';
 
 /**
  * Карточка игрока.
@@ -39,8 +40,8 @@ import { RatingChip } from '../../ui/rating-chip';
         <div class="skeleton" style="height: 120px"></div>
       </div>
     } @else if (profile.value(); as data) {
-      <div class="stack stack--4 stagger">
-        <section class="glass card stack stack--3 center">
+      <div class="stack stack--4" [class.stagger]="stagger">
+        <section class="glass card--tight stack stack--3 center">
           <app-avatar class="self-center" [player]="data.player" [size]="84" />
 
           <div class="stack stack--1">
@@ -107,10 +108,8 @@ import { RatingChip } from '../../ui/rating-chip';
 
         @if (data.canEdit) {
           <section class="glass card--tight stack stack--3">
-            <div class="row row--between">
-              <h3>{{ t()('rating.edit') }}</h3>
-              <span class="tiny faint">{{ t()('rating.range') }}</span>
-            </div>
+            <h3>{{ t()('rating.edit') }}</h3>
+            <p class="tiny faint">{{ t()('rating.range') }}</p>
 
             <div class="row">
               <input
@@ -118,6 +117,7 @@ import { RatingChip } from '../../ui/rating-chip';
                 type="text"
                 inputmode="decimal"
                 autocomplete="off"
+                [attr.aria-label]="t()('rating.edit')"
                 [value]="rating()"
                 (input)="rating.set(sanitizeRating(text($event)))"
               />
@@ -132,7 +132,7 @@ import { RatingChip } from '../../ui/rating-chip';
             </div>
 
             @if (data.player.pendingImportRating !== null) {
-              <div class="glass glass--subtle card--tight stack stack--2">
+              <div class="stack stack--2">
                 <span class="small">
                   {{
                     t()('rating.importConflict', {
@@ -162,6 +162,10 @@ import { RatingChip } from '../../ui/rating-chip';
                 </div>
               </div>
             }
+          </section>
+
+          <section class="glass card--tight stack stack--3">
+            <h3>{{ t()('player.profile') }}</h3>
 
             <label class="field">
               <span class="field__label">{{ t()('player.avatarUrl') }}</span>
@@ -339,7 +343,7 @@ import { RatingChip } from '../../ui/rating-chip';
         }
       </div>
     } @else {
-      <div class="glass card empty-state">
+      <div class="glass card--tight empty-state">
         <p>{{ t()('errors.not_found') }}</p>
       </div>
     }
@@ -412,6 +416,7 @@ export class PlayerProfilePage {
   protected readonly session = inject(SessionStore);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('player-profile');
 
   readonly id = input.required<string>();
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ClockService, elapsedMs, formatClock } from '../../core/clock';
 import { ConfirmService } from '../../core/confirm';
@@ -41,14 +41,14 @@ import { MatchCard } from './match-card';
         </div>
       } @else {
         <div class="stack stack--4">
-          <div class="glass glass--subtle card--tight stack stack--3">
+          <div class="glass glass--plain card--tight stack stack--3">
             <div class="row row--between">
               <button
                 type="button"
                 class="btn btn--icon btn--glass"
                 [disabled]="store.viewRound() === 0"
                 [attr.aria-label]="t()('match.previousRound')"
-                (click)="store.showRound(store.viewRound() - 1)"
+                (click)="goRound(store.viewRound() - 1)"
               >
                 <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
                   <path d="M14 6l-6 6 6 6" />
@@ -76,7 +76,7 @@ import { MatchCard } from './match-card';
                 class="btn btn--icon btn--glass"
                 [disabled]="store.viewRound() >= store.roundCount() - 1"
                 [attr.aria-label]="t()('common.next')"
-                (click)="store.showRound(store.viewRound() + 1)"
+                (click)="goRound(store.viewRound() + 1)"
               >
                 <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
                   <path d="M10 6l6 6-6 6" />
@@ -92,7 +92,7 @@ import { MatchCard } from './match-card';
                   [class.pill--active]="round.index === store.viewRound()"
                   [class.pill--done]="round.closed"
                   [class.pill--skipped]="round.skipped"
-                  (click)="store.showRound(round.index)"
+                  (click)="goRound(round.index)"
                 >
                   {{ round.index + 1 }}
                 </button>
@@ -235,23 +235,15 @@ import { MatchCard } from './match-card';
                 }
               </div>
 
-              <div
-                class="round-control__hint tiny"
-                [class.round-control__hint--danger]="overtime()"
-                [class.muted]="!overtime()"
-              >
-                @if (overtime()) {
-                  {{ t()('match.timeUpHint') }}
-                } @else if (
-                  store.canRunRound() &&
-                  (store.roundState() === 'scheduled' || store.roundState() === 'skipped') &&
-                  !store.previousRoundClosed()
-                ) {
-                  {{ t()('match.roundWaitingPrevious') }}
-                } @else if (store.canRunRound() && store.otherRoundLive()) {
-                  {{ t()('match.roundWaitingLive') }}
-                }
-              </div>
+              @if (roundHint(); as hint) {
+                <div
+                  class="round-control__hint tiny"
+                  [class.round-control__hint--danger]="overtime()"
+                  [class.muted]="!overtime()"
+                >
+                  {{ hint }}
+                </div>
+              }
             </div>
 
             @if (store.canManage() && store.canReshuffle()) {
@@ -270,11 +262,17 @@ import { MatchCard } from './match-card';
           </div>
 
           @if (store.currentRound(); as round) {
-            <div class="stack stack--3">
-              @for (match of round.matches; track match.id) {
-                <app-match-card [match]="match" />
-              }
-            </div>
+            @for (key of [round.index]; track key) {
+              <div
+                class="stack stack--3"
+                [class.round-stage--fwd]="roundDir() === 'fwd'"
+                [class.round-stage--back]="roundDir() === 'back'"
+              >
+                @for (match of round.matches; track match.id) {
+                  <app-match-card [match]="match" />
+                }
+              </div>
+            }
 
             @if (round.sittingOut.length > 0) {
               <section class="glass glass--subtle card--tight stack stack--2">
@@ -333,7 +331,7 @@ import { MatchCard } from './match-card';
                 <button
                   type="button"
                   class="btn btn--glass btn--block"
-                  (click)="store.showRound(store.viewRound() + 1)"
+                  (click)="goRound(store.viewRound() + 1)"
                 >
                   {{ t()('match.nextRound') }}
                 </button>
@@ -362,7 +360,8 @@ import { MatchCard } from './match-card';
 
     .pills {
       gap: var(--space-2);
-      padding-bottom: 2px;
+      flex-wrap: nowrap;
+      padding-bottom: 6px;
     }
 
     .pill {
@@ -440,9 +439,7 @@ import { MatchCard } from './match-card';
       font-size: 13.5px;
     }
 
-    /* Слот подсказки всегда занят — кнопки не прыгают при смене раунда. */
     .round-control__hint {
-      min-height: 1.35em;
       line-height: 1.35;
     }
 
@@ -465,6 +462,14 @@ import { MatchCard } from './match-card';
     .round-clock--over {
       color: var(--danger);
     }
+
+    .round-stage--fwd {
+      animation: round-in-fwd 300ms var(--ease-out) both;
+    }
+
+    .round-stage--back {
+      animation: round-in-back 300ms var(--ease-out) both;
+    }
   `,
 })
 export class TournamentRoundsTab {
@@ -478,6 +483,14 @@ export class TournamentRoundsTab {
   protected readonly tournament = this.store.tournament;
   protected readonly plannedRounds = this.store.plannedRounds;
   protected readonly isMexicano = this.store.isMexicano;
+  protected readonly roundDir = signal<'fwd' | 'back' | null>(null);
+
+  protected goRound(index: number): void {
+    const current = this.store.viewRound();
+    if (index === current) return;
+    this.roundDir.set(index > current ? 'fwd' : 'back');
+    this.store.showRound(index);
+  }
 
   protected readonly allDone = computed(() =>
     this.store.rounds().every((round) => round.allScored),
@@ -507,6 +520,20 @@ export class TournamentRoundsTab {
       state !== 'skipped' &&
       state !== 'scheduled'
     );
+  });
+
+  protected readonly roundHint = computed(() => {
+    if (this.overtime()) return this.i18n.translate('match.timeUpHint');
+    if (!this.store.canRunRound()) return null;
+    const state = this.store.roundState();
+    if (
+      (state === 'scheduled' || state === 'skipped') &&
+      !this.store.previousRoundClosed()
+    ) {
+      return this.i18n.translate('match.roundWaitingPrevious');
+    }
+    if (this.store.otherRoundLive()) return this.i18n.translate('match.roundWaitingLive');
+    return null;
   });
 
   /** Показываем остаток, а когда время вышло — сколько уже переиграли. */

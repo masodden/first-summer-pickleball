@@ -16,11 +16,13 @@ import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
 import { TelegramBackNavigation } from '../../core/telegram-back';
+import { consumeFirstVisit } from '../../core/motion';
 import { bindGlassListRepaint } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { PlayerPicker } from '../players/player-picker';
 import { TournamentJoinPanel } from './tournament-join-panel';
+import { SheetDismiss } from '../../ui/motion';
 
 /**
  * Вкладка «Участники»: приём игроков и подтверждение оплаты.
@@ -33,11 +35,14 @@ import { TournamentJoinPanel } from './tournament-join-panel';
 @Component({
   selector: 'app-tournament-players',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PlayerLine, RatingChip, PlayerPicker, TournamentJoinPanel],
+  imports: [RouterLink, PlayerLine, RatingChip, PlayerPicker, TournamentJoinPanel, SheetDismiss],
   template: `
     @if (tournament(); as item) {
       <div class="stack stack--4">
-        @if (store.canManage()) {
+        @if (
+          store.canManage() &&
+          (item.status === 'registration' || item.status === 'registration_closed')
+        ) {
           <section class="glass card--tight stack stack--3">
             <div class="row row--between">
               <div class="stack stack--1">
@@ -62,11 +67,9 @@ import { TournamentJoinPanel } from './tournament-join-panel';
 
             <p class="tiny faint">{{ t()('checkin.hint') }}</p>
 
-            @if (item.status !== 'finished' && item.status !== 'archived' && item.status !== 'running') {
-              <button type="button" class="btn btn--primary btn--block" (click)="picker.set(true)">
-                {{ t()('participant.add') }}
-              </button>
-            }
+            <button type="button" class="btn btn--primary btn--block" (click)="picker.set(true)">
+              {{ t()('participant.add') }}
+            </button>
           </section>
         }
 
@@ -79,7 +82,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
             </div>
           }
 
-          <div class="stack stack--2">
+          <div class="stack stack--2" [class.stagger]="stagger">
             @for (participant of store.registered(); track participant.id; let index = $index) {
               <div
                 class="glass person"
@@ -125,31 +128,31 @@ import { TournamentJoinPanel } from './tournament-join-panel';
                   </button>
                 }
 
-                @if (store.canManage()) {
+                @if (
+                  store.canManage() &&
+                  (item.status === 'registration' || item.status === 'registration_closed')
+                ) {
                   <div class="person__actions">
                     <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
                       <input
                         type="checkbox"
                         [checked]="participant.confirmedAndPaid"
-                        [disabled]="item.status === 'finished' || item.status === 'archived'"
                         (change)="togglePaid(participant, $event)"
                       />
                       <span class="checkbox__box"></span>
                     </label>
 
-                    @if (item.status === 'registration' || item.status === 'registration_closed') {
-                      <button
-                        type="button"
-                        class="btn btn--icon btn--ghost"
-                        [attr.aria-label]="t()('participant.remove')"
-                        [disabled]="store.isBusy('remove:' + participant.player.id)"
-                        (click)="store.removeParticipant(participant.player.id)"
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
-                          <path d="M6 6l12 12M18 6L6 18" />
-                        </svg>
-                      </button>
-                    }
+                    <button
+                      type="button"
+                      class="btn btn--icon btn--ghost"
+                      [attr.aria-label]="t()('participant.remove')"
+                      [disabled]="store.isBusy('remove:' + participant.player.id)"
+                      (click)="store.removeParticipant(participant.player.id)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
+                    </button>
                   </div>
                 }
               </div>
@@ -220,7 +223,12 @@ import { TournamentJoinPanel } from './tournament-join-panel';
 
       @if (replacing(); as incoming) {
         <div class="overlay" (click)="replacing.set(null)">
-          <div class="sheet glass card stack stack--3" (click)="$event.stopPropagation()">
+          <div
+            class="sheet glass card stack stack--3"
+            appSheetDismiss
+            (dismissed)="replacing.set(null)"
+            (click)="$event.stopPropagation()"
+          >
             <div class="row row--between">
               <h3>{{ t()('waitlist.replaceTitle') }}</h3>
               <button
@@ -272,7 +280,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
 
     .person--confirmed {
       border-color: color-mix(in srgb, var(--success) 35%, transparent);
-      background: color-mix(in srgb, var(--success) 8%, var(--glass-bg));
+      background: color-mix(in srgb, var(--success) 10%, color-mix(in srgb, var(--glass-bg) 72%, transparent));
     }
 
     .person__index {
@@ -336,12 +344,14 @@ import { TournamentJoinPanel } from './tournament-join-panel';
         max(var(--space-4), env(safe-area-inset-bottom, 0px));
       background: rgba(36, 26, 22, 0.42);
       backdrop-filter: blur(4px);
+      animation: fade-in var(--duration-fast) ease both;
     }
 
     .sheet {
       width: min(100%, 440px);
       max-height: min(78dvh, 560px);
       overflow: hidden;
+      animation: sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
     }
 
     .replace-list {
@@ -371,6 +381,7 @@ export class TournamentPlayersTab {
 
   protected readonly store = inject(TournamentStore);
   protected readonly t = this.i18n.t;
+  protected readonly stagger = consumeFirstVisit('tournament-players');
   protected readonly tournament = this.store.tournament;
 
   protected readonly picker = signal(false);

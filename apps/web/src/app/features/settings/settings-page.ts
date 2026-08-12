@@ -73,7 +73,7 @@ import { RatingChip } from '../../ui/rating-chip';
         }
       </section>
 
-      <section class="glass card--tight stack stack--3">
+      <section class="glass glass--subtle card--tight stack stack--3">
         <h3>{{ t()('settings.language') }}</h3>
         <div class="row">
           @for (locale of locales; track locale) {
@@ -90,7 +90,7 @@ import { RatingChip } from '../../ui/rating-chip';
         </div>
       </section>
 
-      <section class="glass card--tight stack stack--3">
+      <section class="glass glass--subtle card--tight stack stack--3">
         <h3>{{ t()('settings.appearance') }}</h3>
 
         <div class="row">

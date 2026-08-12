@@ -369,6 +369,29 @@ async function nextWaitlistPosition(db: Database, tournamentId: string): Promise
   return (row?.value ?? 0) + 1;
 }
 
+/** После promote/remove позиции листа ожидания снова 1…n. */
+async function renumberWaitlist(db: Database, tournamentId: string): Promise<void> {
+  const rows = await db
+    .select({ id: tournamentPlayers.id })
+    .from(tournamentPlayers)
+    .where(
+      and(
+        eq(tournamentPlayers.tournamentId, tournamentId),
+        eq(tournamentPlayers.status, 'waitlisted'),
+      ),
+    )
+    .orderBy(asc(tournamentPlayers.waitlistPosition), asc(tournamentPlayers.createdAt));
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (!row) continue;
+    await db
+      .update(tournamentPlayers)
+      .set({ waitlistPosition: index + 1, updatedAt: new Date() })
+      .where(eq(tournamentPlayers.id, row.id));
+  }
+}
+
 export interface AddParticipantResult {
   participant: ParticipantDto;
   waitlisted: boolean;
@@ -561,6 +584,10 @@ export async function removeParticipant(
     }
   }
 
+  if (existing.status === 'waitlisted' || existing.status === 'registered') {
+    await renumberWaitlist(db, tournamentId);
+  }
+
   await recordAudit(db, actor, {
     action: options.bySelf ? 'participant.left' : 'participant.removed',
     entityType: 'participant',
@@ -579,7 +606,9 @@ export async function setParticipantPaid(
 ): Promise<ParticipantDto> {
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
-  if (isTournamentClosed(tournament.status)) throw wrongStatus('Турнир уже завершён');
+  if (tournament.status !== 'registration' && tournament.status !== 'registration_closed') {
+    throw wrongStatus('Подтверждение оплаты доступно до старта игр');
+  }
 
   const [row] = await db
     .update(tournamentPlayers)
@@ -681,6 +710,8 @@ export async function promoteFromWaitlist(
       .set({ status: 'registered', waitlistPosition: null, updatedAt: new Date() })
       .where(eq(tournamentPlayers.id, waitlisted.id));
   }
+
+  await renumberWaitlist(db, tournamentId);
 
   const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   const [row] = await db

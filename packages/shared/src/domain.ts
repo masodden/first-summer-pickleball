@@ -3,7 +3,7 @@
  * было понятно, какая сборка у него на телефоне. Поднимать при релизе вместе с
  * `version` в package.json.
  */
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '5.5.1';
 
 /** Контакт для обратной связи: сюда игроки пишут про баги. */
 export const FEEDBACK_TELEGRAM = 'masodden';
