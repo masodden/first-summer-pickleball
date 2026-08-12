@@ -60,6 +60,7 @@
           "options": {
             "proxyConfig": "proxy.conf.mjs",
             "port": 4200,
+            "allowedHosts": true,
             "prebundle": {
               "exclude": ["@fsp/shared"]
             }

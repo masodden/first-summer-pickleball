@@ -226,7 +226,8 @@ export class TabBar {
 
   protected readonly activeTab = computed((): TabId | '' => {
     const root = this.url().split('?')[0]?.replace(/^\//, '').split('/')[0] ?? '';
-    if (root === 'tournaments' || root === 'trainings') return 'tournaments';
+    // `/` в Mini App часто не успевает редиректнуться в /tournaments — это тот же таб.
+    if (!root || root === 'tournaments' || root === 'trainings') return 'tournaments';
     if (root === 'players' || root === 'admin' || root === 'settings') return root;
     return '';
   });
