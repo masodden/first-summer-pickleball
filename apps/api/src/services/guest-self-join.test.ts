@@ -206,8 +206,10 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
       admin,
       'test_bot',
       'http://localhost:4200',
+      'play',
     );
-    expect(invite.url).toContain('invite_');
+    expect(invite.url).toContain('startapp=invite_');
+    expect(invite.url).toContain('t.me/test_bot/play');
 
     const realUser = await ensureGuestPlayerForAccount(db, await insertAccount('Катя'));
     const orphanGuestId = realUser.playerId!;
@@ -233,9 +235,90 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
     expect(session.player?.id).toBe(guestCard.id);
     expect(session.claim?.status).toBe('approved');
 
+    // Повтор тем же аккаунтом (клиент добивает после логина) — без ошибки.
+    const again = await useInvite(db, invite.token, realUser);
+    expect(again.player?.id).toBe(guestCard.id);
+
     const { participants } = await listParticipants(db, tournament.id);
     expect(participants.some((row) => row.player.id === guestCard.id)).toBe(true);
     expect(participants.some((row) => row.player.id === orphanGuestId)).toBe(false);
+  });
+
+  it('invite с DUPR-карточки привязывает Telegram без сироты «Имя Гость»', async () => {
+    const adminAccount = await insertAccount('DuprInviteAdmin');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const duprId = `I${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Игорь',
+      lastName: 'Дупров',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const invite = await createInvite(
+      db,
+      duprId,
+      admin,
+      'test_bot',
+      'http://localhost:4200',
+      null,
+    );
+    expect(invite.url).toContain('start=invite_');
+
+    // Как /api/auth/telegram с inviteToken: аккаунт ещё без карточки.
+    const fresh = await insertAccount('Игорь');
+    expect(fresh.playerId).toBeNull();
+
+    const session = await useInvite(db, invite.token, fresh);
+    expect(session.player?.id).toBe(duprId);
+    expect(session.player?.isGuest).toBe(false);
+    expect(session.player?.duprId).toBe(duprId);
+    expect(session.claim?.status).toBe('approved');
+
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, fresh.id)).limit(1);
+    expect(account?.playerId).toBe(duprId);
+    expect(account?.playerId?.startsWith('G-')).toBe(false);
+  });
+
+  it('invite на DUPR забирает уже созданного автогостя', async () => {
+    const adminAccount = await insertAccount('DuprAdoptAdmin');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const duprId = `J${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Юля',
+      lastName: 'Рейтинг',
+      isGuest: false,
+      nameSource: 'manual',
+    });
+
+    const invite = await createInvite(db, duprId, admin, undefined, 'http://localhost:4200');
+
+    const withGuest = await ensureGuestPlayerForAccount(db, await insertAccount('Юля'));
+    const orphanId = withGuest.playerId!;
+    expect(orphanId.startsWith('G-')).toBe(true);
+
+    const session = await useInvite(db, invite.token, withGuest);
+    expect(session.player?.id).toBe(duprId);
+    expect(session.player?.isGuest).toBe(false);
+
+    const [orphan] = await db.select().from(players).where(eq(players.id, orphanId)).limit(1);
+    expect(orphan?.mergedIntoId).toBe(duprId);
   });
 
   it('аккаунт с уже привязанным DUPR не превращается в гостя', async () => {
@@ -432,7 +515,7 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
       avatarUrl: 'https://example.com/oleg.jpg',
       avatarSource: 'self',
       mergedIntoId: duprId,
-      nameSource: 'telegram',
+      nameSource: 'self',
     });
 
     const restored = await restoreContactsFromMergedGuests(db, duprId);

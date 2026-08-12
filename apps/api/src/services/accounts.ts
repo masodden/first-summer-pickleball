@@ -472,6 +472,9 @@ export async function decideClaim(
  *
  * Организатор отправляет её игроку, и тот привязывает свой Telegram к карточке
  * без ручной проверки: доверие уже подтверждено тем, кто выдал ссылку.
+ *
+ * Если задан short name Mini App — сразу `startapp=invite_…` (start_param в initData).
+ * Иначе `?start=invite_…` → бот пришлёт кнопку с `?invite=` в URL.
  */
 export async function createInvite(
   db: Database,
@@ -479,6 +482,7 @@ export async function createInvite(
   actor: Viewer,
   botUsername: string | undefined,
   webUrl: string,
+  miniAppShortName?: string | null,
 ): Promise<InviteDto> {
   const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   if (!player) throw notFound('Игрок не найден');
@@ -505,11 +509,17 @@ export async function createInvite(
     expiresAt,
   });
 
-  // start= надёжнее startapp: не требует Main Mini App в BotFather.
-  // Без бота — query-параметр, его подхватит Mini App при открытии.
-  const url = botUsername
-    ? `https://t.me/${botUsername}?start=invite_${token}`
-    : `${webUrl.replace(/\/$/, '')}/?invite=${encodeURIComponent(token)}`;
+  const payload = `invite_${token}`;
+  const user = botUsername?.replace(/^@/, '');
+  const short = miniAppShortName?.replace(/^\/+|\/+$/g, '');
+  let url: string;
+  if (user && short) {
+    url = `https://t.me/${user}/${short}?startapp=${payload}`;
+  } else if (user) {
+    url = `https://t.me/${user}?start=${payload}`;
+  } else {
+    url = `${webUrl.replace(/\/$/, '')}/?invite=${encodeURIComponent(token)}`;
+  }
 
   await recordAudit(db, actor, {
     action: 'invite.created',
@@ -530,7 +540,16 @@ export async function useInvite(
     .from(invites)
     .where(and(eq(invites.token, token), isNull(invites.usedAt)))
     .limit(1);
-  if (!invite) throw new ApiError('invite_invalid', 'Ссылка недействительна или уже использована');
+
+  // Повторный вызов тем же аккаунтом (логин уже применил invite) — не ошибка.
+  if (!invite) {
+    const [used] = await db.select().from(invites).where(eq(invites.token, token)).limit(1);
+    if (used?.usedByAccountId === account.id) {
+      const linked = await getAccount(db, account.id);
+      return buildSession(db, linked);
+    }
+    throw new ApiError('invite_invalid', 'Ссылка недействительна или уже использована');
+  }
   if (invite.expiresAt.getTime() < Date.now()) {
     throw new ApiError('invite_invalid', 'Срок действия ссылки истёк');
   }

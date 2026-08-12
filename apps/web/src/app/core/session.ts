@@ -81,25 +81,14 @@ export class SessionStore {
   }
 
   /**
-   * Ссылка-приглашение: `invite_<token>` уже применилась на /api/auth/telegram,
-   * а `?invite=` из кнопки бота нужно принять отдельно.
+   * Страховка после логина: токен мог уйти в body (`inviteToken`) или в start_param.
+   * `useInvite` идемпотентен для того же аккаунта — повтор не ломает сессию.
    */
   private async consumeInviteDeepLink(): Promise<void> {
     const token = readInviteDeepLink(this.telegram.startParam);
     if (!token) return;
-
-    const fromTelegramStart = Boolean(this.telegram.startParam?.startsWith('invite_'));
     this.clearInviteQuery();
-
     if (!this.api.token()) return;
-
-    if (fromTelegramStart) {
-      // Сервер уже привязал карточку при логине.
-      if (this.playerId()) {
-        this.toast.success(this.i18n.translate('claim.inviteApplied'));
-      }
-      return;
-    }
 
     try {
       await this.useInvite(token);
@@ -121,7 +110,11 @@ export class SessionStore {
   }
 
   async loginWithTelegram(initData: string): Promise<void> {
-    const response = await this.api.post<AuthResponseDto>('/api/auth/telegram', { initData });
+    const inviteToken = readInviteDeepLink(this.telegram.startParam);
+    const response = await this.api.post<AuthResponseDto>('/api/auth/telegram', {
+      initData,
+      ...(inviteToken ? { inviteToken } : {}),
+    });
     this.api.setToken(response.token);
     this.applySession(response.session);
   }

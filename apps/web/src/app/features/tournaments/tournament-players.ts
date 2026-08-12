@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { ParticipantDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
@@ -7,6 +14,7 @@ import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
+import { bindGlassListRemount } from '../../ui/glass-list-remount';
 import { PlayerLine } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { PlayerPicker } from '../players/player-picker';
@@ -70,7 +78,11 @@ import { TournamentJoinPanel } from './tournament-join-panel';
           }
 
           <div class="stack stack--2">
-            @for (participant of store.registered(); track participant.id; let index = $index) {
+            @for (
+              participant of store.registered();
+              track listGen() + ':' + participant.id;
+              let index = $index
+            ) {
               <div
                 class="glass person"
                 [class.person--confirmed]="participant.confirmedAndPaid"
@@ -150,7 +162,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
         @if (store.waitlisted().length > 0) {
           <section class="stack stack--2">
             <h3>{{ t()('waitlist.title') }}</h3>
-            @for (participant of store.waitlisted(); track participant.id) {
+            @for (participant of store.waitlisted(); track listGen() + ':' + participant.id) {
               <div class="glass glass--subtle card--tight person">
                 <span class="person__index tiny faint numeric">
                   {{ participant.waitlistPosition }}
@@ -365,6 +377,8 @@ export class TournamentPlayersTab {
   protected readonly editing = signal<string | null>(null);
   protected readonly draftRating = signal('');
   protected readonly savingRating = signal(false);
+  /** Бамп после скролла — remount glass-строк (см. bindGlassListRemount). */
+  protected readonly listGen = signal(0);
 
   protected readonly takenIds = computed(
     () => new Set(this.store.participants().map((item) => item.player.id)),
@@ -372,6 +386,15 @@ export class TournamentPlayersTab {
 
   /** Рейтинг ведут вручную, поэтому его правит организатор прямо в списке. */
   protected readonly canEditRating = computed(() => this.store.canManage());
+
+  constructor() {
+    bindGlassListRemount(this.listGen, {
+      destroyRef: inject(DestroyRef),
+      paused: () =>
+        this.editing() !== null || this.picker() || this.replacing() !== null || this.savingRating(),
+      itemCount: () => this.store.registered().length + this.store.waitlisted().length,
+    });
+  }
 
   protected async add(playerId: string): Promise<void> {
     this.picker.set(false);

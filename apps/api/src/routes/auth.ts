@@ -41,14 +41,25 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
         'На сервере не задан TELEGRAM_BOT_TOKEN, вход через Telegram недоступен',
       );
     }
-    const body = parse(z.object({ initData: z.string().min(1) }), request.body);
+    const body = parse(
+      z.object({
+        initData: z.string().min(1),
+        /** Из `?invite=` на кнопке бота — start_param в initData тогда пуст. */
+        inviteToken: z.string().trim().min(1).max(128).optional(),
+      }),
+      request.body,
+    );
     const verified = verifyInitData(body.initData, env.TELEGRAM_BOT_TOKEN);
     let account = await loginWithTelegram(db, verified);
 
-    // Ссылка-приглашение может приехать прямо в deep-link Mini App.
-    const startParam = verified.startParam;
-    if (startParam?.startsWith('invite_')) {
-      const session = await useInvite(db, startParam.slice('invite_'.length), account);
+    // Invite до автогостя: иначе получается сирота «Имя Гость» рядом с DUPR.
+    const fromStart = verified.startParam?.startsWith('invite_')
+      ? verified.startParam.slice('invite_'.length).trim()
+      : null;
+    const inviteToken = fromStart || body.inviteToken || null;
+
+    if (inviteToken) {
+      await useInvite(db, inviteToken, account);
       account = await getAccount(db, account.id);
       await syncPlayerProfileFromTelegram(db, account);
       return {

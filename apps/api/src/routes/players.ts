@@ -116,6 +116,7 @@ export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): voi
       viewer,
       env.TELEGRAM_BOT_USERNAME,
       env.PUBLIC_WEB_URL,
+      env.TELEGRAM_MINI_APP_SHORT_NAME,
     );
     return { invite };
   });
