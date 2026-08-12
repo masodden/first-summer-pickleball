@@ -222,6 +222,11 @@ export const en: Record<TranslationKey, string> = {
   'waitlist.joined': 'You are on the waiting list',
   'waitlist.promoted': 'You have been moved into the main draw',
   'waitlist.promote': 'Move into the draw',
+  'waitlist.replace': 'Replace a player',
+  'waitlist.replaceTitle': 'Who should be replaced?',
+  'waitlist.replaceHint': 'Pick a player from the draw — they will be removed and {{name}} takes the spot.',
+  'waitlist.replaced': 'Waitlisted player took a spot in the draw',
+  'waitlist.replaceConfirm': 'Replace {{outgoing}} with {{incoming}}?',
 
   'checkin.title': 'Check-in',
   'checkin.hint':

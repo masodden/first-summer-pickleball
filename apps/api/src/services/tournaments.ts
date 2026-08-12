@@ -611,29 +611,90 @@ export async function promoteFromWaitlist(
   tournamentId: string,
   playerId: string,
   actor: Viewer,
+  options: { replacePlayerId?: string } = {},
 ): Promise<ParticipantDto> {
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
 
-  const counts = await loadCounts(db, tournamentId);
-  if (counts.participantCount >= tournament.maxPlayers) {
-    throw new ApiError('validation_failed', 'Свободных мест нет, увеличьте состав турнира');
+  const replacePlayerId = options.replacePlayerId;
+
+  const [waitlisted] = await db
+    .select()
+    .from(tournamentPlayers)
+    .where(
+      and(
+        eq(tournamentPlayers.tournamentId, tournamentId),
+        eq(tournamentPlayers.playerId, playerId),
+        eq(tournamentPlayers.status, 'waitlisted'),
+      ),
+    )
+    .limit(1);
+  if (!waitlisted) throw notFound('Игрок не в листе ожидания');
+
+  if (replacePlayerId) {
+    if (replacePlayerId === playerId) {
+      throw new ApiError('validation_failed', 'Нельзя заменить игрока самим собой');
+    }
+    if (tournament.status === 'running' || isTournamentClosed(tournament.status)) {
+      throw wrongStatus('Состав уже зафиксирован расписанием');
+    }
+
+    const [outgoing] = await db
+      .select()
+      .from(tournamentPlayers)
+      .where(
+        and(
+          eq(tournamentPlayers.tournamentId, tournamentId),
+          eq(tournamentPlayers.playerId, replacePlayerId),
+          eq(tournamentPlayers.status, 'registered'),
+        ),
+      )
+      .limit(1);
+    if (!outgoing) throw notFound('Игрок для замены не найден в составе');
+
+    await db.transaction(async (tx) => {
+      await tx.delete(tournamentPlayers).where(eq(tournamentPlayers.id, outgoing.id));
+      await tx
+        .update(tournamentPlayers)
+        .set({ status: 'registered', waitlistPosition: null, updatedAt: new Date() })
+        .where(eq(tournamentPlayers.id, waitlisted.id));
+    });
+
+    await recordAudit(db, actor, {
+      action: 'participant.replaced',
+      entityType: 'participant',
+      entityId: waitlisted.id,
+      tournamentId,
+      payload: { promotedPlayerId: playerId, replacedPlayerId: replacePlayerId },
+    });
+  } else {
+    const counts = await loadCounts(db, tournamentId);
+    if (counts.participantCount >= tournament.maxPlayers) {
+      throw new ApiError(
+        'validation_failed',
+        'Свободных мест нет — выберите, кого заменить из состава',
+      );
+    }
+
+    await db
+      .update(tournamentPlayers)
+      .set({ status: 'registered', waitlistPosition: null, updatedAt: new Date() })
+      .where(eq(tournamentPlayers.id, waitlisted.id));
   }
 
+  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
   const [row] = await db
-    .update(tournamentPlayers)
-    .set({ status: 'registered', waitlistPosition: null, updatedAt: new Date() })
+    .select()
+    .from(tournamentPlayers)
     .where(
       and(
         eq(tournamentPlayers.tournamentId, tournamentId),
         eq(tournamentPlayers.playerId, playerId),
       ),
     )
-    .returning();
-  if (!row) throw notFound('Заявка не найдена');
-
-  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
-  return toParticipantDto(row, toPlayerDto(player as PlayerRow));
+    .limit(1);
+  if (!row || !player) throw notFound('Заявка не найдена');
+  return toParticipantDto(row, toPlayerDto(player));
 }
 
 export async function listParticipants(

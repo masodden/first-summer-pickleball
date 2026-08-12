@@ -112,8 +112,15 @@ export class TournamentApi {
     );
   }
 
-  promote(id: string, playerId: string): Promise<{ participant: ParticipantDto }> {
-    return this.api.post(`/api/tournaments/${id}/participants/${playerId}/promote`);
+  promote(
+    id: string,
+    playerId: string,
+    replacePlayerId?: string,
+  ): Promise<{ participant: ParticipantDto }> {
+    return this.api.post(
+      `/api/tournaments/${id}/participants/${playerId}/promote`,
+      replacePlayerId ? { replacePlayerId } : {},
+    );
   }
 
   closeRegistration(id: string): Promise<{ tournament: TournamentDto }> {

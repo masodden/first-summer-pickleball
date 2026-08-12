@@ -357,11 +357,13 @@ export class TournamentStore {
     );
   }
 
-  promote(playerId: string): Promise<void> {
+  promote(playerId: string, replacePlayerId?: string): Promise<void> {
     return this.run(`promote:${playerId}`, async () => {
-      await this.api.promote(this.requireId(), playerId);
+      await this.api.promote(this.requireId(), playerId, replacePlayerId);
       await this.load({ silent: true });
-      this.toast.success(this.i18n.translate('waitlist.promoted'));
+      this.toast.success(
+        this.i18n.translate(replacePlayerId ? 'waitlist.replaced' : 'waitlist.promoted'),
+      );
     });
   }
 

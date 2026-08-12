@@ -161,9 +161,11 @@ import { TournamentJoinPanel } from './tournament-join-panel';
                     type="button"
                     class="btn btn--sm btn--glass"
                     [disabled]="store.isBusy('promote:' + participant.player.id)"
-                    (click)="store.promote(participant.player.id)"
+                    (click)="promoteOrReplace(participant)"
                   >
-                    {{ t()('waitlist.promote') }}
+                    {{
+                      store.isFull() ? t()('waitlist.replace') : t()('waitlist.promote')
+                    }}
                   </button>
                 }
               </div>
@@ -204,6 +206,46 @@ import { TournamentJoinPanel } from './tournament-join-panel';
           (closed)="picker.set(false)"
           (picked)="add($event)"
         />
+      }
+
+      @if (replacing(); as incoming) {
+        <div class="overlay" (click)="replacing.set(null)">
+          <div class="sheet glass card stack stack--3" (click)="$event.stopPropagation()">
+            <div class="row row--between">
+              <h3>{{ t()('waitlist.replaceTitle') }}</h3>
+              <button
+                type="button"
+                class="btn btn--icon btn--glass"
+                [attr.aria-label]="t()('common.close')"
+                (click)="replacing.set(null)"
+              >
+                <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <p class="small muted">
+              {{ t()('waitlist.replaceHint', { name: incoming.player.fullName }) }}
+            </p>
+            <div class="stack stack--2 replace-list">
+              @for (candidate of store.registered(); track candidate.id) {
+                <button
+                  type="button"
+                  class="glass glass--subtle card--tight person replace-pick"
+                  [disabled]="store.isBusy('promote:' + incoming.player.id)"
+                  (click)="confirmReplace(incoming, candidate)"
+                >
+                  <app-player-line
+                    class="grow"
+                    [player]="candidate.player"
+                    [avatarSize]="30"
+                    [link]="false"
+                  />
+                </button>
+              }
+            </div>
+          </div>
+        </div>
       }
     }
   `,
@@ -267,10 +309,44 @@ import { TournamentJoinPanel } from './tournament-join-panel';
     .icon {
       width: 15px;
       height: 15px;
-      fill: none;
       stroke: currentColor;
-      stroke-width: 2.2;
+      fill: none;
+      stroke-width: 2;
       stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: end center;
+      padding: var(--space-4);
+      background: color-mix(in srgb, var(--ink-900) 45%, transparent);
+    }
+
+    .sheet {
+      width: min(100%, 440px);
+      max-height: min(70vh, 560px);
+      margin-bottom: env(safe-area-inset-bottom, 0);
+      overflow: hidden;
+    }
+
+    .replace-list {
+      overflow: auto;
+      max-height: min(50vh, 400px);
+    }
+
+    .replace-pick {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      border: 0;
+    }
+
+    .replace-pick:hover {
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     }
   `,
 })
@@ -285,6 +361,7 @@ export class TournamentPlayersTab {
   protected readonly tournament = this.store.tournament;
 
   protected readonly picker = signal(false);
+  protected readonly replacing = signal<ParticipantDto | null>(null);
   protected readonly editing = signal<string | null>(null);
   protected readonly draftRating = signal('');
   protected readonly savingRating = signal(false);
@@ -299,6 +376,32 @@ export class TournamentPlayersTab {
   protected async add(playerId: string): Promise<void> {
     this.picker.set(false);
     await this.store.addParticipant(playerId);
+  }
+
+  protected promoteOrReplace(participant: ParticipantDto): void {
+    if (this.store.isFull()) {
+      this.replacing.set(participant);
+      return;
+    }
+    void this.store.promote(participant.player.id);
+  }
+
+  protected async confirmReplace(
+    incoming: ParticipantDto,
+    outgoing: ParticipantDto,
+  ): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: this.i18n.translate('waitlist.replace'),
+      message: this.i18n.translate('waitlist.replaceConfirm', {
+        outgoing: outgoing.player.fullName,
+        incoming: incoming.player.fullName,
+      }),
+      confirmLabel: this.i18n.translate('waitlist.replace'),
+      danger: true,
+    });
+    if (!ok) return;
+    this.replacing.set(null);
+    await this.store.promote(incoming.player.id, outgoing.player.id);
   }
 
   protected async start(): Promise<void> {

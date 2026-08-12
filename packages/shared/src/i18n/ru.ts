@@ -219,6 +219,11 @@ export const ru = {
   'waitlist.joined': 'Вы в листе ожидания',
   'waitlist.promoted': 'Вас перевели в основной состав',
   'waitlist.promote': 'Перевести в состав',
+  'waitlist.replace': 'Заменить игрока',
+  'waitlist.replaceTitle': 'Кого заменить?',
+  'waitlist.replaceHint': 'Выберите игрока из состава — его снимут, а место займёт {{name}}.',
+  'waitlist.replaced': 'Игрок из листа ожидания занял место в составе',
+  'waitlist.replaceConfirm': 'Заменить {{outgoing}} на {{incoming}}?',
 
   'checkin.title': 'Приём участников',
   'checkin.hint':

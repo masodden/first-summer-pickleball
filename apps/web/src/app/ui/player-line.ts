@@ -12,9 +12,17 @@ import type { PlayerDto } from '@fsp/shared';
 import { I18nService } from '../core/i18n';
 import { RatingChip } from './rating-chip';
 
+function safeText(value: string | null | undefined): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /**
  * Аватар игрока: инициалы всегда на месте, фото появляется после успешной
  * загрузки. Битый URL с Telegram не ломает карточку — остаёмся на буквах.
+ *
+ * Важно: при WS-обновлении состава объект player пересоздаётся с тем же URL.
+ * Нельзя из‑за этого сбрасывать loaded — иначе картинка мигает и в WebView
+ * Telegram иногда «глотает» всю строку игрока.
  */
 @Component({
   selector: 'app-avatar',
@@ -24,18 +32,19 @@ import { RatingChip } from './rating-chip';
     <span class="avatar__initials" aria-hidden="true" [class.is-hidden]="photoReady()">
       {{ initials() }}
     </span>
-    @if (pendingUrl(); as src) {
+    @if (displayUrl(); as src) {
       <img
         class="avatar__img"
         [src]="src"
-        [alt]="player().fullName"
+        [alt]="player().fullName || ''"
         [width]="size()"
         [height]="size()"
         loading="lazy"
         decoding="async"
+        referrerpolicy="no-referrer"
         [class.is-ready]="photoReady()"
-        (load)="onLoad()"
-        (error)="onError()"
+        (load)="onLoad(src)"
+        (error)="onError(src)"
       />
     }
   `,
@@ -84,36 +93,52 @@ export class Avatar {
   /** Логический размер в CSS-пикселях; URL с Telegram обычно уже ~160–320px. */
   readonly size = input(40);
 
-  /** URL, который сейчас пытаемся загрузить; null — только инициалы. */
-  protected readonly pendingUrl = signal<string | null>(null);
-  protected readonly loaded = signal(false);
+  /** Актуальный URL с карточки (может приходить снова при каждом WS-тике). */
+  private readonly sourceUrl = signal<string | null>(null);
+  /** URL, который уже успешно показан. */
+  private readonly loadedUrl = signal<string | null>(null);
+  /** URL, который уже упал — не пытаемся снова, пока не сменится. */
+  private readonly failedUrl = signal<string | null>(null);
 
   protected readonly initials = computed(() => {
     const player = this.player();
-    const first = player.firstName.trim().at(0) ?? '';
-    const last = player.lastName.trim().at(0) ?? '';
+    const first = safeText(player.firstName).at(0) ?? '';
+    const last = safeText(player.lastName).at(0) ?? '';
     return `${first}${last}`.toUpperCase() || '?';
   });
 
-  protected readonly photoReady = computed(
-    () => this.loaded() && this.pendingUrl() !== null,
-  );
+  protected readonly displayUrl = computed(() => {
+    const url = this.sourceUrl();
+    if (!url || url === this.failedUrl()) return null;
+    return url;
+  });
+
+  protected readonly photoReady = computed(() => {
+    const url = this.displayUrl();
+    return url !== null && this.loadedUrl() === url;
+  });
 
   constructor() {
     effect(() => {
-      const url = this.player().avatarUrl?.trim() || null;
-      this.pendingUrl.set(url);
-      this.loaded.set(false);
+      const url = safeText(this.player().avatarUrl) || null;
+      if (url === this.sourceUrl()) return;
+      this.sourceUrl.set(url);
+      // Новый URL — даём ещё один шанс, даже если старый падал.
+      if (url !== this.failedUrl()) {
+        // loadedUrl оставляем: если совпадёт с новым — photoReady сразу true;
+        // если нет — покажем инициалы, пока не придёт load.
+      }
     });
   }
 
-  protected onLoad(): void {
-    this.loaded.set(true);
+  protected onLoad(src: string): void {
+    this.loadedUrl.set(src);
+    if (this.failedUrl() === src) this.failedUrl.set(null);
   }
 
-  protected onError(): void {
-    this.pendingUrl.set(null);
-    this.loaded.set(false);
+  protected onError(src: string): void {
+    this.failedUrl.set(src);
+    if (this.loadedUrl() === src) this.loadedUrl.set(null);
   }
 }
 
@@ -136,10 +161,10 @@ export class Avatar {
       <div class="line__text grow">
         @if (link()) {
           <a class="line__name truncate" [routerLink]="['/players', player().id]">
-            {{ player().fullName }}
+            {{ displayName() }}
           </a>
         } @else {
-          <span class="line__name truncate">{{ player().fullName }}</span>
+          <span class="line__name truncate">{{ displayName() }}</span>
         }
 
         @if (subtitle()) {
@@ -189,4 +214,14 @@ export class PlayerLine {
   readonly link = input(true);
 
   protected readonly t = inject(I18nService).t;
+
+  protected readonly displayName = computed(() => {
+    const player = this.player();
+    const full = safeText(player.fullName);
+    if (full) return full;
+    const joined = [safeText(player.firstName), safeText(player.lastName)]
+      .filter(Boolean)
+      .join(' ');
+    return joined || player.id;
+  });
 }

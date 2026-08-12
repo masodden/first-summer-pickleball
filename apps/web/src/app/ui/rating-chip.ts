@@ -47,7 +47,10 @@ export class RatingChip {
 
   protected readonly value = computed(() => {
     const rating = this.player().doublesRating;
-    return rating === null ? this.i18n.translate('rating.noneShort') : rating.toFixed(3);
+    if (rating === null || rating === undefined || Number.isNaN(Number(rating))) {
+      return this.i18n.translate('rating.noneShort');
+    }
+    return Number(rating).toFixed(3);
   });
 
   protected readonly hint = computed(() => {

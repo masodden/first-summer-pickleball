@@ -202,17 +202,28 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     '/api/tournaments/:id/participants/:playerId/promote',
     async (request) => {
       const viewer = requireRole(request, 'moderator');
+      const body = parse(
+        z.object({ replacePlayerId: z.string().trim().min(1).max(32).optional() }),
+        request.body ?? {},
+      );
       const participant = await promoteFromWaitlist(
         db,
         request.params.id,
         request.params.playerId,
         viewer,
+        { replacePlayerId: body.replacePlayerId },
       );
       await broadcastParticipants(db, hub, request.params.id);
       await notify.sendToPlayers(
         [request.params.playerId],
         'Вас перевели из листа ожидания в основной состав турнира.',
       );
+      if (body.replacePlayerId) {
+        await notify.sendToPlayers(
+          [body.replacePlayerId],
+          'Вас сняли с турнира: место отдали игроку из листа ожидания.',
+        );
+      }
       return { participant };
     },
   );
