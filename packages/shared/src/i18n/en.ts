@@ -304,6 +304,11 @@ export const en: Record<TranslationKey, string> = {
   'player.telegramHint': 'Username without @, e.g. ivan_pickle',
   'player.telegramLink': 'Link Telegram',
   'player.telegramLinked': 'Telegram linked',
+  'player.telegramNoUsername': 'Telegram linked, but no @username',
+  'player.telegramNoUsernameHint':
+    'Without a public username you cannot open a Telegram chat. Ask the player to message the organiser.',
+  'player.nudgeContact': 'Remind to message @{{contact}}',
+  'player.nudgeContactSent': 'Reminder sent via the bot',
   'player.duprId': 'DUPR ID',
   'player.stats': 'Statistics',
   'player.statsTournaments': 'Tournaments',

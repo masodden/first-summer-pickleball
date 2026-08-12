@@ -100,6 +100,7 @@ export async function buildServer() {
     telegram: Boolean(env.TELEGRAM_BOT_TOKEN),
     telegramBotUsername: env.TELEGRAM_BOT_USERNAME ?? null,
     telegramMiniAppShortName: env.TELEGRAM_MINI_APP_SHORT_NAME ?? null,
+    clubContactTelegram: env.CLUB_CONTACT_TELEGRAM,
     devLogin: env.ALLOW_DEV_LOGIN,
   }));
 

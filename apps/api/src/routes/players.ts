@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   createPlayerSchema,
@@ -10,9 +11,12 @@ import {
 } from '@fsp/shared';
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
+import { ApiError, notFound } from '../lib/errors.js';
+import { accounts } from '../db/schema.js';
 import {
   createPlayer,
   deletePlayer,
+  getPlayerRow,
   mergeGuestIntoDupr,
   resolveRatingConflict,
   searchPlayers,
@@ -34,7 +38,7 @@ const searchQuerySchema = z.object({
 });
 
 export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): void {
-  const { db, env } = ctx;
+  const { db, env, notify } = ctx;
 
   app.get('/api/players', async (request) => {
     const query = parse(searchQuerySchema, request.query ?? {});
@@ -114,6 +118,38 @@ export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): voi
       env.PUBLIC_WEB_URL,
     );
     return { invite };
+  });
+
+  /**
+   * Игрок привязал Telegram, но без @username — в t.me/… не перейти.
+   * Шлём в бот просьбу написать организатору.
+   */
+  app.post<{ Params: { id: string } }>('/api/players/:id/nudge-contact', async (request) => {
+    requireRole(request, 'moderator');
+    const player = await getPlayerRow(db, request.params.id);
+    if (player.telegramUsername) {
+      throw new ApiError('validation_failed', 'У игрока уже указан Telegram username');
+    }
+
+    const [account] = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.playerId, player.id))
+      .limit(1);
+    if (!account) {
+      throw notFound('К этой карточке не привязан Telegram');
+    }
+
+    const contact = env.CLUB_CONTACT_TELEGRAM;
+    await notify.sendToPlayers(
+      [player.id],
+      [
+        'У вас не указан публичный username в Telegram (@ник), поэтому организаторы не могут написать вам в личные сообщения.',
+        '',
+        `Пожалуйста, напишите @${contact} для регистрации на турнир — или задайте username в настройках Telegram (Настройки → Имя пользователя).`,
+      ].join('\n'),
+    );
+    return { ok: true, contactTelegram: contact };
   });
 
   /** Загрузка справочника DUPR: сопоставление по DUPR ID, ручные правки не трутся. */

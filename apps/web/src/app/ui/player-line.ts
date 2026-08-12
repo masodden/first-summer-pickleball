@@ -1,30 +1,47 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { PlayerDto } from '@fsp/shared';
 import { I18nService } from '../core/i18n';
 import { RatingChip } from './rating-chip';
 
-/** Аватар игрока: фото из профиля или инициалы на тёплой подложке. */
+/**
+ * Аватар игрока: инициалы всегда на месте, фото появляется после успешной
+ * загрузки. Битый URL с Telegram не ломает карточку — остаёмся на буквах.
+ */
 @Component({
   selector: 'app-avatar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[style.--avatar-size.px]': 'size()' },
   template: `
-    @if (player().avatarUrl) {
+    <span class="avatar__initials" aria-hidden="true" [class.is-hidden]="photoReady()">
+      {{ initials() }}
+    </span>
+    @if (pendingUrl(); as src) {
       <img
-        [src]="player().avatarUrl"
+        class="avatar__img"
+        [src]="src"
         [alt]="player().fullName"
         [width]="size()"
         [height]="size()"
         loading="lazy"
         decoding="async"
+        [class.is-ready]="photoReady()"
+        (load)="onLoad()"
+        (error)="onError()"
       />
-    } @else {
-      <span aria-hidden="true">{{ initials() }}</span>
     }
   `,
   styles: `
     :host {
+      position: relative;
       display: grid;
       place-items: center;
       width: var(--avatar-size, 40px);
@@ -41,10 +58,24 @@ import { RatingChip } from './rating-chip';
       box-shadow: inset 0 0 0 1px var(--glass-border);
     }
 
-    img {
+    .avatar__initials,
+    .avatar__img {
+      grid-area: 1 / 1;
+    }
+
+    .avatar__initials.is-hidden {
+      opacity: 0;
+    }
+
+    .avatar__img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      opacity: 0;
+    }
+
+    .avatar__img.is-ready {
+      opacity: 1;
     }
   `,
 })
@@ -53,12 +84,37 @@ export class Avatar {
   /** Логический размер в CSS-пикселях; URL с Telegram обычно уже ~160–320px. */
   readonly size = input(40);
 
+  /** URL, который сейчас пытаемся загрузить; null — только инициалы. */
+  protected readonly pendingUrl = signal<string | null>(null);
+  protected readonly loaded = signal(false);
+
   protected readonly initials = computed(() => {
     const player = this.player();
     const first = player.firstName.trim().at(0) ?? '';
     const last = player.lastName.trim().at(0) ?? '';
     return `${first}${last}`.toUpperCase() || '?';
   });
+
+  protected readonly photoReady = computed(
+    () => this.loaded() && this.pendingUrl() !== null,
+  );
+
+  constructor() {
+    effect(() => {
+      const url = this.player().avatarUrl?.trim() || null;
+      this.pendingUrl.set(url);
+      this.loaded.set(false);
+    });
+  }
+
+  protected onLoad(): void {
+    this.loaded.set(true);
+  }
+
+  protected onError(): void {
+    this.pendingUrl.set(null);
+    this.loaded.set(false);
+  }
 }
 
 /**

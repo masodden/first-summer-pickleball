@@ -27,6 +27,7 @@ export interface PublicConfigDto {
   telegram: boolean;
   telegramBotUsername: string | null;
   telegramMiniAppShortName: string | null;
+  clubContactTelegram: string | null;
   devLogin: boolean;
 }
 
@@ -217,6 +218,10 @@ export class TournamentApi {
 
   createInvite(playerId: string): Promise<{ invite: InviteDto }> {
     return this.api.post(`/api/players/${playerId}/invite`);
+  }
+
+  nudgeContact(playerId: string): Promise<{ ok: true; contactTelegram: string }> {
+    return this.api.post(`/api/players/${playerId}/nudge-contact`);
   }
 
   importPlayers(content: string): Promise<{ report: ImportReportDto }> {

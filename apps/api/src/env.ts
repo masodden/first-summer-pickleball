@@ -41,6 +41,19 @@ const schema = z.object({
   CORS_ORIGIN: z.string().default('*'),
 
   /**
+   * @username организатора клуба без @: куда писать игрокам без ника в Telegram.
+   * Используется в напоминаниях бота и на карточке игрока.
+   */
+  CLUB_CONTACT_TELEGRAM: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => {
+      if (!value) return 'Katevolchok';
+      return value.replace(/^@+/, '') || 'Katevolchok';
+    }),
+
+  /**
    * Локальный вход без Telegram. Нужен, чтобы разработчик мог зайти под любой
    * ролью в докере. В продакшене всегда выключен.
    */

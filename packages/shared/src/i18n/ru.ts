@@ -301,6 +301,11 @@ export const ru = {
   'player.telegramHint': 'Username без @, например ivan_pickle',
   'player.telegramLink': 'Привязать Telegram',
   'player.telegramLinked': 'Telegram привязан',
+  'player.telegramNoUsername': 'Telegram привязан, но без @ника',
+  'player.telegramNoUsernameHint':
+    'Без публичного username нельзя открыть чат в Telegram. Напомните игроку написать организатору.',
+  'player.nudgeContact': 'Напомнить написать @{{contact}}',
+  'player.nudgeContactSent': 'Напоминание отправлено в бот',
   'player.duprId': 'DUPR ID',
   'player.stats': 'Статистика',
   'player.statsTournaments': 'Турниров',

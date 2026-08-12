@@ -64,6 +64,19 @@ import { RatingChip } from '../../ui/rating-chip';
             >
               @{{ data.player.telegramUsername }}
             </button>
+          } @else if (data.player.isClaimed && session.isModerator()) {
+            <div class="stack stack--2">
+              <span class="chip chip--pink">{{ t()('player.telegramNoUsername') }}</span>
+              <p class="tiny muted">{{ t()('player.telegramNoUsernameHint') }}</p>
+              <button
+                type="button"
+                class="btn btn--sm btn--primary"
+                [disabled]="saving()"
+                (click)="nudgeContact()"
+              >
+                {{ t()('player.nudgeContact', { contact: clubContact() }) }}
+              </button>
+            </div>
           }
         </section>
 
@@ -421,8 +434,13 @@ export class PlayerProfilePage {
   protected readonly saving = signal(false);
   protected readonly inviteUrl = signal<string | null>(null);
   protected readonly inviteExpires = signal<string | null>(null);
+  protected readonly clubContact = signal('Katevolchok');
 
   constructor() {
+    void this.api.getHealth().then((health) => {
+      if (health.clubContactTelegram) this.clubContact.set(health.clubContactTelegram);
+    });
+
     // Черновики полей заполняются один раз на карточку, чтобы правка не сбрасывалась.
     let filledFor: string | null = null;
     effect(() => {
@@ -468,6 +486,19 @@ export class PlayerProfilePage {
 
   protected openTelegram(username: string): void {
     this.telegram.openExternal(`https://t.me/${username}`);
+  }
+
+  protected async nudgeContact(): Promise<void> {
+    this.saving.set(true);
+    try {
+      const { contactTelegram } = await this.api.nudgeContact(this.id());
+      this.clubContact.set(contactTelegram);
+      this.toast.success(this.i18n.translate('player.nudgeContactSent'));
+    } catch (error) {
+      this.toast.failure(error, () => void this.nudgeContact());
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected selectInput(event: Event): void {
