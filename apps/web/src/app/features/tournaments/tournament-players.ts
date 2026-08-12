@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -331,23 +332,26 @@ import { TournamentJoinPanel } from './tournament-join-panel';
     .overlay {
       position: fixed;
       inset: 0;
-      z-index: 40;
+      z-index: 100;
       display: grid;
       place-items: end center;
-      padding: var(--space-4);
-      background: color-mix(in srgb, var(--ink-900) 45%, transparent);
+      padding: max(var(--space-4), env(safe-area-inset-top, 0px)) var(--space-4)
+        max(var(--space-4), env(safe-area-inset-bottom, 0px));
+      background: rgba(36, 26, 22, 0.42);
+      backdrop-filter: blur(4px);
     }
 
     .sheet {
       width: min(100%, 440px);
-      max-height: min(70vh, 560px);
-      margin-bottom: env(safe-area-inset-bottom, 0);
+      max-height: min(78dvh, 560px);
       overflow: hidden;
     }
 
     .replace-list {
       overflow: auto;
-      max-height: min(50vh, 400px);
+      max-height: min(52dvh, 400px);
+      overscroll-behavior: contain;
+      padding-bottom: var(--space-2);
     }
 
     .replace-pick {
@@ -388,11 +392,23 @@ export class TournamentPlayersTab {
   protected readonly canEditRating = computed(() => this.store.canManage());
 
   constructor() {
+    const destroyRef = inject(DestroyRef);
+
     bindGlassListRemount(this.listGen, {
-      destroyRef: inject(DestroyRef),
+      destroyRef,
       paused: () =>
         this.editing() !== null || this.picker() || this.replacing() !== null || this.savingRating(),
       itemCount: () => this.store.registered().length + this.store.waitlisted().length,
+    });
+
+    // Как у player-picker: sheet внутри main, таббар снаружи с большим z-index —
+    // пока открыта замена, прячем навигацию, чтобы не перехватывала тапы.
+    effect(() => {
+      const open = this.replacing() !== null;
+      document.documentElement.classList.toggle('fsp-overlay-open', open);
+    });
+    destroyRef.onDestroy(() => {
+      document.documentElement.classList.remove('fsp-overlay-open');
     });
   }
 
