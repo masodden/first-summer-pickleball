@@ -401,6 +401,7 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f web    # ло
 ```bash
 cd ~/first-summer-pickleball
 sh infra/backup.sh          # положит дамп в infra/backups/fsp-ГГГГ-ММ-ДД_ЧЧ-ММ.sql.gz
+# скрипт сам берёт корневой .env (как docker compose --env-file .env)
 ```
 
 Каждую ночь автоматически (`crontab -e`):
