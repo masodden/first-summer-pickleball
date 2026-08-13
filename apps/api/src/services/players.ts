@@ -93,7 +93,7 @@ export async function searchPlayers(
     .select()
     .from(players)
     .where(and(...filters))
-    .orderBy(desc(players.doublesRating), asc(players.lastName))
+    .orderBy(sql`${players.doublesRating} DESC NULLS LAST`, asc(players.lastName))
     .limit(limit);
 
   return toPlayerDtos(db, rows);

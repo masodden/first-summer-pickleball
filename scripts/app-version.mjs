@@ -121,17 +121,15 @@ export function collectIndexVersions() {
 }
 
 /**
- * Если в коммите уже подняли версию — вернуть её (и дописать в файлы, где забыли).
- * Иначе null: нужно bump.
+ * Если в коммите версию уже меняли (в любую сторону) — вернуть её и дописать
+ * в файлы, где забыли. Иначе null: нужно bump.
  */
 export function versionAlreadyBumped() {
   const head = headVersion('package.json', 'json');
   const indexed = collectIndexVersions();
-  const newer = indexed
-    .map((file) => file.version)
-    .filter((version) => version && head && compareSemver(version, head) > 0);
-  if (newer.length === 0) return null;
-  return newer.sort(compareSemver).at(-1) ?? null;
+  const changed = indexed.filter((file) => file.version && file.version !== head);
+  if (changed.length === 0) return null;
+  return indexed.find((file) => file.path === 'package.json')?.version ?? changed[0]?.version ?? null;
 }
 
 export function writeAllVersions(version) {
