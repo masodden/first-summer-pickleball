@@ -388,9 +388,9 @@ export const en: Record<TranslationKey, string> = {
 
   'about.title': 'The game',
   'about.lead':
-    'Pickleball is a popular sport that mixes tennis, badminton and table tennis. You play with a plastic ball full of holes and a solid paddle, on a court the size of a badminton court. The net is like tennis, only a little lower.',
+    'Pickleball is a popular sport that mixes tennis, badminton and table tennis. The rules are easy: you can figure them out in an evening and get on court.',
   'about.lead2':
-    'You can play singles or doubles, indoors or out. The rules are easy: you can figure them out in an evening and get on court.',
+    'You play with a plastic ball full of holes and a solid paddle, on a court the size of a badminton court. The net is like tennis, only a little lower. You can play singles or doubles, indoors or out.',
   'about.courtTitle': 'The court',
   'about.courtCaption':
     'The court is 13.41 × 6.10 m. On each side of the net sits a 2.13 m kitchen: you cannot hit out of the air from there. The serve is from behind the baseline, diagonally into the opponent’s box.',
@@ -416,13 +416,13 @@ export const en: Record<TranslationKey, string> = {
   'about.scoreBody':
     'Only the serving side scores. Games are usually to 11, win by two: 11–9 is over, 11–10 keeps going. Tournaments sometimes play to 15 or 21.',
   'about.scoreCall':
-    'In singles the score is two numbers: yours — theirs. In doubles it is three: yours — theirs — server number (1 or 2). The game starts at 0–0–2.',
+    'In singles the score is two numbers: yours — theirs. In doubles it is three: yours — theirs — server number (1 or 2).',
   'about.singlesTitle': 'Singles',
   'about.singlesBody':
-    'Serve from the right when your score is even, from the left when it is odd. Lose the rally and the serve goes to your opponent.',
+    'The game starts at 0–0. Serve from the right when your score is even, from the left when it is odd. Lose the rally and the serve goes to your opponent.',
   'about.doublesTitle': 'Doubles',
   'about.doublesBody':
-    'Partners switch sides only when they win a point on their serve. Lose the rally and the other team serves.',
+    'The game starts at 0–0–2. Partners switch sides only when they win a point on their serve. Lose the rally and the other team serves.',
   'about.faultsTitle': 'The rally is lost if',
   'about.faultNet': 'the ball hits the net and does not go over',
   'about.faultBounce': 'the two-bounce rule is broken',
@@ -431,7 +431,7 @@ export const en: Record<TranslationKey, string> = {
   'about.faultKitchen': 'you hit out of the air from the kitchen or its line',
   'about.faultReceiver': 'in doubles, the wrong player returns the serve',
   'about.video': 'Watch on YouTube',
-  'about.historyTitle': 'Where it started',
+  'about.historyTitle': 'A bit of history',
   'about.historyBody':
     'The game appeared in 1965 on Bainbridge Island, near Seattle. Three friends — Joel Pritchard, Bill Bell and Barney McCallum — made something for their kids: paddles, a plastic ball and a lowered badminton net. That was pickleball.',
   'about.clubTitle': 'Here in Russia',

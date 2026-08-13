@@ -40,9 +40,12 @@ const FAULTS: readonly TranslationKey[] = [
     <div class="stack stack--5">
       <header class="hero">
         <h1>{{ t()('about.title') }}</h1>
+      </header>
+
+      <section class="glass glass--plain card--tight stack stack--2">
         <p class="lead">{{ t()('about.lead') }}</p>
         <p class="lead">{{ t()('about.lead2') }}</p>
-      </header>
+      </section>
 
       <section class="glass glass--plain court-card stack stack--3">
         <div class="row row--between row--wrap">
