@@ -24,7 +24,7 @@
     "docker:dev": "docker compose -f infra/docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f infra/docker-compose.dev.yml down",
     "docker:prod": "docker compose --env-file .env -f infra/docker-compose.yml up -d --build",
-    "prepare": "node scripts/install-git-hooks.mjs",
+    "prepare": "node -e \"require('node:fs').existsSync('scripts/install-git-hooks.mjs')&&require('node:child_process').execFileSync('node',['scripts/install-git-hooks.mjs'],{stdio:'inherit'})\"",
     "version:bump": "node scripts/app-version.mjs"
   },
   "devDependencies": {
