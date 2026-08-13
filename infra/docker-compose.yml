@@ -1,4 +1,7 @@
 # Продакшен на VPS: pnpm docker:prod
+# Образы собирает GitHub Actions и кладёт в GHCR. На сервере — только pull.
+# Пакеты private: один раз `docker login ghcr.io` (токен read:packages).
+# Откат: IMAGE_TAG=<sha коммита> pnpm docker:prod
 # .env лежит в корне репозитория — всегда передавайте --env-file .env
 # (Compose сам ищет .env только рядом с этим файлом, в infra/).
 # Caddy получает HTTPS-сертификат сам и проксирует /api и /ws в контейнер api.
@@ -21,6 +24,8 @@ services:
       retries: 20
 
   api:
+    image: ghcr.io/masodden/first-summer-pickleball/api:${IMAGE_TAG:-latest}
+    pull_policy: always
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
@@ -49,6 +54,8 @@ services:
              node apps/api/dist/server.js"
 
   web:
+    image: ghcr.io/masodden/first-summer-pickleball/web:${IMAGE_TAG:-latest}
+    pull_policy: always
     build:
       context: ..
       dockerfile: infra/Dockerfile.web

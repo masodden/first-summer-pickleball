@@ -207,16 +207,23 @@ TELEGRAM_WEBHOOK_SECRET=<из третьей команды>
 
 ### 4. Запуск
 
+Образы собирает GitHub Actions (workflow **Docker** на `main`) и кладёт в GHCR.
+Пока прогон не зелёный, `pull` вернёт 404. Пакеты private — на VPS нужен
+однократный вход, токен GitHub с правом `read:packages`:
+
 ```bash
+echo TOKEN | docker login ghcr.io -u masodden --password-stdin
 pnpm docker:prod
-# или без pnpm на сервере (важно: --env-file .env — иначе Compose
+# или без pnpm (важно: --env-file .env — иначе Compose
 # ищет переменные рядом с infra/docker-compose.yml и не видит корневой .env):
-docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml pull api web
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
-Первая сборка занимает 5–10 минут. Что происходит: собираются образы API и фронтенда,
-поднимается PostgreSQL, применяются миграции, Caddy получает сертификат Let's Encrypt
-и включает HTTPS. База сначала пустая — игроков импортируете сами.
+Первый `pull` занимает минуту-другую. Что происходит: скачиваются готовые образы API и
+фронтенда, поднимается PostgreSQL, применяются миграции, Caddy получает сертификат
+Let's Encrypt и включает HTTPS. База сначала пустая — игроков импортируете сами.
+Не запускайте `up --build` на этом VPS — сборка на 2 ГБ RAM занимает десятки минут.
 
 Проверьте:
 
@@ -376,14 +383,21 @@ DUPR ID можно не указывать — получится гостева
 
 ## Обновление приложения
 
+Дождитесь зелёного workflow **Docker** на GitHub (push в `main`), затем на VPS:
+
 ```bash
 cd ~/first-summer-pickleball
 git pull
-docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+pnpm docker:prod
+# то же без pnpm:
+# docker compose --env-file .env -f infra/docker-compose.yml pull api web
+# docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
+Откат на конкретный коммит: `IMAGE_TAG=<sha> pnpm docker:prod`.
+
 Миграции базы применяются автоматически при старте контейнера API. Данные лежат в docker-томе
-`fsp_db-data` и при пересборке не теряются.
+`fsp_db-data` и при обновлении не теряются.
 
 Посмотреть, что происходит:
 
