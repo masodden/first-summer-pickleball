@@ -15,11 +15,13 @@
 		reverse_proxy api:3000
 	}
 
-	# Иначе SPA try_files отдаст index.html как /robots.txt — Lighthouse считает это 20+ ошибками.
+	# Иначе SPA try_files отдаст index.html как /robots.txt — Lighthouse
+	# разбирает HTML как директивы (~20 ошибок). respond, а не file_server:
+	# не зависит от того, попал ли файл в /srv.
 	handle /robots.txt {
-		root * /srv
-		file_server
 		header Content-Type "text/plain; charset=utf-8"
+		header Cache-Control "public, max-age=300"
+		respond "User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /ws\n" 200
 	}
 
 	handle {
