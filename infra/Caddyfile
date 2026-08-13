@@ -15,13 +15,21 @@
 		reverse_proxy api:3000
 	}
 
+	# Иначе SPA try_files отдаст index.html как /robots.txt — Lighthouse считает это 20+ ошибками.
+	handle /robots.txt {
+		root * /srv
+		file_server
+		header Content-Type "text/plain; charset=utf-8"
+	}
+
 	handle {
 		root * /srv
 		try_files {path} /index.html
 		file_server
 
 		# Хэшированные файлы сборки можно кэшировать надолго.
-		@immutable path_regexp \-[A-Z0-9]{8}\.(js|css|woff2)$
+		# Angular ставит смешанный регистр и иногда дефис: chunk-BE5K2gws.js, chunk-DxvF7-ch.js.
+		@immutable path_regexp \-[A-Za-z0-9_-]+\.(js|css|woff2)$
 		header @immutable Cache-Control "public, max-age=31536000, immutable"
 
 		# Mini App открывается как `/`, не как `/index.html`. Telegram WebView

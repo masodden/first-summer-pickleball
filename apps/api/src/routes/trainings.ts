@@ -5,7 +5,7 @@ import {
   setPaidSchema,
   setTrainingAmountSchema,
   updateTrainingSchema,
-} from '@fsp/shared';
+} from '@fsp/shared/schemas';
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
 import { ApiError } from '../lib/errors.js';

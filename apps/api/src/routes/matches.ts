@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { matchActionSchema, matchScoreSchema } from '@fsp/shared';
+import { matchActionSchema, matchScoreSchema } from '@fsp/shared/schemas';
 import { parse } from '../lib/validate.js';
 import { requireRole } from '../auth/context.js';
 import {

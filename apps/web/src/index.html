@@ -15,8 +15,36 @@
     <link rel="apple-touch-icon" href="icon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
 
-    <!-- Telegram Mini App: подпись пользователя и тема оформления приходят отсюда. -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!--
+      Официально скрипт всегда в head. Мы не грузим его в обычном браузере:
+      без Mini App initData пустой, а запрос на telegram.org блокирует первый кадр.
+
+      Mini App определяем по контракту клиента, не по User-Agent (на iOS UA как у Safari):
+      хеш/query tgWebApp*, нативный bridge, либо sessionStorage после первого захода
+      (reload на /tournaments уже без хеша). Внутри Telegram грузим синхронно —
+      TelegramService читает window.Telegram при создании.
+    -->
+    <script>
+      (function () {
+        var STORAGE_KEY = 'fsp.tgWebApp';
+        var inTelegram = false;
+        try {
+          var hash = location.hash || '';
+          var search = location.search || '';
+          inTelegram =
+            hash.indexOf('tgWebApp') !== -1 ||
+            search.indexOf('tgWebApp') !== -1 ||
+            sessionStorage.getItem(STORAGE_KEY) === '1' ||
+            typeof window.TelegramWebviewProxy !== 'undefined' ||
+            typeof window.TelegramWebview !== 'undefined';
+        } catch (e) {}
+        if (!inTelegram) return;
+        try {
+          sessionStorage.setItem(STORAGE_KEY, '1');
+        } catch (e) {}
+        document.write('<script src="https://telegram.org/js/telegram-web-app.js"><' + '/script>');
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

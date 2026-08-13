@@ -1,15 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { STANDINGS_SORT_KEYS, type StandingsSortKey } from '@fsp/shared';
 import {
-  STANDINGS_SORT_KEYS,
   addParticipantSchema,
   createTournamentSchema,
   generateScheduleSchema,
   reshuffleSchema,
   setPaidSchema,
   updateTournamentSchema,
-  type StandingsSortKey,
-} from '@fsp/shared';
+} from '@fsp/shared/schemas';
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
 import { ensureGuestPlayerForAccount, getAccount } from '../services/accounts.js';

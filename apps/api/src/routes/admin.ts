@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, eq } from 'drizzle-orm';
-import { setRoleSchema } from '@fsp/shared';
+import { setRoleSchema } from '@fsp/shared/schemas';
 import { z } from 'zod';
 import { parse } from '../lib/validate.js';
 import { requireRole } from '../auth/context.js';

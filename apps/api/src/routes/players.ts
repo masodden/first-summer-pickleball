@@ -8,7 +8,7 @@ import {
   setRoleSchema,
   updatePlayerSchema,
   updateRatingSchema,
-} from '@fsp/shared';
+} from '@fsp/shared/schemas';
 import { parse } from '../lib/validate.js';
 import { requireRole, requireViewer } from '../auth/context.js';
 import { ApiError, notFound } from '../lib/errors.js';

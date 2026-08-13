@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { claimSchema, localeSchema, updateSettingsSchema } from '@fsp/shared';
+import { claimSchema, localeSchema, updateSettingsSchema } from '@fsp/shared/schemas';
 import { z } from 'zod';
 import { ApiError } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
