@@ -24,7 +24,8 @@ interface TelegramWebApp {
   ready(): void;
   expand(): void;
   disableVerticalSwipes?(): void;
-  setHeaderColor?(color: string): void;
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
   openLink?(url: string): void;
   openTelegramLink?(url: string): void;
   /** Bot API 8.0+: нативный диалог сохранения файла (iOS/Android WebView). */
@@ -54,6 +55,7 @@ declare global {
 @Injectable({ providedIn: 'root' })
 export class TelegramService {
   private readonly app = window.Telegram?.WebApp;
+  private closingGuards = 0;
 
   /** Есть ли живой Telegram WebApp с initData (пересчитываем — скрипт может ожить позже). */
   get available(): boolean {
@@ -145,11 +147,68 @@ export class TelegramService {
   }
 
   tap(style: 'light' | 'medium' | 'heavy' = 'light'): void {
-    this.app?.HapticFeedback?.impactOccurred(style);
+    if (!this.hapticsEnabled()) return;
+    try {
+      this.app?.HapticFeedback?.impactOccurred(style);
+    } catch {
+      // Desktop и старые клиенты: метод есть, но вызов бросает.
+    }
   }
 
   notify(type: 'error' | 'success' | 'warning'): void {
-    this.app?.HapticFeedback?.notificationOccurred(type);
+    if (!this.hapticsEnabled()) return;
+    try {
+      this.app?.HapticFeedback?.notificationOccurred(type);
+    } catch {
+      // Desktop и старые клиенты.
+    }
+  }
+
+  select(): void {
+    if (!this.hapticsEnabled()) return;
+    try {
+      this.app?.HapticFeedback?.selectionChanged();
+    } catch {
+      // Desktop и старые клиенты.
+    }
+  }
+
+  /**
+   * Пока открыт ввод счёта — свайп вниз не закрывает Mini App.
+   * Несколько карточек делят один счётчик.
+   */
+  acquireClosingConfirmation(): () => void {
+    if (!this.app?.enableClosingConfirmation) return () => undefined;
+    this.closingGuards += 1;
+    if (this.closingGuards === 1) {
+      try {
+        this.app.enableClosingConfirmation();
+      } catch {
+        this.closingGuards = 0;
+        return () => undefined;
+      }
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.closingGuards = Math.max(0, this.closingGuards - 1);
+      if (this.closingGuards === 0) {
+        try {
+          this.app?.disableClosingConfirmation?.();
+        } catch {
+          // Старые клиенты.
+        }
+      }
+    };
+  }
+
+  /** Шаринг ссылки в чат Telegram, иначе обычное открытие. */
+  shareUrl(url: string, text?: string): void {
+    const share = new URL('https://t.me/share/url');
+    share.searchParams.set('url', url);
+    if (text) share.searchParams.set('text', text);
+    this.openExternal(share.toString());
   }
 
   openExternal(url: string): void {
@@ -160,6 +219,10 @@ export class TelegramService {
     }
     if (this.app?.openLink) this.app.openLink(url);
     else window.open(url, '_blank', 'noopener');
+  }
+
+  private hapticsEnabled(): boolean {
+    return document.documentElement.dataset['reducedMotion'] !== 'true';
   }
 
   /**

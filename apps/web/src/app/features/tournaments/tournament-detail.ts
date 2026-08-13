@@ -100,8 +100,8 @@ import { StatusBadge } from '../../ui/status-badge';
           </div>
 
           <div class="row row--wrap actions">
-            <button type="button" class="btn btn--sm btn--glass" (click)="copyAppLink()">
-              {{ t()('tournament.appLink') }}
+            <button type="button" class="btn btn--sm btn--glass" (click)="shareAppLink()">
+              {{ t()(telegram.available ? 'common.share' : 'tournament.appLink') }}
             </button>
             @if (store.canManage()) {
               <button type="button" class="btn btn--sm btn--glass" (click)="copyPublicLink()">
@@ -307,7 +307,7 @@ export class TournamentDetailPage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
-  private readonly telegram = inject(TelegramService);
+  protected readonly telegram = inject(TelegramService);
   private readonly viewState = inject(ViewStateService);
 
   protected readonly store = inject(TournamentStore);
@@ -412,7 +412,7 @@ export class TournamentDetailPage {
     }
   }
 
-  protected async copyAppLink(): Promise<void> {
+  protected async shareAppLink(): Promise<void> {
     const current = this.tournament();
     if (!current) return;
 
@@ -432,6 +432,12 @@ export class TournamentDetailPage {
     }
 
     const url = tournamentMiniAppLink(botUsername, current.id, { shortName });
+    if (this.telegram.available) {
+      this.telegram.shareUrl(url, current.title);
+      this.telegram.tap();
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(url);
       this.telegram.tap();

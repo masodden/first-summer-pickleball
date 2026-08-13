@@ -394,6 +394,7 @@ export class TournamentStore {
       await this.api.start(this.requireId());
       await this.load({ silent: true });
       this.goToActiveRound();
+      this.telegram.tap('medium');
       this.toast.success(this.i18n.translate('tournament.created'));
     });
   }
@@ -428,6 +429,7 @@ export class TournamentStore {
       const { tournament } = await this.api.finish(this.requireId());
       this.tournamentSignal.set(tournament);
       await this.load({ silent: true });
+      this.telegram.tap('heavy');
       this.toast.success(this.i18n.translate('tournament.finished'));
     });
   }
@@ -493,7 +495,9 @@ export class TournamentStore {
       async () => {
         const { rounds } = await this.api.roundAction(this.requireId(), index, action);
         this.roundsSignal.set(rounds);
-        this.telegram.tap();
+        if (action === 'start') this.telegram.tap('medium');
+        else if (action === 'finish') this.telegram.notify('success');
+        else this.telegram.tap();
         void this.refreshStandings();
       },
       () => void this.roundAction(action),
@@ -613,6 +617,30 @@ export class TournamentStore {
     );
   }
 
+  private hapticIfMyMatch(next: MatchDto): void {
+    const me = this.session.playerId();
+    if (!me || this.isBusy(`match:${next.id}`)) return;
+    const players = [...next.teamA.players, ...next.teamB.players];
+    if (!players.some((player) => player.id === me)) return;
+
+    const prev = this.findMatch(next.id);
+    if (!prev) return;
+    const scoreChanged =
+      prev.teamA.score !== next.teamA.score || prev.teamB.score !== next.teamB.score;
+    const justFinished = prev.status !== 'finished' && next.status === 'finished';
+    if (!scoreChanged && prev.status === next.status) return;
+    if (justFinished) this.telegram.notify('success');
+    else this.telegram.select();
+  }
+
+  private findMatch(id: string): MatchDto | undefined {
+    for (const round of this.roundsSignal()) {
+      const match = round.matches.find((item) => item.id === id);
+      if (match) return match;
+    }
+    return undefined;
+  }
+
   private applyEvent(event: import('@fsp/shared').ServerEvent): void {
     if (!('tournamentId' in event) || event.tournamentId !== this.idSignal()) return;
 
@@ -621,6 +649,7 @@ export class TournamentStore {
         this.participantsSignal.set(event.participants);
         break;
       case 'match.updated':
+        this.hapticIfMyMatch(event.match);
         this.patchMatch(event.match);
         break;
       case 'round.updated':

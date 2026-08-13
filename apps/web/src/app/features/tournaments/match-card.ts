@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   input,
@@ -301,6 +302,7 @@ import { ScoreTick } from '../../ui/motion';
 export class MatchCard {
   private readonly telegram = inject(TelegramService);
   private readonly i18n = inject(I18nService);
+  private closeGuard: (() => void) | null = null;
 
   protected readonly store = inject(TournamentStore);
   protected readonly t = this.i18n.t;
@@ -310,6 +312,25 @@ export class MatchCard {
   protected readonly editing = signal(false);
   protected readonly draftA = signal(0);
   protected readonly draftB = signal(0);
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.releaseClosingGuard());
+    effect(() => {
+      if (this.editing()) this.holdClosingGuard();
+      else this.releaseClosingGuard();
+    });
+    effect(() => {
+      const match = this.match();
+      if (this.editing()) return;
+      if (match.teamA.score === null && match.teamB.score === null) {
+        this.draftA.set(11);
+        this.draftB.set(0);
+        return;
+      }
+      this.draftA.set(match.teamA.score ?? 0);
+      this.draftB.set(match.teamB.score ?? 0);
+    });
+  }
 
   protected readonly canManage = this.store.canManage;
   protected readonly courtLabel = computed(() => this.i18n.court(this.match().courtName));
@@ -342,20 +363,6 @@ export class MatchCard {
     if (this.draftA() === this.draftB() && !tieAllowed) return false;
     return this.draftA() >= 0 && this.draftB() >= 0;
   });
-
-  constructor() {
-    effect(() => {
-      const match = this.match();
-      if (this.editing()) return;
-      if (match.teamA.score === null && match.teamB.score === null) {
-        this.draftA.set(11);
-        this.draftB.set(0);
-        return;
-      }
-      this.draftA.set(match.teamA.score ?? 0);
-      this.draftB.set(match.teamB.score ?? 0);
-    });
-  }
 
   protected isWinner(first: boolean): boolean {
     const { teamA, teamB } = this.match();
@@ -395,5 +402,15 @@ export class MatchCard {
     if (!this.scoreValid()) return;
     await this.store.setScore(this.match(), this.draftA(), this.draftB());
     this.editing.set(false);
+  }
+
+  private holdClosingGuard(): void {
+    if (this.closeGuard) return;
+    this.closeGuard = this.telegram.acquireClosingConfirmation();
+  }
+
+  private releaseClosingGuard(): void {
+    this.closeGuard?.();
+    this.closeGuard = null;
   }
 }
