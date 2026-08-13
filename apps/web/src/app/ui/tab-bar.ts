@@ -1,18 +1,18 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   inject,
   Injector,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter, map, startWith } from 'rxjs';
+import { isActive, Router, type UrlTree } from '@angular/router';
 import { I18nService } from '../core/i18n';
 import { SessionStore } from '../core/session';
 import { swipeToTab, tabDirection } from '../core/tab-view-transition';
 
-type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
+function pathFromUrlTree(tree: UrlTree): string {
+  const segments = tree.root.children['primary']?.segments ?? [];
+  return '/' + segments.map((segment) => segment.path).join('/');
+}
 
 /**
  * Нижняя навигация + горизонтальный свайп между корневыми табами.
@@ -28,7 +28,7 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
       <a
         href="/tournaments"
         class="tab"
-        [class.is-active]="activeTab() === 'tournaments'"
+        [class.is-active]="tournamentsActive() || trainingsActive() || rootActive()"
         (click)="onTabClick($event, '/tournaments')"
       >
         <span class="tab__glyph">
@@ -46,7 +46,7 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
       <a
         href="/players"
         class="tab"
-        [class.is-active]="activeTab() === 'players'"
+        [class.is-active]="playersActive()"
         (click)="onTabClick($event, '/players')"
       >
         <span class="tab__glyph">
@@ -69,7 +69,7 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
         <a
           href="/admin"
           class="tab"
-          [class.is-active]="activeTab() === 'admin'"
+          [class.is-active]="adminActive()"
           (click)="onTabClick($event, '/admin')"
         >
           <span class="tab__glyph">
@@ -86,7 +86,7 @@ type TabId = 'tournaments' | 'players' | 'admin' | 'settings';
       <a
         href="/settings"
         class="tab"
-        [class.is-active]="activeTab() === 'settings'"
+        [class.is-active]="settingsActive()"
         (click)="onTabClick($event, '/settings')"
       >
         <span class="tab__glyph">
@@ -215,30 +215,23 @@ export class TabBar {
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
 
-  private readonly url = toSignal(
-    this.router.events.pipe(
-      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-      map(() => this.router.url),
-      startWith(this.router.url),
-    ),
-    { initialValue: this.router.url },
-  );
-
-  protected readonly activeTab = computed((): TabId | '' => {
-    const root = this.url().split('?')[0]?.replace(/^\//, '').split('/')[0] ?? '';
-    // `/` в Mini App часто не успевает редиректнуться в /tournaments — это тот же таб.
-    if (!root || root === 'tournaments' || root === 'trainings') return 'tournaments';
-    if (root === 'players' || root === 'admin' || root === 'settings') return root;
-    return '';
-  });
+  /** `/` в Mini App (hash Telegram игнорируется по умолчанию). */
+  protected readonly rootActive = isActive('/', this.router, { paths: 'exact' });
+  protected readonly tournamentsActive = isActive('/tournaments', this.router);
+  protected readonly trainingsActive = isActive('/trainings', this.router);
+  protected readonly playersActive = isActive('/players', this.router);
+  protected readonly adminActive = isActive('/admin', this.router);
+  protected readonly settingsActive = isActive('/settings', this.router);
 
   protected onTabClick(event: Event, target: string): void {
     event.preventDefault();
     (event.currentTarget as HTMLElement | null)?.blur();
     if (this.tabSwipeBusy) return;
 
-    const current = this.url().split('?')[0] ?? '';
-    if (current === target) return;
+    const current = pathFromUrlTree(
+      this.router.lastSuccessfulNavigation()?.finalUrl ?? this.router.parseUrl(this.router.url),
+    );
+    if (current === target || (current === '/' && target === '/tournaments')) return;
 
     const direction = tabDirection(current, target);
     if (!direction) {
