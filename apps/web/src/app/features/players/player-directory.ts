@@ -8,7 +8,6 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { PlayerDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TournamentApi } from '../../core/tournament-api';
@@ -109,10 +108,9 @@ export class PlayerDirectoryPage {
   protected readonly players = resource({
     params: () => this.debounced(),
     loader: ({ params }) => this.api.searchPlayers(params).then((response) => response.items),
-    defaultValue: [] as PlayerDto[],
   });
 
-  protected readonly items = computed(() => this.players.value());
+  protected readonly items = computed(() => this.players.value() ?? []);
 
   private timer: number | null = null;
 

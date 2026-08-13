@@ -55,9 +55,7 @@ import { RatingChip } from '../../ui/rating-chip';
             <span class="strong">{{ t()('auth.spectatorMode') }}</span>
             <span class="small muted">
               {{
-                session.canSignInAgain()
-                  ? t()('auth.signedOutHint')
-                  : t()('auth.notInTelegramHint')
+                session.canSignInAgain() ? t()('auth.signedOutHint') : t()('auth.notInTelegramHint')
               }}
             </span>
             @if (session.canSignInAgain()) {
@@ -114,6 +112,22 @@ import { RatingChip } from '../../ui/rating-chip';
               type="checkbox"
               [checked]="preferences.reducedMotion()"
               (change)="setReducedMotion($event)"
+            />
+            <span class="switch__track"></span>
+            <span class="switch__thumb"></span>
+          </label>
+        </div>
+
+        <div class="row row--between">
+          <div class="grow stack stack--1">
+            <span>{{ t()('settings.hideAboutTab') }}</span>
+            <span class="tiny faint">{{ t()('settings.hideAboutTabHint') }}</span>
+          </div>
+          <label class="switch">
+            <input
+              type="checkbox"
+              [checked]="preferences.hideAboutTab()"
+              (change)="setHideAboutTab($event)"
             />
             <span class="switch__track"></span>
             <span class="switch__thumb"></span>
@@ -353,6 +367,10 @@ export class SettingsPage {
     const value = (event.target as HTMLInputElement).checked;
     this.preferences.setReducedMotion(value);
     void this.session.updateSettings({ reducedMotion: value }).catch(() => undefined);
+  }
+
+  protected setHideAboutTab(event: Event): void {
+    this.preferences.setHideAboutTab((event.target as HTMLInputElement).checked);
   }
 
   protected async setNotifications(event: Event): Promise<void> {

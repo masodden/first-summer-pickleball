@@ -115,6 +115,11 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'about',
+    loadComponent: () => import('./features/about/about-page').then((m) => m.AboutPage),
+    title: 'Об игре',
+  },
+  {
     path: 'players',
     loadComponent: () =>
       import('./features/players/player-directory').then((m) => m.PlayerDirectoryPage),

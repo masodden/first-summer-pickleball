@@ -6,7 +6,14 @@ import { ConfirmService } from './confirm';
 import { TelegramService } from './telegram';
 
 /** Корневые экраны таббара: BackButton скрыт, Android back сворачивает Mini App. */
-const ROOT_PATHS = new Set(['/tournaments', '/trainings', '/players', '/admin', '/settings']);
+const ROOT_PATHS = new Set([
+  '/tournaments',
+  '/trainings',
+  '/about',
+  '/players',
+  '/admin',
+  '/settings',
+]);
 
 /**
  * Нативная «назад» в Telegram Mini App.

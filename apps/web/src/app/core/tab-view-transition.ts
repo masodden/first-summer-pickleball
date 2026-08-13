@@ -2,7 +2,7 @@ import { afterNextRender, Injector } from '@angular/core';
 import type { Router } from '@angular/router';
 
 /** Порядок табов слева направо (тренировки — тот же слот, что турниры). */
-const TAB_ORDER = ['tournaments', 'players', 'admin', 'settings'] as const;
+const TAB_ORDER = ['tournaments', 'about', 'players', 'admin', 'settings'] as const;
 
 type TabKey = (typeof TAB_ORDER)[number];
 
@@ -27,9 +27,7 @@ export function tabDirection(
   const fromRoot = fromUrlOrSegment.includes('/')
     ? rootSegmentFromUrl(fromUrlOrSegment)
     : fromUrlOrSegment;
-  const toRoot = toUrlOrSegment.includes('/')
-    ? rootSegmentFromUrl(toUrlOrSegment)
-    : toUrlOrSegment;
+  const toRoot = toUrlOrSegment.includes('/') ? rootSegmentFromUrl(toUrlOrSegment) : toUrlOrSegment;
   const fromIdx = tabIndex(fromRoot);
   const toIdx = tabIndex(toRoot);
   if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return null;
@@ -109,10 +107,7 @@ export async function swipeToTab(
   const header = document.querySelector('header.header');
   const slotTop = header?.getBoundingClientRect().bottom ?? Math.max(rect.top, 0);
   const slotHeight = Math.max(window.innerHeight - slotTop, 0);
-  document.documentElement.style.setProperty(
-    '--tab-swipe-x',
-    `${Math.round(window.innerWidth)}px`,
-  );
+  document.documentElement.style.setProperty('--tab-swipe-x', `${Math.round(window.innerWidth)}px`);
 
   const ghost = main.cloneNode(true) as HTMLElement;
   ghost.removeAttribute('id');
@@ -137,8 +132,11 @@ export async function swipeToTab(
   main.classList.add('tab-swipe-main', `tab-swipe-main--${direction}`, 'tab-swipe-main--prep');
 
   try {
+    // afterNextRender — до navigate: иначе пропускаем первый кадр (скелетон)
+    // и ждём уже второй, когда пришёл список игроков.
+    const painted = afterRender(injector);
     await router.navigateByUrl(target);
-    await afterRender(injector);
+    await painted;
     await waitFrames(2);
 
     main.classList.remove('tab-swipe-main--prep');

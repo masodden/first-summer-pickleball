@@ -1,11 +1,7 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  Injector,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Injector } from '@angular/core';
 import { isActive, Router, type UrlTree } from '@angular/router';
 import { I18nService } from '../core/i18n';
+import { PreferencesService } from '../core/preferences';
 import { SessionStore } from '../core/session';
 import { swipeToTab, tabDirection } from '../core/tab-view-transition';
 
@@ -21,10 +17,7 @@ function pathFromUrlTree(tree: UrlTree): string {
   selector: 'app-tab-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <nav
-      class="tabbar glass glass--strong vt-tabbar"
-      [attr.aria-label]="t()('nav.tournaments')"
-    >
+    <nav class="tabbar glass glass--strong vt-tabbar" [attr.aria-label]="t()('nav.tournaments')">
       <a
         href="/tournaments"
         class="tab"
@@ -43,6 +36,40 @@ function pathFromUrlTree(tree: UrlTree): string {
         </span>
         <span>{{ t()('nav.tournaments') }}</span>
       </a>
+      @if (!preferences.hideAboutTab()) {
+        <a
+          href="/about"
+          class="tab"
+          [class.is-active]="aboutActive()"
+          (click)="onTabClick($event, '/about')"
+        >
+          <span class="tab__glyph">
+            <svg
+              class="tab__icon tab__icon--outline tab__icon--ball"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="8.6" />
+              <g class="ball-holes">
+                <circle cx="12" cy="12" r="1.2" />
+                <circle cx="12" cy="6.55" r="1.2" />
+                <circle cx="16.5" cy="9.4" r="1.2" />
+                <circle cx="16.5" cy="14.6" r="1.2" />
+                <circle cx="12" cy="17.45" r="1.2" />
+                <circle cx="7.5" cy="14.6" r="1.2" />
+                <circle cx="7.5" cy="9.4" r="1.2" />
+              </g>
+            </svg>
+            <svg class="tab__icon tab__icon--filled" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill-rule="evenodd"
+                d="M12 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM12 5.05a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM16.5 7.9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM16.5 13.1a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM12 15.95a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM7.5 13.1a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3zM7.5 7.9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 1 1 0-3z"
+              />
+            </svg>
+          </span>
+          <span>{{ t()('nav.about') }}</span>
+        </a>
+      }
       <a
         href="/players"
         class="tab"
@@ -160,6 +187,13 @@ function pathFromUrlTree(tree: UrlTree): string {
       outline-offset: 2px;
     }
 
+    .tab span:last-child {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .tab:hover {
       text-decoration: none;
       color: var(--text-strong);
@@ -192,6 +226,11 @@ function pathFromUrlTree(tree: UrlTree): string {
       opacity: 0;
     }
 
+    .tab__icon--ball .ball-holes {
+      fill: currentColor;
+      stroke: none;
+    }
+
     .tab.is-active {
       background: var(--accent-soft);
       color: var(--accent-strong);
@@ -213,12 +252,14 @@ export class TabBar {
   private tabSwipeBusy = false;
 
   protected readonly session = inject(SessionStore);
+  protected readonly preferences = inject(PreferencesService);
   protected readonly t = this.i18n.t;
 
   /** `/` в Mini App (hash Telegram игнорируется по умолчанию). */
   protected readonly rootActive = isActive('/', this.router, { paths: 'exact' });
   protected readonly tournamentsActive = isActive('/tournaments', this.router);
   protected readonly trainingsActive = isActive('/trainings', this.router);
+  protected readonly aboutActive = isActive('/about', this.router);
   protected readonly playersActive = isActive('/players', this.router);
   protected readonly adminActive = isActive('/admin', this.router);
   protected readonly settingsActive = isActive('/settings', this.router);

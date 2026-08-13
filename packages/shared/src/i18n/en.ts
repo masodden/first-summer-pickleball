@@ -43,6 +43,7 @@ export const en: Record<TranslationKey, string> = {
   'nav.profile': 'Profile',
   'nav.settings': 'Settings',
   'nav.admin': 'Admin',
+  'nav.about': 'The game',
 
   'auth.loginTelegram': 'Sign in with Telegram',
   'auth.notInTelegram': 'Opened outside Telegram',
@@ -185,8 +186,7 @@ export const en: Record<TranslationKey, string> = {
 
   'format.americano': 'Americano',
   'format.mexicano': 'Mexicano',
-  'format.americano.description':
-    'Everyone partners with everyone: partners rotate each round.',
+  'format.americano.description': 'Everyone partners with everyone: partners rotate each round.',
   'format.mexicano.description':
     'Teams for each round are built from the current standings: leaders move up to the top courts, others move down.',
 
@@ -224,7 +224,8 @@ export const en: Record<TranslationKey, string> = {
   'waitlist.promote': 'Move into the draw',
   'waitlist.replace': 'Replace a player',
   'waitlist.replaceTitle': 'Who should be replaced?',
-  'waitlist.replaceHint': 'Pick a player from the draw — they will be removed and {{name}} takes the spot.',
+  'waitlist.replaceHint':
+    'Pick a player from the draw — they will be removed and {{name}} takes the spot.',
   'waitlist.replaced': 'Waitlisted player took a spot in the draw',
   'waitlist.replaceConfirm': 'Replace {{outgoing}} with {{incoming}}?',
 
@@ -375,6 +376,8 @@ export const en: Record<TranslationKey, string> = {
   'settings.languageEn': 'English',
   'settings.appearance': 'Appearance',
   'settings.reducedMotion': 'Reduce animations',
+  'settings.hideAboutTab': 'Hide “The game” tab',
+  'settings.hideAboutTabHint': 'The page will still open from a direct link.',
   'settings.notifications': 'Telegram notifications',
   'settings.notificationsHint':
     'Tournament start and results, check-in confirmation, DUPR link and roster changes',
@@ -382,6 +385,58 @@ export const en: Record<TranslationKey, string> = {
   'settings.saved': 'Settings saved',
   'settings.version': 'Version',
   'settings.feedback': 'Feedback & bugs',
+
+  'about.title': 'The game',
+  'about.lead':
+    'Pickleball is a popular sport that mixes tennis, badminton and table tennis. You play with a plastic ball full of holes and a solid paddle, on a court the size of a badminton court. The net is like tennis, only a little lower.',
+  'about.lead2':
+    'You can play singles or doubles, indoors or out. The rules are easy: you can figure them out in an evening and get on court.',
+  'about.courtTitle': 'The court',
+  'about.courtCaption':
+    'The court is 13.41 × 6.10 m. On each side of the net sits a 2.13 m kitchen: you cannot hit out of the air from there. The serve is from behind the baseline, diagonally into the opponent’s box.',
+  'about.courtKitchen': 'Kitchen',
+  'about.courtServe': 'Serve',
+  'about.courtReceive': 'Return',
+  'about.courtNet': 'Net height',
+  'about.dimLength': '13.41 m',
+  'about.dimWidth': '6.10 m',
+  'about.dimKitchen': '2.13 m',
+  'about.dimNet': '86 cm',
+  'about.equipment': 'A paddle and a plastic ball with holes — that’s all you need.',
+  'about.serveTitle': 'The serve',
+  'about.serveBody':
+    'Underhand, below the waist, diagonally. At least one foot stays down — no jump serves. One attempt.',
+  'about.bounceTitle': 'Two bounces',
+  'about.bounceBody':
+    'The return has to bounce. So does the server’s next shot. From the third shot you may hit out of the air — unless you are standing in the kitchen.',
+  'about.kitchenTitle': 'The kitchen',
+  'about.kitchenBody':
+    'You cannot hit out of the air from the kitchen or its line. If a volley’s momentum carries you in, that’s a fault. You may step in; you may hit from there only after the ball bounces.',
+  'about.scoreTitle': 'Scoring',
+  'about.scoreBody':
+    'Only the serving side scores. Games are usually to 11, win by two: 11–9 is over, 11–10 keeps going. Tournaments sometimes play to 15 or 21.',
+  'about.scoreCall':
+    'In singles the score is two numbers: yours — theirs. In doubles it is three: yours — theirs — server number (1 or 2). The game starts at 0–0–2.',
+  'about.singlesTitle': 'Singles',
+  'about.singlesBody':
+    'Serve from the right when your score is even, from the left when it is odd. Lose the rally and the serve goes to your opponent.',
+  'about.doublesTitle': 'Doubles',
+  'about.doublesBody':
+    'Partners switch sides only when they win a point on their serve. Lose the rally and the other team serves.',
+  'about.faultsTitle': 'The rally is lost if',
+  'about.faultNet': 'the ball hits the net and does not go over',
+  'about.faultBounce': 'the two-bounce rule is broken',
+  'about.faultBody': 'the ball hits a player or their clothing',
+  'about.faultOut': 'the ball lands out',
+  'about.faultKitchen': 'you hit out of the air from the kitchen or its line',
+  'about.faultReceiver': 'in doubles, the wrong player returns the serve',
+  'about.video': 'Watch on YouTube',
+  'about.historyTitle': 'Where it started',
+  'about.historyBody':
+    'The game appeared in 1965 on Bainbridge Island, near Seattle. Three friends — Joel Pritchard, Bill Bell and Barney McCallum — made something for their kids: paddles, a plastic ball and a lowered badminton net. That was pickleball.',
+  'about.clubTitle': 'Here in Russia',
+  'about.clubBody':
+    'FIRST SUMMER PICKLEBALL is growing the game in Moscow: somewhere to show up, people to play with, and a friendly tournament when you want one. Pick your category and go. The rest the game will teach you.',
 
   'import.title': 'Import players',
   'import.hint':
