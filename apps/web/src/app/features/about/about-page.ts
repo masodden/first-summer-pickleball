@@ -93,23 +93,23 @@ const FAULTS: readonly TranslationKey[] = [
 
           <path
             class="serve-arc"
-            d="M506 202C370 156 200 116 92 102"
+            d="M506 88C345 158 175 208 92 202"
             marker-end="url(#about-serve-head)"
           />
 
-          <circle class="spot spot--serve" cx="506" cy="202" r="9" />
-          <circle class="spot spot--return" cx="80" cy="102" r="9" />
+          <circle class="spot spot--serve" cx="506" cy="88" r="9" />
+          <circle class="spot spot--return" cx="80" cy="202" r="9" />
 
-          <text class="label label--stack" x="233" y="155">
+          <text class="label label--stack" x="233" y="70">
             {{ t()('about.courtKitchen') }}
           </text>
-          <text class="label label--stack" x="303" y="58">
+          <text class="label label--stack" x="303" y="70">
             {{ t()('about.courtKitchen') }}
           </text>
-          <text class="label" x="442" y="220" text-anchor="middle">
+          <text class="label" x="468" y="90" text-anchor="end">
             {{ t()('about.courtServe') }}
           </text>
-          <text class="label" x="86" y="84" text-anchor="middle">
+          <text class="label" x="96" y="232" text-anchor="middle">
             {{ t()('about.courtReceive') }}
           </text>
 
@@ -293,7 +293,7 @@ const FAULTS: readonly TranslationKey[] = [
       font-size: 14px;
       writing-mode: vertical-rl;
       text-orientation: upright;
-      letter-spacing: -0.08em;
+      letter-spacing: -0.14em;
     }
 
     .dim {
