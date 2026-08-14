@@ -145,7 +145,7 @@ export const en: Record<TranslationKey, string> = {
   'tournament.deleted': 'Tournament deleted',
   'tournament.deleteConfirm': 'Delete tournament "{{title}}"? This cannot be undone.',
   'tournament.closeRegistration': 'Close registration',
-  'tournament.reopenRegistration': 'Reopen registration',
+  'tournament.reopenRegistration': 'Registration',
   'tournament.start': 'Build tournament and start',
   'tournament.startShort': 'Start tournament',
   'tournament.startHint': 'All participants are confirmed, games can be built',

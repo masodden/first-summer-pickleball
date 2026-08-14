@@ -172,18 +172,22 @@ import { SheetDismiss } from '../../ui/motion';
                   [player]="participant.player"
                   [avatarSize]="30"
                   [showRating]="false"
+                  [subtitle]="participant.addedBySelf ? t()('participant.selfAdded') : null"
                 />
+                <app-rating-chip [player]="participant.player" [showLabel]="false" />
                 @if (store.canManage()) {
-                  <button
-                    type="button"
-                    class="btn btn--sm btn--glass person__cta"
-                    [disabled]="store.isBusy('promote:' + participant.player.id)"
-                    (click)="promoteOrReplace(participant)"
-                  >
-                    {{
-                      store.isFull() ? t()('waitlist.replace') : t()('waitlist.promote')
-                    }}
-                  </button>
+                  <div class="person__actions">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--glass person__cta"
+                      [disabled]="store.isBusy('promote:' + participant.player.id)"
+                      (click)="promoteOrReplace(participant)"
+                    >
+                      {{
+                        store.isFull() ? t()('waitlist.replace') : t()('waitlist.promote')
+                      }}
+                    </button>
+                  </div>
                 }
               </div>
             }
@@ -275,7 +279,9 @@ import { SheetDismiss } from '../../ui/motion';
     .person {
       display: flex;
       align-items: center;
+      flex-wrap: nowrap;
       gap: var(--space-2);
+      min-width: 0;
       padding: 10px 12px;
       transition:
         border-color var(--duration-base) ease,
@@ -304,14 +310,33 @@ import { SheetDismiss } from '../../ui/motion';
       font-size: 13px;
     }
 
+    .person__actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .person__actions .btn--icon {
+      width: 30px;
+      min-height: 30px;
+    }
+
+    .person > app-rating-chip {
+      flex: 0 0 auto;
+    }
+
     .person__cta {
       flex: 0 0 auto;
-      min-height: 28px;
+      min-height: 30px;
       padding: 0 10px;
       font-size: 12.5px;
+      white-space: nowrap;
     }
 
     .rating-button {
+      flex: 0 0 auto;
       border: 0;
       padding: 0;
       background: transparent;
