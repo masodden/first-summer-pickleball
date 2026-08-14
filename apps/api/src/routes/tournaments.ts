@@ -135,14 +135,22 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     async (request) => {
       const viewer = requireRole(request, 'moderator');
       const tournament = await getTournamentRow(db, request.params.id);
-      await removeParticipant(db, request.params.id, request.params.playerId, viewer, {
-        bySelf: false,
-      });
-      await broadcastParticipants(db, hub, request.params.id);
-      await notify.sendToPlayers(
-        [request.params.playerId],
-        `Вас исключили из турнира «${escapeHtml(tournament.title)}».`,
+      const removed = await removeParticipant(
+        db,
+        request.params.id,
+        request.params.playerId,
+        viewer,
+        { bySelf: false },
       );
+      await broadcastParticipants(db, hub, request.params.id);
+      if (removed) {
+        const title = escapeHtml(tournament.title);
+        const text =
+          removed.status === 'waitlisted'
+            ? `Вас убрали из листа ожидания турнира «${title}».`
+            : `Вас исключили из турнира «${title}».`;
+        await notify.sendToPlayers([request.params.playerId], text);
+      }
       return { ok: true };
     },
   );

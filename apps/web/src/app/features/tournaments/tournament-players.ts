@@ -179,13 +179,27 @@ import { SheetDismiss } from '../../ui/motion';
                   <div class="person__actions">
                     <button
                       type="button"
-                      class="btn btn--sm btn--glass person__cta"
+                      class="btn btn--icon person__swap"
+                      [attr.aria-label]="
+                        store.isFull() ? t()('waitlist.replace') : t()('waitlist.promote')
+                      "
                       [disabled]="store.isBusy('promote:' + participant.player.id)"
                       (click)="promoteOrReplace(participant)"
                     >
-                      {{
-                        store.isFull() ? t()('waitlist.replace') : t()('waitlist.promote')
-                      }}
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                        <path d="M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--icon btn--ghost"
+                      [attr.aria-label]="t()('waitlist.remove')"
+                      [disabled]="store.isBusy('remove:' + participant.player.id)"
+                      (click)="store.removeParticipant(participant.player.id)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
                     </button>
                   </div>
                 }
@@ -323,16 +337,15 @@ import { SheetDismiss } from '../../ui/motion';
       min-height: 30px;
     }
 
-    .person > app-rating-chip {
-      flex: 0 0 auto;
+    .person__swap {
+      border-radius: 9px;
+      background: linear-gradient(160deg, var(--lime-300), var(--lime-500));
+      border-color: var(--lime-500);
+      color: var(--ink-900);
     }
 
-    .person__cta {
+    .person > app-rating-chip {
       flex: 0 0 auto;
-      min-height: 30px;
-      padding: 0 10px;
-      font-size: 12.5px;
-      white-space: nowrap;
     }
 
     .rating-button {

@@ -527,7 +527,7 @@ export async function removeParticipant(
   playerId: string,
   actor: Viewer,
   options: { bySelf: boolean },
-): Promise<void> {
+): Promise<{ status: string } | null> {
   const tournament = await getTournamentRow(db, tournamentId);
   if (options.bySelf) {
     if (actor.playerId !== playerId) throw forbidden('Отменить можно только свою заявку');
@@ -553,7 +553,7 @@ export async function removeParticipant(
       ),
     )
     .limit(1);
-  if (!existing) return;
+  if (!existing) return null;
 
   // Сам игрок может сняться, пока модератор не подтвердил участие
   // (и для самостоятельной заявки, и если добавили организатором).
@@ -595,6 +595,8 @@ export async function removeParticipant(
     tournamentId,
     payload: { playerId },
   });
+
+  return { status: existing.status };
 }
 
 export async function setParticipantPaid(

@@ -229,6 +229,8 @@ export const ru = {
   'waitlist.replaceHint': 'Выберите игрока из состава — его снимут, а место займёт {{name}}.',
   'waitlist.replaced': 'Игрок из листа ожидания занял место в составе',
   'waitlist.replaceConfirm': 'Заменить {{outgoing}} на {{incoming}}?',
+  'waitlist.remove': 'Убрать из листа ожидания',
+  'waitlist.removed': 'Убран из листа ожидания',
 
   'checkin.title': 'Приём участников',
   'checkin.hint':

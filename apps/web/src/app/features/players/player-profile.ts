@@ -17,6 +17,7 @@ import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
+import { HoldTap } from '../../ui/hold-tap';
 import { consumeFirstVisit } from '../../core/motion';
 
 /**
@@ -32,7 +33,7 @@ import { consumeFirstVisit } from '../../core/motion';
 @Component({
   selector: 'app-player-profile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Avatar, RatingChip],
+  imports: [Avatar, RatingChip, HoldTap],
   template: `
     @if (profile.isLoading()) {
       <div class="stack stack--3">
@@ -49,7 +50,15 @@ import { consumeFirstVisit } from '../../core/motion';
             <div class="row center-row">
               <app-rating-chip [player]="data.player" />
               @if (data.canSeeDuprId && data.player.duprId) {
-                <span class="chip">{{ t()('player.duprId') }}: {{ data.player.duprId }}</span>
+                <button
+                  type="button"
+                  class="chip chip--action"
+                  appHoldTap
+                  (held)="copyDuprId(data.player.duprId!)"
+                  (tapped)="openDupr(data.player.duprId!)"
+                >
+                  {{ t()('player.duprId') }}: {{ data.player.duprId }}
+                </button>
               }
               @if (data.player.isGuest) {
                 <span class="chip chip--pink">{{ t()('participant.guestBadge') }}</span>
@@ -61,12 +70,9 @@ import { consumeFirstVisit } from '../../core/motion';
             <button
               type="button"
               class="btn btn--sm btn--glass tg-handle"
-              (pointerdown)="onUsernameDown($event)"
-              (pointermove)="onUsernameMove($event)"
-              (pointerup)="onUsernameUp($event, data.player.telegramUsername!)"
-              (pointercancel)="onUsernameUp($event, data.player.telegramUsername!)"
-              (click)="onUsernameClick($event, data.player.telegramUsername!)"
-              (contextmenu)="onUsernameContext($event, data.player.telegramUsername!)"
+              appHoldTap
+              (held)="copyTelegramHandle(data.player.telegramUsername!)"
+              (tapped)="openTelegram(data.player.telegramUsername!)"
             >
               @{{ data.player.telegramUsername }}
             </button>
@@ -354,10 +360,27 @@ import { consumeFirstVisit } from '../../core/motion';
     }
   `,
   styles: `
-    .tg-handle {
+    .tg-handle,
+    .chip--action {
+      touch-action: manipulation;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
+    }
+
+    .chip--action {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      box-sizing: border-box;
+      min-height: 0;
+      height: 22px;
+      padding: 0 8px;
+      font: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
     }
 
     .self-center {
@@ -366,8 +389,22 @@ import { consumeFirstVisit } from '../../core/motion';
 
     .center-row {
       justify-content: center;
+      align-items: center;
       flex-wrap: wrap;
       gap: var(--space-2);
+    }
+
+    .center-row app-rating-chip {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .center-row :deep(.rating-chip) {
+      box-sizing: border-box;
+      align-items: center;
+      height: 22px;
+      padding-block: 0;
+      line-height: 1;
     }
 
     .grid {
@@ -452,10 +489,6 @@ export class PlayerProfilePage {
   protected readonly inviteExpires = signal<string | null>(null);
   protected readonly clubContact = signal('Katevolchok');
 
-  private pressCopied = false;
-  private pressAt = 0;
-  private pressStart: { x: number; y: number } | null = null;
-
   constructor() {
     void this.api.getHealth().then((health) => {
       if (health.clubContactTelegram) this.clubContact.set(health.clubContactTelegram);
@@ -508,59 +541,26 @@ export class PlayerProfilePage {
     this.telegram.openExternal(`https://t.me/${username}`);
   }
 
-  protected onUsernameDown(event: PointerEvent): void {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    this.pressCopied = false;
-    this.pressAt = Date.now();
-    this.pressStart = { x: event.clientX, y: event.clientY };
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  protected openDupr(duprId: string): void {
+    this.telegram.openExternal(
+      `https://dashboard.dupr.com/dashboard/player/${encodeURIComponent(duprId)}`,
+    );
   }
 
-  protected onUsernameMove(event: PointerEvent): void {
-    if (!this.pressStart) return;
-    const dx = event.clientX - this.pressStart.x;
-    const dy = event.clientY - this.pressStart.y;
-    if (dx * dx + dy * dy > 24 * 24) this.pressStart = null;
+  protected copyTelegramHandle(username: string): void {
+    void this.copyText(`@${username.replace(/^@+/, '')}`);
   }
 
-  protected onUsernameUp(event: PointerEvent, username: string): void {
-    const held = this.pressAt === 0 ? 0 : Date.now() - this.pressAt;
-    const stayed = this.pressStart !== null;
-    this.pressAt = 0;
-    this.pressStart = null;
+  protected copyDuprId(duprId: string): void {
+    void this.copyText(duprId);
+  }
+
+  private async copyText(value: string): Promise<void> {
     try {
-      (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+      await navigator.clipboard.writeText(value);
+      this.toast.success(this.i18n.translate('common.copied'), value);
     } catch {
-      // pointer already released
-    }
-    if (stayed && held >= 400) {
-      this.pressCopied = true;
-      void this.copyTelegramHandle(username);
-    }
-  }
-
-  protected onUsernameClick(event: Event, username: string): void {
-    if (this.pressCopied) {
-      event.preventDefault();
-      this.pressCopied = false;
-      return;
-    }
-    this.openTelegram(username);
-  }
-
-  protected onUsernameContext(event: Event, username: string): void {
-    event.preventDefault();
-    if (!this.pressCopied) void this.copyTelegramHandle(username);
-    this.pressCopied = true;
-  }
-
-  private async copyTelegramHandle(username: string): Promise<void> {
-    const handle = `@${username.replace(/^@+/, '')}`;
-    try {
-      await navigator.clipboard.writeText(handle);
-      this.toast.success(this.i18n.translate('common.copied'), handle);
-    } catch {
-      this.toast.info(this.i18n.translate('common.copy'), handle);
+      this.toast.info(this.i18n.translate('common.copy'), value);
     }
   }
 

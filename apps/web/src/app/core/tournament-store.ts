@@ -306,9 +306,12 @@ export class TournamentStore {
   removeParticipant(playerId: string): Promise<void> {
     return this.run(`remove:${playerId}`, async () => {
       const id = this.requireId();
+      const fromWaitlist = this.waitlisted().some((item) => item.player.id === playerId);
       await this.api.removeParticipant(id, playerId);
       await this.load({ silent: true });
-      this.toast.success(this.i18n.translate('participant.removed'));
+      this.toast.success(
+        this.i18n.translate(fromWaitlist ? 'waitlist.removed' : 'participant.removed'),
+      );
     });
   }
 

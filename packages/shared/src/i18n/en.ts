@@ -232,6 +232,8 @@ export const en: Record<TranslationKey, string> = {
     'Pick a player from the draw — they will be removed and {{name}} takes the spot.',
   'waitlist.replaced': 'Waitlisted player took a spot in the draw',
   'waitlist.replaceConfirm': 'Replace {{outgoing}} with {{incoming}}?',
+  'waitlist.remove': 'Remove from waiting list',
+  'waitlist.removed': 'Removed from waiting list',
 
   'checkin.title': 'Check-in',
   'checkin.hint':
