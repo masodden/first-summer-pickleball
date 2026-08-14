@@ -6,6 +6,7 @@ import {
   inject,
   input,
   resource,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -99,19 +100,24 @@ import { StatusBadge } from '../../ui/status-badge';
             </div>
           </div>
 
-          <div class="row row--wrap actions">
+          <div class="actions">
             <button type="button" class="btn btn--sm btn--glass" (click)="shareAppLink()">
-              {{ t()(telegram.available ? 'common.share' : 'tournament.appLink') }}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M21.5 4.5L2.8 11.6c-.7.27-.7.66-.13.83l4.8 1.5 1.84 5.64c.23.7.58.86 1.1.54l2.64-2.02 5.1 3.76c.94.52 1.62.25 1.86-.87l3.37-15.88c.34-1.36-.52-1.97-1.48-1.56zM9.3 14.2l9.5-6c.38-.23.73-.1.44.16l-7.7 6.96-.3 3.28-1.94-4.4z"
+                />
+              </svg>
+              {{ t()('tournament.appLinkShort') }}
             </button>
-            @if (store.canManage()) {
-              <button type="button" class="btn btn--sm btn--glass" (click)="copyPublicLink()">
-                {{ t()('tournament.publicLink') }}
-              </button>
-            }
-          </div>
+            <button type="button" class="btn btn--sm btn--glass" (click)="copyPublicLink()">
+              <svg class="icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 13a5 5 0 007.54.54l1.83-1.83a5 5 0 00-7.07-7.07L10.7 6.24" />
+                <path d="M14 11a5 5 0 00-7.54-.54L4.63 12.3a5 5 0 007.07 7.07l1.59-1.59" />
+              </svg>
+              {{ t()('tournament.boardLinkShort') }}
+            </button>
 
-          @if (store.canManage()) {
-            <div class="row row--wrap actions">
+            @if (store.canManage()) {
               @if (item.status === 'registration') {
                 <button
                   type="button"
@@ -142,32 +148,19 @@ import { StatusBadge } from '../../ui/status-badge';
                   "
                   (click)="start()"
                 >
-                  {{ t()('tournament.start') }}
-                </button>
-              }
-              @if (store.canUnstart()) {
-                <button
-                  type="button"
-                  class="btn btn--sm btn--glass"
-                  [disabled]="store.isBusy('unstart')"
-                  (click)="unstart()"
-                >
-                  {{ t()('tournament.unstart') }}
+                  {{ t()('tournament.startShort') }}
                 </button>
               }
               @if (store.canFinish()) {
                 <button
                   type="button"
-                  class="btn btn--sm btn--primary"
+                  class="btn btn--sm btn--primary actions__wide"
                   [disabled]="store.isBusy('finish')"
                   (click)="finish()"
                 >
                   {{ t()('tournament.finish') }}
                 </button>
               }
-              <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
-                {{ t()('common.edit') }}
-              </a>
               @if (item.status === 'finished' || item.status === 'archived') {
                 <button
                   type="button"
@@ -198,12 +191,32 @@ import { StatusBadge } from '../../ui/status-badge';
                   {{ t()('tournament.unarchive') }}
                 </button>
               }
-              @if (item.canDelete) {
-                <button type="button" class="btn btn--sm btn--danger" (click)="remove()">
-                  {{ t()('common.delete') }}
-                </button>
+              @if (item.status !== 'running' || moreOpen()) {
+                @if (store.canUnstart()) {
+                  <button
+                    type="button"
+                    class="btn btn--sm btn--glass"
+                    [disabled]="store.isBusy('unstart')"
+                    (click)="unstart()"
+                  >
+                    {{ t()('tournament.unstart') }}
+                  </button>
+                }
+                <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
+                  {{ t()('common.edit') }}
+                </a>
+                @if (item.canDelete) {
+                  <button type="button" class="btn btn--sm btn--danger" (click)="remove()">
+                    {{ t()('common.delete') }}
+                  </button>
+                }
               }
-            </div>
+            }
+          </div>
+          @if (store.canManage() && item.status === 'running') {
+            <button type="button" class="more" (click)="moreOpen.set(!moreOpen())">
+              {{ moreOpen() ? t()('common.close') : t()('common.more') }}
+            </button>
           }
         </header>
 
@@ -245,7 +258,52 @@ import { StatusBadge } from '../../ui/status-badge';
     }
 
     .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: var(--space-2);
+    }
+
+    .actions > .btn {
+      width: 100%;
+      min-width: 0;
+      white-space: normal;
+      line-height: 1.2;
+      padding-inline: var(--space-3);
+    }
+
+    .actions > .btn svg {
+      width: 17px;
+      height: 17px;
+      flex-shrink: 0;
+      fill: currentColor;
+    }
+
+    .actions > .btn svg.icon--stroke {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .actions__wide {
+      grid-column: 1 / -1;
+    }
+
+    .more {
+      margin: 0;
+      padding: 2px 0 0;
+      border: 0;
+      background: none;
+      color: var(--text-faint);
+      font-size: 13px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .more:hover,
+    .more:focus-visible {
+      color: var(--text-muted);
     }
 
     .row--gap-sm {
@@ -314,6 +372,7 @@ export class TournamentDetailPage {
   protected readonly session = inject(SessionStore);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
+  protected readonly moreOpen = signal(false);
 
   /** Приходит из маршрута благодаря `withComponentInputBinding`. */
   readonly id = input.required<string>();
@@ -339,6 +398,7 @@ export class TournamentDetailPage {
   constructor() {
     effect(() => {
       void this.store.open(this.id());
+      this.moreOpen.set(false);
     });
 
     // Запоминаем открытую вкладку, чтобы следующий турнир открылся на ней же.

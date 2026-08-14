@@ -30,6 +30,7 @@ export const en: Record<TranslationKey, string> = {
   'common.reset': 'Reset',
   'common.notSet': 'not set',
   'common.actions': 'Actions',
+  'common.more': 'More',
   'common.date': 'Date',
   'common.time': 'Time',
   'common.online': 'Connected',
@@ -146,6 +147,7 @@ export const en: Record<TranslationKey, string> = {
   'tournament.closeRegistration': 'Close registration',
   'tournament.reopenRegistration': 'Reopen registration',
   'tournament.start': 'Build tournament and start',
+  'tournament.startShort': 'Start tournament',
   'tournament.startHint': 'All participants are confirmed, games can be built',
   'tournament.startConfirm':
     'Build games for {{count}} participants? They will get a Telegram notification.',
@@ -166,7 +168,9 @@ export const en: Record<TranslationKey, string> = {
   'tournament.unarchived': 'Tournament restored from archive',
   'tournament.exportCsv': 'Download CSV for DUPR',
   'tournament.publicLink': 'Public standings link',
+  'tournament.boardLinkShort': 'Live board',
   'tournament.appLink': 'Link to tournament in the bot',
+  'tournament.appLinkShort': 'Tournament link',
   'tournament.appLinkCopied': 'Link copied — share it with players in chat',
   'tournament.appLinkMissingBot':
     'TELEGRAM_BOT_USERNAME is not set on the server — cannot build an in-bot link',
@@ -222,7 +226,7 @@ export const en: Record<TranslationKey, string> = {
   'waitlist.joined': 'You are on the waiting list',
   'waitlist.promoted': 'You have been moved into the main draw',
   'waitlist.promote': 'Move into the draw',
-  'waitlist.replace': 'Replace a player',
+  'waitlist.replace': 'Replace',
   'waitlist.replaceTitle': 'Who should be replaced?',
   'waitlist.replaceHint':
     'Pick a player from the draw — they will be removed and {{name}} takes the spot.',

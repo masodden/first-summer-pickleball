@@ -60,8 +60,13 @@ import { consumeFirstVisit } from '../../core/motion';
           @if (data.player.telegramUsername) {
             <button
               type="button"
-              class="btn btn--sm btn--glass"
-              (click)="openTelegram(data.player.telegramUsername!)"
+              class="btn btn--sm btn--glass tg-handle"
+              (pointerdown)="onUsernameDown($event)"
+              (pointermove)="onUsernameMove($event)"
+              (pointerup)="onUsernameUp($event, data.player.telegramUsername!)"
+              (pointercancel)="onUsernameUp($event, data.player.telegramUsername!)"
+              (click)="onUsernameClick($event, data.player.telegramUsername!)"
+              (contextmenu)="onUsernameContext($event, data.player.telegramUsername!)"
             >
               @{{ data.player.telegramUsername }}
             </button>
@@ -349,6 +354,12 @@ import { consumeFirstVisit } from '../../core/motion';
     }
   `,
   styles: `
+    .tg-handle {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
     .self-center {
       margin-inline: auto;
     }
@@ -441,6 +452,10 @@ export class PlayerProfilePage {
   protected readonly inviteExpires = signal<string | null>(null);
   protected readonly clubContact = signal('Katevolchok');
 
+  private pressCopied = false;
+  private pressAt = 0;
+  private pressStart: { x: number; y: number } | null = null;
+
   constructor() {
     void this.api.getHealth().then((health) => {
       if (health.clubContactTelegram) this.clubContact.set(health.clubContactTelegram);
@@ -491,6 +506,62 @@ export class PlayerProfilePage {
 
   protected openTelegram(username: string): void {
     this.telegram.openExternal(`https://t.me/${username}`);
+  }
+
+  protected onUsernameDown(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    this.pressCopied = false;
+    this.pressAt = Date.now();
+    this.pressStart = { x: event.clientX, y: event.clientY };
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  }
+
+  protected onUsernameMove(event: PointerEvent): void {
+    if (!this.pressStart) return;
+    const dx = event.clientX - this.pressStart.x;
+    const dy = event.clientY - this.pressStart.y;
+    if (dx * dx + dy * dy > 24 * 24) this.pressStart = null;
+  }
+
+  protected onUsernameUp(event: PointerEvent, username: string): void {
+    const held = this.pressAt === 0 ? 0 : Date.now() - this.pressAt;
+    const stayed = this.pressStart !== null;
+    this.pressAt = 0;
+    this.pressStart = null;
+    try {
+      (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+    } catch {
+      // pointer already released
+    }
+    if (stayed && held >= 400) {
+      this.pressCopied = true;
+      void this.copyTelegramHandle(username);
+    }
+  }
+
+  protected onUsernameClick(event: Event, username: string): void {
+    if (this.pressCopied) {
+      event.preventDefault();
+      this.pressCopied = false;
+      return;
+    }
+    this.openTelegram(username);
+  }
+
+  protected onUsernameContext(event: Event, username: string): void {
+    event.preventDefault();
+    if (!this.pressCopied) void this.copyTelegramHandle(username);
+    this.pressCopied = true;
+  }
+
+  private async copyTelegramHandle(username: string): Promise<void> {
+    const handle = `@${username.replace(/^@+/, '')}`;
+    try {
+      await navigator.clipboard.writeText(handle);
+      this.toast.success(this.i18n.translate('common.copied'), handle);
+    } catch {
+      this.toast.info(this.i18n.translate('common.copy'), handle);
+    }
   }
 
   protected async nudgeContact(): Promise<void> {

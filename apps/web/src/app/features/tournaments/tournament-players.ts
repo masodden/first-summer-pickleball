@@ -163,15 +163,20 @@ import { SheetDismiss } from '../../ui/motion';
           <section class="stack stack--2">
             <h3>{{ t()('waitlist.title') }}</h3>
             @for (participant of store.waitlisted(); track participant.id) {
-              <div class="glass glass--subtle card--tight person">
-                <span class="person__index tiny faint numeric">
+              <div class="glass glass--subtle person">
+                <span class="person__index faint numeric">
                   {{ participant.waitlistPosition }}
                 </span>
-                <app-player-line class="grow" [player]="participant.player" />
+                <app-player-line
+                  class="grow"
+                  [player]="participant.player"
+                  [avatarSize]="30"
+                  [showRating]="false"
+                />
                 @if (store.canManage()) {
                   <button
                     type="button"
-                    class="btn btn--sm btn--glass"
+                    class="btn btn--sm btn--glass person__cta"
                     [disabled]="store.isBusy('promote:' + participant.player.id)"
                     (click)="promoteOrReplace(participant)"
                   >
@@ -299,11 +304,11 @@ import { SheetDismiss } from '../../ui/motion';
       font-size: 13px;
     }
 
-    .person__actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .person__cta {
       flex: 0 0 auto;
+      min-height: 28px;
+      padding: 0 10px;
+      font-size: 12.5px;
     }
 
     .rating-button {
