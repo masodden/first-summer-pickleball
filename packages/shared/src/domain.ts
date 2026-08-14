@@ -3,7 +3,7 @@
  * было понятно, какая сборка у него на телефоне. commit-msg хук поднимает
  * patch (или minor при `feat:`), если в коммите версию не меняли.
  */
-export const APP_VERSION = '0.7.5';
+export const APP_VERSION = '0.7.6';
 
 /** Контакт для обратной связи: сюда игроки пишут про баги. */
 export const FEEDBACK_TELEGRAM = 'masodden';
