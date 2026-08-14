@@ -164,11 +164,11 @@ export const ru = {
   'tournament.unarchive': 'Из архива',
   'tournament.archived': 'Турнир убран в архив',
   'tournament.unarchived': 'Турнир возвращён из архива',
-  'tournament.exportCsv': 'Скачать CSV для DUPR',
+  'tournament.exportCsv': 'CSV для DUPR',
   'tournament.publicLink': 'Публичная ссылка на табло',
   'tournament.boardLinkShort': 'Онлайн табло',
   'tournament.appLink': 'Ссылка на турнир в боте',
-  'tournament.appLinkShort': 'Ссылка турнир',
+  'tournament.appLinkShort': 'Ссылка',
   'tournament.appLinkCopied': 'Ссылка скопирована — можно скинуть игрокам в чат',
   'tournament.appLinkMissingBot':
     'Не задан TELEGRAM_BOT_USERNAME на сервере — прямую ссылку в бота собрать нельзя',

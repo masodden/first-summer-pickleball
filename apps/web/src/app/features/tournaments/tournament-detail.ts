@@ -166,8 +166,14 @@ import { StatusBadge } from '../../ui/status-badge';
                   type="button"
                   class="btn btn--sm btn--glass"
                   [disabled]="store.isBusy('export')"
+                  [attr.aria-label]="t()('tournament.exportCsv')"
                   (click)="store.exportCsv()"
                 >
+                  <svg class="icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="M8 11l4 4 4-4" />
+                    <path d="M5 21h14" />
+                  </svg>
                   {{ t()('tournament.exportCsv') }}
                 </button>
               }

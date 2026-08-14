@@ -166,11 +166,11 @@ export const en: Record<TranslationKey, string> = {
   'tournament.unarchive': 'Unarchive',
   'tournament.archived': 'Tournament archived',
   'tournament.unarchived': 'Tournament restored from archive',
-  'tournament.exportCsv': 'Download CSV for DUPR',
+  'tournament.exportCsv': 'CSV for DUPR',
   'tournament.publicLink': 'Public standings link',
   'tournament.boardLinkShort': 'Live board',
   'tournament.appLink': 'Link to tournament in the bot',
-  'tournament.appLinkShort': 'Tournament link',
+  'tournament.appLinkShort': 'Link',
   'tournament.appLinkCopied': 'Link copied — share it with players in chat',
   'tournament.appLinkMissingBot':
     'TELEGRAM_BOT_USERNAME is not set on the server — cannot build an in-bot link',
