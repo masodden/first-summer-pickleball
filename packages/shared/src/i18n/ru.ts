@@ -143,7 +143,7 @@ export const ru = {
   'tournament.deleted': 'Турнир удалён',
   'tournament.deleteConfirm': 'Удалить турнир «{{title}}»? Действие необратимо.',
   'tournament.closeRegistration': 'Завершить регистрацию',
-  'tournament.reopenRegistration': 'Регистрация',
+  'tournament.reopenRegistration': 'К регистрации',
   'tournament.start': 'Создать турнир и начать',
   'tournament.startShort': 'Создать турнир',
   'tournament.startHint': 'Все участники подтверждены, можно формировать игры',

@@ -135,9 +135,6 @@ import { StatusBadge } from '../../ui/status-badge';
                   [disabled]="store.isBusy('registration')"
                   (click)="store.setRegistrationOpen(true)"
                 >
-                  <svg class="icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M15 6l-6 6 6 6" />
-                  </svg>
                   {{ t()('tournament.reopenRegistration') }}
                 </button>
               }
