@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, ne } from 'drizzle-orm';
 import { computeStandings, resolveMedals, type MatchResult } from '@fsp/engine';
 import { courtLabel, isMatchClosed } from '@fsp/shared';
 import type {
@@ -127,13 +127,19 @@ export async function loadRounds(db: Database, tournament: TournamentRow): Promi
   });
 }
 
-/** Результаты для таблицы: считаем только матчи с введённым счётом. */
+/** Результаты для таблицы: только сыгранные матчи, пропущенные не считаем. */
 export async function loadMatchResults(db: Database, tournamentId: string): Promise<MatchResult[]> {
   const rows = await db
     .select({ match: matches, lineup: matchPlayers })
     .from(matches)
     .innerJoin(matchPlayers, eq(matchPlayers.matchId, matches.id))
-    .where(and(eq(matches.tournamentId, tournamentId), isNotNull(matches.scoreA)));
+    .where(
+      and(
+        eq(matches.tournamentId, tournamentId),
+        isNotNull(matches.scoreA),
+        ne(matches.status, 'skipped'),
+      ),
+    );
 
   const grouped = new Map<string, { match: MatchRow; teamA: string[]; teamB: string[] }>();
   for (const row of rows) {

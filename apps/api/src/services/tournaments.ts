@@ -812,12 +812,20 @@ export async function finishTournament(
         and(eq(matches.tournamentId, tournamentId), eq(matches.status, 'scheduled')),
       );
   } else {
+    // Пропущенный раунд — как будто его не было: счёт не нужен.
+    // Неначатые (scheduled) по-прежнему блокируют: их надо явно пропустить,
+    // чтобы случайно не закрыть идущий americano с хвостом расписания.
     const [unscored] = await db
       .select({ total: count() })
       .from(matches)
-      .where(and(eq(matches.tournamentId, tournamentId), isNull(matches.scoreA)));
+      .where(
+        and(
+          eq(matches.tournamentId, tournamentId),
+          isNull(matches.scoreA),
+          ne(matches.status, 'skipped'),
+        ),
+      );
     if (Number(unscored?.total ?? 0) > 0) {
-      // Не даём завершить турнир с пустыми матчами: таблица получилась бы неполной.
       throw new ApiError('score_required', 'В некоторых матчах не введён счёт');
     }
   }

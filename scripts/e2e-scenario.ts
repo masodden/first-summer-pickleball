@@ -941,6 +941,65 @@ async function main(): Promise<void> {
 
   await request('DELETE', `/api/tournaments/${plain.id}`, { token: admin.token });
 
+  section('Americano: пропуск последнего раунда и финиш');
+  const skipLast = await createTournament(admin.token, {
+    title: 'Девять из десяти',
+    format: 'americano',
+    startsAt,
+    courts: 1,
+    maxPlayers: 4,
+    pointsToWin: 11,
+    roundsPlanned: 2,
+    ratingBalance: true,
+  });
+  for (const player of intermediatePlayers.slice(8, 12)) {
+    await request('POST', `/api/tournaments/${skipLast.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+    await request('PUT', `/api/tournaments/${skipLast.id}/participants/${player.id}/paid`, {
+      token: admin.token,
+      body: { confirmedAndPaid: true },
+    });
+  }
+  await request('POST', `/api/tournaments/${skipLast.id}/start`, {
+    token: admin.token,
+    body: { seed: 7 },
+  });
+  const skipLastState = await state(skipLast.id, admin.token);
+  await playRound(admin.token, skipLast.id, skipLastState.rounds[0]!, () => [11, 6]);
+  await expectError(
+    'score_required',
+    'без пропуска последнего раунда americano не завершить',
+    () => request('POST', `/api/tournaments/${skipLast.id}/finish`, { token: admin.token }),
+  );
+  await roundAction(admin.token, skipLast.id, 1, 'skip');
+  const skippedLast = await state(skipLast.id, admin.token);
+  check(
+    skippedLast.standings.every((row) => row.played === 1),
+    'пропущенный раунд не попадает в таблицу',
+  );
+  await request('POST', `/api/tournaments/${skipLast.id}/finish`, { token: admin.token });
+  const skipLastFinished = await state(skipLast.id, admin.token);
+  check(
+    skipLastFinished.tournament.status === 'finished',
+    'americano завершается после пропуска хвоста',
+  );
+  check(
+    skipLastFinished.standings.every((row) => row.played === 1),
+    'после финиша пропущенный раунд по-прежнему не в статистике',
+  );
+  check(
+    skipLastFinished.standings.some((row) => row.medal === 'gold'),
+    'медали считаются по сыгранным матчам',
+  );
+  const skipLastCsv = await fetch(`${BASE}/api/tournaments/${skipLast.id}/export.csv`, {
+    headers: { authorization: `Bearer ${admin.token}` },
+  });
+  const skipLastCsvText = await skipLastCsv.text();
+  const skipLastCsvRows = skipLastCsvText.trim().split('\n').slice(1).filter(Boolean);
+  check(skipLastCsv.ok && skipLastCsvRows.length === 1, 'в CSV только сыгранный матч');
+
   section('Гость без DUPR: самозапись на тренировку');
   const trainingGuest = await login('user', `e2e-train-guest-${RUN_TAG}`, 'Гость Тренировки');
   check(
