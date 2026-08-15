@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * commit-msg: если в коммите нет новой версии — поднимаем patch,
+ * prepare-commit-msg: если в коммите нет новой версии — поднимаем patch,
  * при префиксе feat: / feat(scope): — minor. Файлы добавляются в тот же коммит
- * через индекс хука (GIT_INDEX_FILE).
+ * через индекс (хук срабатывает до снимка дерева).
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -19,10 +19,14 @@ import {
 if (process.env.SKIP_VERSION_BUMP === '1') process.exit(0);
 
 const messageFile = process.argv[2];
+const source = process.argv[3] ?? '';
 if (!messageFile) {
-  console.error('commit-msg: нет файла сообщения');
+  console.error('prepare-commit-msg: нет файла сообщения');
   process.exit(1);
 }
+
+// merge / squash / amend (source=commit) — не бампаем
+if (source === 'merge' || source === 'squash' || source === 'commit') process.exit(0);
 
 const message = readFileSync(messageFile, 'utf8');
 if (isMergeCommit(message) || isAmendCommit()) process.exit(0);
