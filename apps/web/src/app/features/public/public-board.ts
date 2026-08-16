@@ -3,13 +3,17 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   input,
-  resource,
+  signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import type { ServerEvent } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
-import { TournamentApi } from '../../core/tournament-api';
+import { RealtimeService } from '../../core/realtime';
+import { patchMatchInRounds, upsertRound } from '../../core/round-sync';
+import { TournamentApi, type PublicBoardDto } from '../../core/tournament-api';
 import { Ball } from '../../ui/ball';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
@@ -20,19 +24,20 @@ import { FlipMove, ScoreTick } from '../../ui/motion';
  * Публичное табло по короткой ссылке.
  *
  * Открывается без входа и без Telegram: ссылку кидают в чат клуба, её открывают
- * на планшете у корта. Обновляется само, чтобы за экраном не нужно было следить.
+ * на планшете у корта. Живёт на той же WebSocket-комнате, что и телефоны
+ * организаторов; опрос раз в 15 с — только если сокет оборвался.
  */
 @Component({
   selector: 'app-public-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball, ScoreTick, FlipMove],
   template: `
-    @if (board.isLoading() && !board.hasValue()) {
+    @if (loading() && !board()) {
       <div class="stack stack--3">
         <div class="skeleton" style="height: 120px"></div>
         <div class="skeleton" style="height: 260px"></div>
       </div>
-    } @else if (board.value(); as data) {
+    } @else if (board(); as data) {
       <div class="stack stack--4">
         <header class="glass card--tight stack stack--2">
           <div class="row row--between">
@@ -200,25 +205,123 @@ import { FlipMove, ScoreTick } from '../../ui/motion';
 })
 export class PublicBoardPage {
   private readonly api = inject(TournamentApi);
+  private readonly realtime = inject(RealtimeService);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
 
   readonly slug = input.required<string>();
 
-  protected readonly board = resource({
-    params: () => this.slug(),
-    loader: ({ params }) => this.api.getPublicBoard(params),
-  });
+  protected readonly board = signal<PublicBoardDto | null>(null);
+  protected readonly loading = signal(true);
 
   constructor() {
-    // Табло без входа обновляется опросом: подписка WebSocket тут не нужна.
-    const timer = setInterval(() => this.board.reload(), 15_000);
+    effect((onCleanup) => {
+      const slug = this.slug();
+      this.loading.set(true);
+      let cancelled = false;
+      let room: string | null = null;
+      let unlisten: (() => void) | undefined;
+
+      void this.api.getPublicBoard(slug).then(
+        (data) => {
+          if (cancelled) return;
+          this.board.set(data);
+          this.loading.set(false);
+          room = data.tournament.id;
+          unlisten = this.realtime.listen((event) => {
+            if (!cancelled) this.applyEvent(event, room!, slug);
+          });
+          this.realtime.subscribe(room);
+        },
+        () => {
+          if (cancelled) return;
+          this.board.set(null);
+          this.loading.set(false);
+        },
+      );
+
+      onCleanup(() => {
+        cancelled = true;
+        unlisten?.();
+        if (room) this.realtime.unsubscribe(room);
+      });
+    });
+
+    // Запасной опрос: только когда сокет не открыт, иначе полный GET затрёт живой счёт.
+    const timer = setInterval(() => {
+      if (this.realtime.state() === 'open') return;
+      const slug = this.slug();
+      void this.api
+        .getPublicBoard(slug)
+        .then((data) => {
+          if (this.slug() === slug) this.board.set(data);
+        })
+        .catch(() => {
+          // Табло подождёт следующий тик или восстановление сокета.
+        });
+    }, 15_000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }
 
   /** Показываем последний раунд, в котором ещё не всё сыграно. */
   protected readonly currentRound = computed(() => {
-    const rounds = this.board.value()?.rounds ?? [];
+    const rounds = this.board()?.rounds ?? [];
     return rounds.find((round) => !round.allScored) ?? rounds[rounds.length - 1] ?? null;
   });
+
+  private applyEvent(event: ServerEvent, tournamentId: string, slug: string): void {
+    if (!('tournamentId' in event) || event.tournamentId !== tournamentId) return;
+
+    switch (event.type) {
+      case 'match.updated':
+        this.board.update((data) =>
+          data ? { ...data, rounds: patchMatchInRounds(data.rounds, event.match) } : data,
+        );
+        break;
+      case 'round.updated':
+        this.board.update((data) =>
+          data ? { ...data, rounds: upsertRound(data.rounds, event.round) } : data,
+        );
+        break;
+      case 'schedule.rebuilt':
+        this.board.update((data) => (data ? { ...data, rounds: event.rounds } : data));
+        break;
+      case 'standings.updated':
+        this.board.update((data) => (data ? { ...data, standings: event.standings } : data));
+        break;
+      case 'participants.updated':
+        this.board.update((data) =>
+          data ? { ...data, participants: event.participants } : data,
+        );
+        break;
+      case 'tournament.changed':
+        // Только карточка (статус, название). Раунды уже пришли сокетом.
+        void this.refreshCard(slug);
+        break;
+      case 'tournament.deleted':
+        this.board.set(null);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private async refreshCard(slug: string): Promise<void> {
+    try {
+      const snapshot = await this.api.getPublicBoard(slug);
+      if (this.slug() !== slug) return;
+      this.board.update((current) =>
+        current
+          ? {
+              ...current,
+              tournament: snapshot.tournament,
+              venue: snapshot.venue,
+              description: snapshot.description,
+            }
+          : snapshot,
+      );
+    } catch {
+      // Следующее событие или опрос подтянут карточку.
+    }
+  }
 }

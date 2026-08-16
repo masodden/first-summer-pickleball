@@ -11,6 +11,7 @@ import {
 import { ApiFailure } from './api';
 import { I18nService } from './i18n';
 import { RealtimeService } from './realtime';
+import { findMatch, patchMatchInRounds, upsertRound } from './round-sync';
 import { SessionStore } from './session';
 import { TelegramService } from './telegram';
 import { ToastService } from './toast';
@@ -92,16 +93,18 @@ export class TournamentStore {
    * кнопка и таймер одни на всех. Корт, где уже внесли счёт, считается
    * отыгравшим и на состояние раунда не влияет.
    */
-  readonly roundState = computed<'scheduled' | 'running' | 'paused' | 'finished' | 'skipped'>(() => {
-    const round = this.currentRound();
-    const matches = round?.matches ?? [];
-    if (matches.length === 0) return 'scheduled';
-    if (round?.skipped || matches.every((match) => match.status === 'skipped')) return 'skipped';
-    if (matches.some((match) => match.status === 'running')) return 'running';
-    if (matches.some((match) => match.status === 'paused')) return 'paused';
-    if (matches.every((match) => match.status === 'finished')) return 'finished';
-    return 'scheduled';
-  });
+  readonly roundState = computed<'scheduled' | 'running' | 'paused' | 'finished' | 'skipped'>(
+    () => {
+      const round = this.currentRound();
+      const matches = round?.matches ?? [];
+      if (matches.length === 0) return 'scheduled';
+      if (round?.skipped || matches.every((match) => match.status === 'skipped')) return 'skipped';
+      if (matches.some((match) => match.status === 'running')) return 'running';
+      if (matches.some((match) => match.status === 'paused')) return 'paused';
+      if (matches.every((match) => match.status === 'finished')) return 'finished';
+      return 'scheduled';
+    },
+  );
 
   /** Предыдущий раунд закрыт — можно стартовать или пропустить текущий. */
   readonly previousRoundClosed = computed(() => {
@@ -441,6 +444,9 @@ export class TournamentStore {
     return this.run('reopen', async () => {
       const { tournament } = await this.api.reopen(this.requireId());
       this.tournamentSignal.set(tournament);
+      await this.load({ silent: true });
+      this.telegram.tap();
+      this.toast.success(this.i18n.translate('tournament.reopened'));
     });
   }
 
@@ -552,6 +558,18 @@ export class TournamentStore {
     }
   }
 
+  /** Статус и права — без раундов, чтобы не затереть живой счёт. */
+  private async refreshTournament(): Promise<void> {
+    const id = this.idSignal();
+    if (!id) return;
+    try {
+      const { tournament } = await this.api.getTournament(id);
+      this.tournamentSignal.set(tournament);
+    } catch {
+      // Следующее событие или повторный вход подтянут карточку.
+    }
+  }
+
   private unlisten?: () => void;
 
   private requireId(): string {
@@ -595,29 +613,7 @@ export class TournamentStore {
   }
 
   private patchMatch(match: MatchDto): void {
-    this.roundsSignal.update((rounds) =>
-      rounds.map((round) => {
-        if (round.index !== match.roundIndex) return round;
-        const matches = round.matches.map((item) => (item.id === match.id ? match : item));
-        const skipped =
-          matches.length > 0 && matches.every((item) => item.status === 'skipped');
-        const closed =
-          matches.length > 0 &&
-          matches.every((item) => item.status === 'finished' || item.status === 'skipped');
-        return {
-          ...round,
-          matches,
-          allFinished: matches.every((item) => item.status === 'finished'),
-          allScored: matches.every(
-            (item) =>
-              item.status === 'skipped' ||
-              (item.teamA.score !== null && item.teamB.score !== null),
-          ),
-          skipped,
-          closed,
-        };
-      }),
-    );
+    this.roundsSignal.update((rounds) => patchMatchInRounds(rounds, match));
   }
 
   private hapticIfMyMatch(next: MatchDto): void {
@@ -626,7 +622,7 @@ export class TournamentStore {
     const players = [...next.teamA.players, ...next.teamB.players];
     if (!players.some((player) => player.id === me)) return;
 
-    const prev = this.findMatch(next.id);
+    const prev = findMatch(this.roundsSignal(), next.id);
     if (!prev) return;
     const scoreChanged =
       prev.teamA.score !== next.teamA.score || prev.teamB.score !== next.teamB.score;
@@ -634,14 +630,6 @@ export class TournamentStore {
     if (!scoreChanged && prev.status === next.status) return;
     if (justFinished) this.telegram.notify('success');
     else this.telegram.select();
-  }
-
-  private findMatch(id: string): MatchDto | undefined {
-    for (const round of this.roundsSignal()) {
-      const match = round.matches.find((item) => item.id === id);
-      if (match) return match;
-    }
-    return undefined;
   }
 
   private applyEvent(event: import('@fsp/shared').ServerEvent): void {
@@ -656,12 +644,7 @@ export class TournamentStore {
         this.patchMatch(event.match);
         break;
       case 'round.updated':
-        this.roundsSignal.update((rounds) => {
-          const exists = rounds.some((round) => round.index === event.round.index);
-          return exists
-            ? rounds.map((round) => (round.index === event.round.index ? event.round : round))
-            : [...rounds, event.round].sort((a, b) => a.index - b.index);
-        });
+        this.roundsSignal.update((rounds) => upsertRound(rounds, event.round));
         break;
       case 'standings.updated':
         this.standingsSignal.set(event.standings);
@@ -670,8 +653,9 @@ export class TournamentStore {
         this.roundsSignal.set(event.rounds);
         break;
       case 'tournament.changed':
-        // Права зависят от пользователя, поэтому турнир перезапрашиваем целиком.
-        void this.load({ silent: true });
+        // Только карточка турнира (статус, права). Раунды уже пришли сокетом —
+        // полный load() затирал свежий счёт устаревшим HTTP.
+        void this.refreshTournament();
         break;
       case 'tournament.deleted':
         this.tournamentSignal.set(null);

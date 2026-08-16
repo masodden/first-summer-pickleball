@@ -158,8 +158,12 @@ export const ru = {
   'tournament.finish': 'Завершить турнир',
   'tournament.finishShort': 'Закончить',
   'tournament.finishConfirm':
-    'Завершить турнир? После этого счёт нельзя будет изменить, в таблице появятся медали.',
+    'Завершить турнир? Счёт закроется, в таблице появятся медали. Если ошиблись — можно вернуть турнир к играм.',
   'tournament.finished': 'Турнир завершён',
+  'tournament.reopen': 'Вернуть к играм',
+  'tournament.reopenConfirm':
+    'Турнир снова будет «Идёт»: можно поправить счёт. Медали пропадут, пока не завершите турнир ещё раз.',
+  'tournament.reopened': 'Турнир снова идёт — можно править счёт',
   'tournament.archive': 'В архив',
   'tournament.unarchive': 'Из архива',
   'tournament.archived': 'Турнир убран в архив',

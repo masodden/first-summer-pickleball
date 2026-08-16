@@ -105,7 +105,7 @@ import { ScoreTick } from '../../ui/motion';
 
       @if (scoreEntry()) {
         <div class="presets">
-          @for (preset of presets; track preset[0] + ':' + preset[1]) {
+          @for (preset of presets(); track preset[0] + ':' + preset[1]) {
             <button
               type="button"
               class="preset"
@@ -323,7 +323,7 @@ export class MatchCard {
       const match = this.match();
       if (this.editing()) return;
       if (match.teamA.score === null && match.teamB.score === null) {
-        this.draftA.set(11);
+        this.draftA.set(this.pointsToWin());
         this.draftB.set(0);
         return;
       }
@@ -350,13 +350,31 @@ export class MatchCard {
     return this.editing() || !this.hasScore();
   });
 
-  /** Компактный ряд пресетов в одну строку. */
-  protected readonly presets: readonly [number, number][] = [
-    [11, 9],
-    [11, 7],
-    [7, 11],
-    [9, 11],
-  ];
+  protected readonly pointsToWin = computed(() => this.store.tournament()?.pointsToWin ?? 11);
+
+  /**
+   * Четыре быстрых счёта: победа до лимита, близкий (минус 2) и более спокойный
+   * (минус 4). Для игры до 11 это 11:9 / 11:7, для 15 — 15:13 / 15:11.
+   */
+  protected readonly presets = computed(() => {
+    const win = this.pointsToWin();
+    const close = Math.max(0, win - 2);
+    const stretch = Math.max(0, win - 4);
+    const pairs: Array<[number, number]> = [
+      [win, close],
+      [win, stretch],
+      [stretch, win],
+      [close, win],
+    ];
+    const seen = new Set<string>();
+    return pairs.filter(([a, b]) => {
+      if (a === b) return false;
+      const key = `${a}:${b}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
 
   protected readonly scoreValid = computed(() => {
     const tieAllowed = this.store.tournament()?.tieRule === 'draw';
@@ -372,7 +390,7 @@ export class MatchCard {
 
   protected startEditing(): void {
     const match = this.match();
-    this.draftA.set(match.teamA.score ?? 11);
+    this.draftA.set(match.teamA.score ?? this.pointsToWin());
     this.draftB.set(match.teamB.score ?? 0);
     this.editing.set(true);
   }

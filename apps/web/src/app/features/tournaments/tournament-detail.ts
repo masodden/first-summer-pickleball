@@ -177,6 +177,16 @@ import { StatusBadge } from '../../ui/status-badge';
                   {{ t()('tournament.exportCsv') }}
                 </button>
               }
+              @if (item.status === 'finished') {
+                <button
+                  type="button"
+                  class="btn btn--sm btn--glass"
+                  [disabled]="store.isBusy('reopen')"
+                  (click)="reopen()"
+                >
+                  {{ t()('tournament.reopen') }}
+                </button>
+              }
               @if (session.isAdmin() && item.status === 'finished') {
                 <button
                   type="button"
@@ -197,7 +207,12 @@ import { StatusBadge } from '../../ui/status-badge';
                   {{ t()('tournament.unarchive') }}
                 </button>
               }
-              @if (item.status !== 'running' || moreOpen()) {
+              @if (
+                moreOpen() ||
+                (item.status !== 'running' &&
+                  item.status !== 'finished' &&
+                  item.status !== 'archived')
+              ) {
                 @if (store.canUnstart()) {
                   <button
                     type="button"
@@ -208,9 +223,11 @@ import { StatusBadge } from '../../ui/status-badge';
                     {{ t()('tournament.unstart') }}
                   </button>
                 }
-                <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
-                  {{ t()('common.edit') }}
-                </a>
+                @if (item.status !== 'finished' && item.status !== 'archived') {
+                  <a class="btn btn--sm btn--glass" [routerLink]="['/tournaments', item.id, 'edit']">
+                    {{ t()('common.edit') }}
+                  </a>
+                }
                 @if (item.canDelete) {
                   <button type="button" class="btn btn--sm btn--danger" (click)="remove()">
                     {{ t()('common.delete') }}
@@ -219,7 +236,11 @@ import { StatusBadge } from '../../ui/status-badge';
               }
             }
           </div>
-          @if (store.canManage() && item.status === 'running') {
+          @if (
+            store.canManage() &&
+            (item.status === 'running' ||
+              (item.canDelete && (item.status === 'finished' || item.status === 'archived')))
+          ) {
             <button type="button" class="more" (click)="moreOpen.set(!moreOpen())">
               {{ moreOpen() ? t()('common.close') : t()('common.more') }}
             </button>
@@ -456,6 +477,17 @@ export class TournamentDetailPage {
     if (!confirmed) return;
     await this.store.finish();
     await this.router.navigate(['/tournaments', this.id(), 'standings']);
+  }
+
+  protected async reopen(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('tournament.reopen'),
+      message: this.i18n.translate('tournament.reopenConfirm'),
+      confirmLabel: this.i18n.translate('tournament.reopen'),
+    });
+    if (!confirmed) return;
+    await this.store.reopen();
+    await this.router.navigate(['/tournaments', this.id(), 'rounds']);
   }
 
   protected async remove(): Promise<void> {

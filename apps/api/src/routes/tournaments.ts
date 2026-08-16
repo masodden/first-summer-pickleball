@@ -36,6 +36,8 @@ import { computeTournamentStandings, getTournamentState, loadRounds } from '../s
 import {
   broadcastParticipants,
   broadcastSchedule,
+  broadcastStandings,
+  broadcastStatusAndStandings,
   broadcastTournamentChanged,
   broadcastTournamentDeleted,
 } from '../realtime/broadcast.js';
@@ -104,7 +106,19 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     const viewer = requireRole(request, 'moderator');
     const body = parse(updateTournamentSchema, request.body ?? {});
     const tournament = await updateTournament(db, request.params.id, body, viewer);
-    broadcastTournamentChanged(hub, request.params.id);
+    const rebuildSchedule =
+      body.courts !== undefined ||
+      body.courtNames !== undefined ||
+      body.matchDurationMin !== undefined;
+    if (rebuildSchedule) {
+      // Подписи кортов и длительность живут в RoundDto — одного changed мало.
+      await broadcastSchedule(db, hub, request.params.id);
+    } else {
+      if (body.tieRule !== undefined || body.standingsSort !== undefined) {
+        await broadcastStandings(db, hub, request.params.id);
+      }
+      broadcastTournamentChanged(hub, request.params.id);
+    }
     return { tournament };
   });
 
@@ -321,7 +335,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/finish', async (request) => {
     const viewer = requireRole(request, 'moderator');
     const tournament = await finishTournament(db, request.params.id, viewer);
-    broadcastTournamentChanged(hub, request.params.id);
+    await broadcastStatusAndStandings(db, hub, request.params.id);
 
     const standings = await computeTournamentStandings(
       db,
@@ -344,21 +358,21 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/reopen', async (request) => {
     const viewer = requireRole(request, 'moderator');
     const tournament = await reopenTournament(db, request.params.id, viewer);
-    broadcastTournamentChanged(hub, request.params.id);
+    await broadcastStatusAndStandings(db, hub, request.params.id);
     return { tournament };
   });
 
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/archive', async (request) => {
     const viewer = requireRole(request, 'admin');
     const tournament = await archiveTournament(db, request.params.id, viewer);
-    broadcastTournamentChanged(hub, request.params.id);
+    await broadcastStatusAndStandings(db, hub, request.params.id);
     return { tournament };
   });
 
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/unarchive', async (request) => {
     const viewer = requireRole(request, 'admin');
     const tournament = await unarchiveTournament(db, request.params.id, viewer);
-    broadcastTournamentChanged(hub, request.params.id);
+    await broadcastStatusAndStandings(db, hub, request.params.id);
     return { tournament };
   });
 

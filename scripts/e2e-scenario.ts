@@ -352,10 +352,7 @@ async function main(): Promise<void> {
     token: staffUser.token,
     body: { duprId: staffPlayer.player.duprId },
   });
-  check(
-    staffClaim.session.role === 'admin',
-    'при входе аккаунт подхватывает роль с карточки DUPR',
-  );
+  check(staffClaim.session.role === 'admin', 'при входе аккаунт подхватывает роль с карточки DUPR');
 
   await request('PUT', `/api/players/${staffPlayer.player.id}/role`, {
     token: admin.token,
@@ -375,11 +372,9 @@ async function main(): Promise<void> {
     token: admin.token,
     body: { role: 'user' },
   });
-  const afterDemote = await request<{ accounts: { id: string }[] }>(
-    'GET',
-    '/api/admin/accounts',
-    { token: admin.token },
-  );
+  const afterDemote = await request<{ accounts: { id: string }[] }>('GET', '/api/admin/accounts', {
+    token: admin.token,
+  });
   check(
     !afterDemote.accounts.some((row) => row.id === staffUser.session.accountId),
     'после понижения до игрока строка пропадает из таблицы админки',
@@ -502,7 +497,10 @@ async function main(): Promise<void> {
   // Двенадцатый участник заявляется сам: сначала как гость, потом привязывает DUPR.
   const selfPlayer = advancedPlayers[11]!;
   const guest = await login('user', `e2e-self-${RUN_TAG}`, 'Игрок с телефона');
-  check(guest.session.player?.isGuest === true, 'после входа без DUPR появляется гостевая карточка');
+  check(
+    guest.session.player?.isGuest === true,
+    'после входа без DUPR появляется гостевая карточка',
+  );
 
   const guestJoined = await request<{
     waitlisted: boolean;
@@ -570,15 +568,25 @@ async function main(): Promise<void> {
 
   section('Расписание americano на 11 игр');
   const events: string[] = [];
+  let lastRounds: RoundDto[] | null = null;
+  let lastStandings: StandingRowDto[] | null = null;
   const socket = new WebSocket(`${BASE.replace('http', 'ws')}${WS_PATH}`);
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener('message', (event: MessageEvent<string>) => {
+      const parsed = JSON.parse(event.data) as {
+        type: string;
+        rounds?: RoundDto[];
+        standings?: StandingRowDto[];
+      };
+      events.push(parsed.type);
+      if (parsed.type === 'schedule.rebuilt' && parsed.rounds) lastRounds = parsed.rounds;
+      if (parsed.type === 'standings.updated' && parsed.standings) lastStandings = parsed.standings;
+    });
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'subscribe', tournamentId: advanced.id }));
       resolve();
     });
-  });
-  socket.addEventListener('message', (event: MessageEvent<string>) => {
-    events.push((JSON.parse(event.data) as { type: string }).type);
+    socket.addEventListener('error', () => reject(new Error('WebSocket не открылся')));
   });
 
   await request('POST', `/api/tournaments/${advanced.id}/start`, {
@@ -602,6 +610,24 @@ async function main(): Promise<void> {
     ),
     'у каждого матча стоит подпись корта: 4, 5 и 6',
   );
+
+  await request('PATCH', `/api/tournaments/${advanced.id}`, {
+    token: admin.token,
+    body: { courtNames: ['A', 'B', 'C'] },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  check(
+    Boolean(
+      lastRounds?.every((round) =>
+        round.matches.every((match) => match.courtName === ['A', 'B', 'C'][match.court - 1]),
+      ),
+    ),
+    'подписи кортов после правки приходят по WebSocket',
+  );
+  await request('PATCH', `/api/tournaments/${advanced.id}`, {
+    token: admin.token,
+    body: { courtNames: ['4', '5', '6'] },
+  });
 
   // Корты неравноценны, поэтому за вечер каждый должен побывать на всех трёх.
   const usage = courtUsage(started.rounds, 3);
@@ -684,6 +710,11 @@ async function main(): Promise<void> {
   await request('POST', `/api/tournaments/${advanced.id}/finish`, { token: admin.token });
   const finished = await state(advanced.id, admin.token);
   check(finished.tournament.status === 'finished', 'турнир завершён');
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  check(
+    Boolean(lastStandings?.some((row) => row.medal)),
+    'медали приходят по WebSocket после завершения турнира',
+  );
 
   const medals = finished.standings.filter((row) => row.medal);
   check(medals.length === 3, 'медали получили трое');
@@ -716,6 +747,26 @@ async function main(): Promise<void> {
     }),
   );
 
+  await request('POST', `/api/tournaments/${advanced.id}/reopen`, { token: admin.token });
+  const reopened = await state(advanced.id, admin.token);
+  check(reopened.tournament.status === 'running', 'завершённый турнир можно вернуть к играм');
+  check(
+    reopened.standings.every((row) => !row.medal),
+    'медали снимаются, пока турнир снова идёт',
+  );
+  const afterReopen = await request<{ match: MatchDto }>(
+    'PUT',
+    `/api/matches/${lastMatch.id}/score`,
+    {
+      token: admin.token,
+      body: { scoreA: 11, scoreB: 4, version: edited.match.version },
+    },
+  );
+  check(afterReopen.match.teamB.score === 4, 'после возврата к играм счёт снова можно править');
+  await request('POST', `/api/tournaments/${advanced.id}/finish`, { token: admin.token });
+  const finishedAgain = await state(advanced.id, admin.token);
+  check(finishedAgain.tournament.status === 'finished', 'турнир можно завершить повторно');
+
   section('Сортировка таблицы по любому столбцу');
   const byWins = await request<{ standings: StandingRowDto[] }>(
     'GET',
@@ -744,16 +795,13 @@ async function main(): Promise<void> {
     csvText.startsWith('matchType,event,date,playerA1,playerA1DuprId,playerA1ExternalId,'),
     'CSV в формате DUPR',
   );
-  check(csvText.includes(',SIDEOUT\n') || csvText.trimEnd().endsWith(',SIDEOUT'), 'scoreType SIDEOUT');
   check(
-    csvText.includes('FIRST SUMMER PICKLEBALL'),
-    'в event есть префикс клуба',
+    csvText.includes(',SIDEOUT\n') || csvText.trimEnd().endsWith(',SIDEOUT'),
+    'scoreType SIDEOUT',
   );
+  check(csvText.includes('FIRST SUMMER PICKLEBALL'), 'в event есть префикс клуба');
   const firstDuprId = finished.standings[0]!.player.duprId;
-  check(
-    firstDuprId !== null && csvText.includes(firstDuprId),
-    'в CSV есть DUPR ID игроков',
-  );
+  check(firstDuprId !== null && csvText.includes(firstDuprId), 'в CSV есть DUPR ID игроков');
   const disposition = csv.headers.get('content-disposition') ?? '';
   check(
     disposition.includes('DUPR Results.csv') || disposition.includes('DUPR%20Results.csv'),
@@ -764,6 +812,8 @@ async function main(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 300));
   check(events.includes('subscribed'), 'клиент подписался на комнату турнира');
   check(events.includes('match.updated'), 'обновления матчей приходят по WebSocket');
+  check(events.includes('round.updated'), 'обновления раунда приходят по WebSocket');
+  check(events.includes('schedule.rebuilt'), 'пересборка сетки приходит по WebSocket');
   check(events.includes('standings.updated'), 'таблица приходит по WebSocket');
   socket.close();
 
@@ -815,9 +865,7 @@ async function main(): Promise<void> {
   for (let roundIndex = 0; roundIndex < 3; roundIndex += 1) {
     mex = await state(mexicano.id, admin.token);
     const round = mex.rounds[roundIndex]!;
-    await playRound(admin.token, mexicano.id, round, (index) =>
-      index === 0 ? [11, 7] : [9, 11],
-    );
+    await playRound(admin.token, mexicano.id, round, (index) => (index === 0 ? [11, 7] : [9, 11]));
     if (roundIndex < 2) {
       const next = await request<{ roundIndex: number }>(
         'POST',
@@ -968,10 +1016,8 @@ async function main(): Promise<void> {
   });
   const skipLastState = await state(skipLast.id, admin.token);
   await playRound(admin.token, skipLast.id, skipLastState.rounds[0]!, () => [11, 6]);
-  await expectError(
-    'score_required',
-    'без пропуска последнего раунда americano не завершить',
-    () => request('POST', `/api/tournaments/${skipLast.id}/finish`, { token: admin.token }),
+  await expectError('score_required', 'без пропуска последнего раунда americano не завершить', () =>
+    request('POST', `/api/tournaments/${skipLast.id}/finish`, { token: admin.token }),
   );
   await roundAction(admin.token, skipLast.id, 1, 'skip');
   const skippedLast = await state(skipLast.id, admin.token);
@@ -1040,7 +1086,10 @@ async function main(): Promise<void> {
     },
   });
   check(guestTrainClaim.session.player?.id === guestTrainDupr, 'claim на тренировке сливает гостя');
-  check(guestTrainClaim.session.player?.isGuest === false, 'после claim на тренировке уже не гость');
+  check(
+    guestTrainClaim.session.player?.isGuest === false,
+    'после claim на тренировке уже не гость',
+  );
 
   const guestTrainingState = await request<{
     participants: { player: { id: string; isGuest: boolean } }[];

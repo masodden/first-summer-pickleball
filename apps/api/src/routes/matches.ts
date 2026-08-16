@@ -12,7 +12,7 @@ import {
   setMatchScore,
   startMatch,
 } from '../services/matches.js';
-import { broadcastMatch, broadcastStandings } from '../realtime/broadcast.js';
+import { broadcastMatch, broadcastRound, broadcastStandings } from '../realtime/broadcast.js';
 import type { AppContext } from './context.js';
 
 export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -39,6 +39,7 @@ export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void
       });
       const tournamentId = await getMatchTournamentId(db, request.params.id);
       broadcastMatch(hub, tournamentId, match);
+      await broadcastRound(db, hub, tournamentId, match.roundIndex);
       // Завершение матча меняет таблицу, поэтому её тоже рассылаем.
       if (name === 'finish' || name === 'reopen') {
         await broadcastStandings(db, hub, tournamentId);
@@ -53,6 +54,7 @@ export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void
     const match = await setMatchScore(db, request.params.id, body, viewer);
     const tournamentId = await getMatchTournamentId(db, request.params.id);
     broadcastMatch(hub, tournamentId, match);
+    await broadcastRound(db, hub, tournamentId, match.roundIndex);
     await broadcastStandings(db, hub, tournamentId);
     return { match };
   });
@@ -66,6 +68,7 @@ export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void
     });
     const tournamentId = await getMatchTournamentId(db, request.params.id);
     broadcastMatch(hub, tournamentId, match);
+    await broadcastRound(db, hub, tournamentId, match.roundIndex);
     await broadcastStandings(db, hub, tournamentId);
     return { match };
   });

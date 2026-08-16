@@ -160,8 +160,12 @@ export const en: Record<TranslationKey, string> = {
   'tournament.finish': 'Finish tournament',
   'tournament.finishShort': 'Finish',
   'tournament.finishConfirm':
-    'Finish the tournament? Scores can no longer be edited, and medals will appear in the standings.',
+    'Finish the tournament? Scores will lock and medals will appear. If you made a mistake, you can put it back in play.',
   'tournament.finished': 'Tournament finished',
+  'tournament.reopen': 'Back to play',
+  'tournament.reopenConfirm':
+    'The tournament will be “In progress” again: you can edit scores. Medals will disappear until you finish it once more.',
+  'tournament.reopened': 'Tournament is live again — scores can be edited',
   'tournament.archive': 'Archive',
   'tournament.unarchive': 'Unarchive',
   'tournament.archived': 'Tournament archived',

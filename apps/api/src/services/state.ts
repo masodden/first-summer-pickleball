@@ -49,6 +49,16 @@ function toMatchDto(
   };
 }
 
+/** Один раунд — для `round.updated`, чтобы второй телефон видел тот же closed/allScored. */
+export async function loadRound(
+  db: Database,
+  tournament: TournamentRow,
+  roundIndex: number,
+): Promise<RoundDto | null> {
+  const rounds = await loadRounds(db, tournament);
+  return rounds.find((round) => round.index === roundIndex) ?? null;
+}
+
 export async function loadRounds(db: Database, tournament: TournamentRow): Promise<RoundDto[]> {
   const roundRows = await db
     .select()
