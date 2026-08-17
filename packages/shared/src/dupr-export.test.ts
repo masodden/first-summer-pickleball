@@ -104,7 +104,9 @@ describe('formatDuprEventLabel', () => {
 
 describe('formatDuprLocation', () => {
   it('склеивает название площадки с Москвой', () => {
-    expect(formatDuprLocation('Центр Пиклбола')).toBe('Центр Пиклбола, Москва, Россия');
+    expect(formatDuprLocation('Центр Пиклбола, Красногорск')).toBe(
+      'Центр Пиклбола, Красногорск, Москва, Россия',
+    );
   });
 
   it('без названия площадки оставляет только город', () => {
@@ -155,7 +157,7 @@ describe('buildDuprResultsCsv', () => {
     title: 'Summer Cup',
     category: '3.5',
     startsAt: '2026-01-25T12:00:00.000Z',
-    venueName: 'Центр Пиклбола',
+    venueName: 'Центр Пиклбола, Красногорск',
   };
 
   it('совпадает с официальной шапкой DUPR', () => {
@@ -188,7 +190,7 @@ describe('buildDuprResultsCsv', () => {
     expect(row[15]).toBe('11');
     expect(row[16]).toBe('4');
     expect(row.slice(17, 25)).toEqual(['', '', '', '', '', '', '', '']);
-    expect(row[25]).toBe('Центр Пиклбола, Москва, Россия');
+    expect(row[25]).toBe('Центр Пиклбола, Красногорск, Москва, Россия');
     expect(row[26]).toBe('SIDEOUT');
   });
 
@@ -218,7 +220,7 @@ describe('buildDuprResultsCsv', () => {
         title: 'Cup, Open',
         category: null,
         startsAt: '2026-01-25T12:00:00.000Z',
-        venueName: 'Центр Пиклбола',
+        venueName: 'Центр Пиклбола, Красногорск',
       },
       [
         match({
@@ -229,7 +231,7 @@ describe('buildDuprResultsCsv', () => {
       ],
     );
     expect(csv).toContain(`"${DUPR_EVENT_PREFIX} Cup, Open"`);
-    expect(csv).toContain('"Центр Пиклбола, Москва, Россия"');
+    expect(csv).toContain('"Центр Пиклбола, Красногорск, Москва, Россия"');
     expect(csv).toContain('"Eve, A"');
     expect(csv.trimEnd().endsWith(',SIDEOUT')).toBe(true);
   });

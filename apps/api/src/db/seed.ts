@@ -1,9 +1,10 @@
+import { eq } from 'drizzle-orm';
 import { createDatabase, type Database } from './index.js';
 import { players, venues } from './schema.js';
 
 const SEED_VENUES = [
   {
-    name: 'Центр Пиклбола',
+    name: 'Центр Пиклбола, Красногорск',
     address: 'Красногорск, Советская ул., 14',
     mapUrl: 'https://yandex.ru/maps/-/CTGZFWPy',
   },
@@ -20,6 +21,11 @@ const SEED_VENUES = [
 ] as const;
 
 export async function seedVenues(db: Database): Promise<void> {
+  await db
+    .update(venues)
+    .set({ name: 'Центр Пиклбола, Красногорск' })
+    .where(eq(venues.name, 'Центр Пиклбола'));
+
   // Upsert: адрес и карта иногда правятся в коде — при повторном посеве
   // обновляем уже существующую площадку, а не оставляем старую ссылку.
   for (const venue of SEED_VENUES) {

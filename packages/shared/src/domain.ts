@@ -8,20 +8,6 @@ export const APP_VERSION = '0.8.0';
 /** Как приложение называется в шапке, боте, DUPR-экспорте и манифесте. */
 export const APP_NAME = 'PICKLEBALL Events';
 
-/** Площадка по умолчанию: первая в списке и подставляется в новый турнир. */
-export const DEFAULT_VENUE_NAME = 'Центр Пиклбола';
-
-/** «Центр Пиклбола» всегда первый чип, остальные — как пришли. */
-export function withDefaultVenueFirst<T extends { name: string }>(venues: readonly T[]): T[] {
-  const preferred: T[] = [];
-  const rest: T[] = [];
-  for (const venue of venues) {
-    if (venue.name === DEFAULT_VENUE_NAME) preferred.push(venue);
-    else rest.push(venue);
-  }
-  return [...preferred, ...rest];
-}
-
 /** Контакт для обратной связи: сюда игроки пишут про баги. */
 export const FEEDBACK_TELEGRAM = 'masodden';
 

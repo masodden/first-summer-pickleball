@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  DEFAULT_VENUE_NAME,
   WINNER_RULE_IDS,
   WINNER_RULE_SORT,
   matchWinnerRule,
@@ -250,13 +249,15 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
         <h3>{{ t()('tournament.venue') }}</h3>
 
         @if (venues.value().length > 0) {
-          <div class="row row--wrap">
+          <div class="stack stack--2">
             <span class="tiny faint">{{ t()('tournament.savedVenues') }}</span>
-            @for (venue of venues.value(); track venue.id) {
-              <button type="button" class="chip" (click)="applyVenue(venue)">
-                {{ venue.name }}
-              </button>
-            }
+            <div class="venue-chips">
+              @for (venue of venues.value(); track venue.id) {
+                <button type="button" class="chip" (click)="applyVenue(venue)">
+                  {{ venue.name }}
+                </button>
+              }
+            </div>
           </div>
         }
 
@@ -380,7 +381,6 @@ export class TournamentFormPage {
   protected readonly saving = signal(false);
   /** Названия кортов по позициям; пустое значение — корт остаётся под номером. */
   protected readonly courtNames = signal<string[]>([]);
-  private defaultVenueApplied = false;
 
   protected readonly isEdit = computed(() => Boolean(this.id()));
 
@@ -444,14 +444,6 @@ export class TournamentFormPage {
       this.description.set(tournament.description ?? '');
       this.formatDescription.set(tournament.formatDescription ?? '');
       this.courtNames.set([...(tournament.courtNames ?? [])]);
-    });
-
-    effect(() => {
-      if (this.isEdit() || this.defaultVenueApplied) return;
-      const preferred = this.venues.value().find((venue) => venue.name === DEFAULT_VENUE_NAME);
-      if (!preferred) return;
-      this.defaultVenueApplied = true;
-      this.applyVenue(preferred);
     });
   }
 

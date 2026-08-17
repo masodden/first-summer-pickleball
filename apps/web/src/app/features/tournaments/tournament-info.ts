@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import {
-  courtLabel,
   matchWinnerRule,
   type TranslationKey,
   type WinnerRuleId,
@@ -38,7 +37,7 @@ import { TournamentJoinPanel } from './tournament-join-panel';
             </div>
             <div class="cell">
               <span class="tiny faint">{{ t()('tournament.courts') }}</span>
-              <span class="strong" [class.numeric]="!item.courtNames">{{ courtsLabel() }}</span>
+              <span class="strong numeric">{{ item.courts }}</span>
             </div>
             <div class="cell">
               <span class="tiny faint">{{ t()('tournament.pointsToWin') }}</span>
@@ -153,17 +152,6 @@ export class TournamentInfoTab {
       this.tournament()?.format === 'mexicano' ? 'format.mexicano' : 'format.americano',
     ),
   );
-
-  /** Подписанные корты показываем списком: «4, 5, 6» вместо «3». */
-  protected readonly courtsLabel = computed(() => {
-    const item = this.tournament();
-    if (!item) return '';
-    const names = item.courtNames;
-    if (!names) return item.courts.toString();
-    return Array.from({ length: item.courts }, (_, index) => courtLabel(index + 1, names)).join(
-      ', ',
-    );
-  });
 
   protected readonly formatDescription = computed(() =>
     this.i18n.translate(

@@ -140,7 +140,7 @@ function compareTournaments(
                   <div class="row">
                     <div class="grow stack tile__body">
                       <div class="row tile__title">
-                        <h3 class="truncate grow">{{ item.title }}</h3>
+                        <h3 class="grow">{{ item.title }}</h3>
                         @if (item.category) {
                           <span class="chip chip--accent tile__level">{{ item.category }}</span>
                         }
@@ -239,13 +239,20 @@ function compareTournaments(
     }
 
     .tile__title {
-      align-items: center;
+      align-items: flex-start;
       gap: var(--space-2);
       min-width: 0;
     }
 
+    .tile__title h3 {
+      min-width: 0;
+      line-height: 1.25;
+      overflow-wrap: break-word;
+    }
+
     .tile__level {
       flex: 0 0 auto;
+      margin-top: 2px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;

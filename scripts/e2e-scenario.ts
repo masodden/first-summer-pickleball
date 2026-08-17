@@ -420,7 +420,7 @@ async function main(): Promise<void> {
     standingsSort: ['points', 'diff'],
     ratingBalance: true,
     entryFee: 1000,
-    venueName: 'Центр Пиклбола',
+    venueName: 'Центр Пиклбола, Красногорск',
     venueAddress: 'Корты клуба, 6 кортов',
   };
 

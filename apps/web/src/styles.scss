@@ -711,6 +711,23 @@ button {
   white-space: nowrap;
 }
 
+/** Сохранённые площадки: одна строка, длинные имена обрезаются. */
+.venue-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.venue-chips .chip {
+  display: block;
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
 .chip--accent {
   background: var(--accent-soft);
   border-color: transparent;
