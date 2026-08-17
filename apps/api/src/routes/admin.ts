@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, eq } from 'drizzle-orm';
+import { withDefaultVenueFirst } from '@fsp/shared';
 import { setRoleSchema } from '@fsp/shared/schemas';
 import { z } from 'zod';
 import { parse } from '../lib/validate.js';
@@ -67,7 +68,7 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: AppContext): void
   app.get('/api/venues', async () => {
     const rows = await db.select().from(venues).orderBy(desc(venues.createdAt));
     return {
-      venues: rows.map((row) => ({
+      venues: withDefaultVenueFirst(rows).map((row) => ({
         id: row.id,
         name: row.name,
         address: row.address,

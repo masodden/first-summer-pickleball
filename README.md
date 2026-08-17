@@ -1,4 +1,4 @@
-# FIRST SUMMER PICKLEBALL
+# PICKLEBALL Events
 
 Приложение для проведения локальных турниров по пиклболу: регистрация игроков, приём оплаты,
 счёт на кортах в прямом эфире и турнирная таблица с медалями. Работает как Telegram Mini App и
@@ -241,7 +241,7 @@ curl https://first-summer-pickleball.ru/api/tournaments  # должен верн
 ## Telegram-бот и Mini App
 
 1. Напишите [@BotFather](https://t.me/BotFather) → `/newbot` → задайте имя и username
-   (например `FirstSummerPickleballBot`).
+   (например `PickleballEventsBot`).
 2. Скопируйте токен и положите его в `.env` (`TELEGRAM_BOT_TOKEN`), а username — в
    `TELEGRAM_BOT_USERNAME` (без `@`).
 3. Там же у BotFather: `/setmenubutton` → выберите бота → пришлите

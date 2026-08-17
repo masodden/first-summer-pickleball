@@ -1,6 +1,6 @@
 {
-  "name": "FIRST SUMMER PICKLEBALL",
-  "short_name": "FS Pickleball",
+  "name": "PICKLEBALL Events",
+  "short_name": "PB Events",
   "description": "Турниры по пиклболу: регистрация, счёт на кортах и живая таблица",
   "start_url": "/",
   "display": "standalone",

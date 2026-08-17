@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 92" role="img" aria-label="FIRST SUMMER PICKLEBALL">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 92" role="img" aria-label="PICKLEBALL Events">
   <defs>
     <linearGradient id="logo-ball" x1="0.2" y1="0" x2="0.8" y2="1">
       <stop offset="0" stop-color="#d2ef62"/>
@@ -21,8 +21,8 @@
 
   <text x="80" y="38"
         font-family="Inter Tight, Inter, system-ui, sans-serif"
-        font-size="21" font-weight="700" letter-spacing="3.4" fill="#c75b39">FIRST SUMMER</text>
+        font-size="21" font-weight="700" letter-spacing="3.4" fill="#c75b39">PICKLEBALL</text>
   <text x="80" y="70"
         font-family="Inter Tight, Inter, system-ui, sans-serif"
-        font-size="27" font-weight="800" letter-spacing="1.6" fill="currentColor">PICKLEBALL</text>
+        font-size="27" font-weight="800" letter-spacing="1.6" fill="currentColor">Events</text>
 </svg>

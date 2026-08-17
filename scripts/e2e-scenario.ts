@@ -12,6 +12,7 @@
 
 // Скрипт лежит вне рабочих пакетов, поэтому берём общий контракт по пути, а не по имени.
 import {
+  DUPR_EVENT_PREFIX,
   WS_PATH,
   type MatchDto,
   type RoundDto,
@@ -419,7 +420,7 @@ async function main(): Promise<void> {
     standingsSort: ['points', 'diff'],
     ratingBalance: true,
     entryFee: 1000,
-    venueName: 'First Summer Club',
+    venueName: 'Центр Пиклбола',
     venueAddress: 'Корты клуба, 6 кортов',
   };
 
@@ -799,7 +800,7 @@ async function main(): Promise<void> {
     csvText.includes(',SIDEOUT\n') || csvText.trimEnd().endsWith(',SIDEOUT'),
     'scoreType SIDEOUT',
   );
-  check(csvText.includes('FIRST SUMMER PICKLEBALL'), 'в event есть префикс клуба');
+  check(csvText.includes(DUPR_EVENT_PREFIX), 'в event есть префикс клуба');
   const firstDuprId = finished.standings[0]!.player.duprId;
   check(firstDuprId !== null && csvText.includes(firstDuprId), 'в CSV есть DUPR ID игроков');
   const disposition = csv.headers.get('content-disposition') ?? '';

@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
+  DEFAULT_VENUE_NAME,
   trainingCourtHours,
   type CreateTrainingInput,
   type VenueDto,
@@ -212,6 +213,7 @@ export class TrainingFormPage {
   protected readonly venueAddress = signal('');
   protected readonly venueMapUrl = signal('');
   protected readonly saving = signal(false);
+  private defaultVenueApplied = false;
 
   protected readonly venues = resource({
     loader: () => this.tournamentApi.listVenues().then((response) => response.venues),
@@ -268,6 +270,14 @@ export class TrainingFormPage {
         this.venueAddress.set(item.venueAddress ?? '');
         this.venueMapUrl.set(item.venueMapUrl ?? '');
       });
+    });
+
+    effect(() => {
+      if (this.isEdit() || this.defaultVenueApplied) return;
+      const preferred = this.venues.value().find((venue) => venue.name === DEFAULT_VENUE_NAME);
+      if (!preferred) return;
+      this.defaultVenueApplied = true;
+      this.applyVenue(preferred);
     });
   }
 

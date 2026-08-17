@@ -1,7 +1,8 @@
 import type { MatchDto } from './dto.js';
+import { APP_NAME } from './domain.js';
 
 /** Префикс события в имени файла и в колонке event. */
-export const DUPR_EVENT_PREFIX = 'FIRST SUMMER PICKLEBALL';
+export const DUPR_EVENT_PREFIX = APP_NAME;
 
 /**
  * Заголовки ровно как в шаблоне DUPR (club CSV import).
@@ -46,7 +47,7 @@ export interface DuprExportTournament {
   venueName: string | null;
 }
 
-/** `FIRST SUMMER PICKLEBALL {{ title }} {{ category }}` */
+/** `PICKLEBALL Events {{ title }} {{ category }}` */
 export function formatDuprEventLabel(title: string, category: string | null | undefined): string {
   const parts = [DUPR_EVENT_PREFIX, title.trim()];
   const cat = category?.trim();
@@ -75,7 +76,7 @@ export function formatDuprEventDate(startsAt: string | Date): string {
 }
 
 /**
- * `yyyy-mm-dd FIRST SUMMER PICKLEBALL {{ title }} - DUPR Results.csv`
+ * `yyyy-mm-dd PICKLEBALL Events {{ title }} - DUPR Results.csv`
  * Недопустимые для файловой системы символы в названии заменяем на пробел.
  */
 export function formatDuprExportFilename(startsAt: string | Date, title: string): string {

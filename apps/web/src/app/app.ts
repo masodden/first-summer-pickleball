@@ -34,8 +34,8 @@ import { ToastHost } from './ui/toast-host';
         <a class="brand" routerLink="/tournaments">
           <app-ball [size]="30" [motion]="connectionBusy() ? 'spin' : 'none'" />
           <span class="brand__text">
-            <span class="brand__first">FIRST SUMMER</span>
-            <span class="brand__second">PICKLEBALL</span>
+            <span class="brand__first">PICKLEBALL</span>
+            <span class="brand__second">Events</span>
           </span>
         </a>
 

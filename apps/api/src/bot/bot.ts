@@ -28,7 +28,7 @@ export function createBot(env: Env): BotBundle | null {
 
     let url = appUrl;
     let text =
-      'FIRST SUMMER PICKLEBALL — турниры клуба. Откройте приложение, чтобы посмотреть турниры и заявиться.';
+      'PICKLEBALL Events — турниры и тренировки. Откройте приложение, чтобы посмотреть события и заявиться.';
     if (inviteToken) {
       url = `${appUrl}/?invite=${encodeURIComponent(inviteToken)}`;
       text = 'Откройте приложение, чтобы привязать свою карточку игрока.';

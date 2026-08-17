@@ -2,7 +2,7 @@
   "name": "first-summer-pickleball",
   "version": "0.7.8",
   "private": true,
-  "description": "FIRST SUMMER PICKLEBALL — приложение для проведения локальных турниров по пиклболу",
+  "description": "PICKLEBALL Events — проводим локальные турниры по пиклболу",
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=22"

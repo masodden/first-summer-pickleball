@@ -3,6 +3,11 @@ import { players, venues } from './schema.js';
 
 const SEED_VENUES = [
   {
+    name: 'Центр Пиклбола',
+    address: 'Красногорск, Советская ул., 14',
+    mapUrl: 'https://yandex.ru/maps/-/CTGZFWPy',
+  },
+  {
     name: 'First Summer Club, ВДНХ',
     address: 'Москва, ВДНХ',
     mapUrl: 'https://yandex.ru/maps/-/CTGNBM4U',
@@ -11,11 +16,6 @@ const SEED_VENUES = [
     name: 'Пиклбол Гераклион',
     address: 'Москва, Лодочная ул., 15, стр. 1А',
     mapUrl: 'https://yandex.ru/maps/-/CTGZFGMw',
-  },
-  {
-    name: 'Центр Пиклбола',
-    address: 'Красногорск, Советская ул., 14',
-    mapUrl: 'https://yandex.ru/maps/-/CTGZFWPy',
   },
 ] as const;
 

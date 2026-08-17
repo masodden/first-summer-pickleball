@@ -1,8 +1,8 @@
 import type { TranslationKey } from './ru.js';
 
 export const en: Record<TranslationKey, string> = {
-  'app.name': 'FIRST SUMMER PICKLEBALL',
-  'app.shortName': 'First Summer Pickleball',
+  'app.name': 'PICKLEBALL Events',
+  'app.shortName': 'PICKLEBALL Events',
   'app.tagline': 'Local pickleball tournaments',
 
   'common.save': 'Save',
@@ -446,7 +446,7 @@ export const en: Record<TranslationKey, string> = {
     'The game appeared in 1965 on Bainbridge Island, near Seattle. Three friends — Joel Pritchard, Bill Bell and Barney McCallum — made something for their kids: paddles, a plastic ball and a lowered badminton net. That was pickleball.',
   'about.clubTitle': 'Here in Russia',
   'about.clubBody':
-    'FIRST SUMMER PICKLEBALL is growing the game in Moscow: somewhere to show up, people to play with, and a friendly tournament when you want one. Pick your category and go. The rest the game will teach you.',
+    'PICKLEBALL Events is growing the game in Moscow: somewhere to show up, people to play with, and a friendly tournament when you want one. Pick your category and go. The rest the game will teach you.',
 
   'import.title': 'Import players',
   'import.hint':
