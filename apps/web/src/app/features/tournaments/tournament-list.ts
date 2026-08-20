@@ -13,7 +13,6 @@ import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TournamentApi } from '../../core/tournament-api';
 import { Ball, Racket } from '../../ui/ball';
-import { DomainSwitch } from '../../ui/domain-switch';
 import { StatusBadge } from '../../ui/status-badge';
 import { consumeFirstVisit } from '../../core/motion';
 
@@ -44,11 +43,11 @@ function compareTournaments(
 @Component({
   selector: 'app-tournament-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DomainSwitch, StatusBadge, Ball, Racket],
+  imports: [RouterLink, StatusBadge, Ball, Racket],
   template: `
     <div class="stack stack--4">
       <div class="row row--between header">
-        <app-domain-switch />
+        <h1>{{ t()('nav.tournaments') }}</h1>
         @if (session.isModerator()) {
           <a class="btn btn--primary btn--sm create" routerLink="/tournaments/new">
             {{ t()('common.create') }}
@@ -139,8 +138,8 @@ function compareTournaments(
 
                   <div class="row">
                     <div class="grow stack tile__body">
-                      <div class="row tile__title">
-                        <h3 class="grow">{{ item.title }}</h3>
+                      <div class="tile__title">
+                        <h3>{{ item.title }}</h3>
                         @if (item.category) {
                           <span class="chip chip--accent tile__level">{{ item.category }}</span>
                         }
@@ -205,6 +204,10 @@ function compareTournaments(
       flex-wrap: nowrap;
     }
 
+    .header h1 {
+      min-width: 0;
+    }
+
     .create {
       flex: 0 0 auto;
     }
@@ -239,20 +242,24 @@ function compareTournaments(
     }
 
     .tile__title {
-      align-items: flex-start;
-      gap: var(--space-2);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      column-gap: var(--space-2);
       min-width: 0;
     }
 
     .tile__title h3 {
+      grid-column: 1;
       min-width: 0;
       line-height: 1.25;
       overflow-wrap: break-word;
     }
 
     .tile__level {
-      flex: 0 0 auto;
-      margin-top: 2px;
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;

@@ -37,7 +37,7 @@ export const ru = {
   'common.pendingActions': 'Несохранённых действий: {{count}}',
 
   'nav.tournaments': 'Турниры',
-  'nav.trainings': 'Тренировки',
+  'nav.trainings': 'Open Play',
   'nav.players': 'Игроки',
   'nav.profile': 'Профиль',
   'nav.settings': 'Настройки',
@@ -492,9 +492,10 @@ export const ru = {
   'public.title': 'Табло',
   'public.spectatorHint': 'Живое табло турнира. Обновляется автоматически.',
 
-  'training.list': 'Тренировки',
   'training.empty': 'Тренировок пока нет',
   'training.emptyHint': 'Создайте тренировку и отправьте ссылку игрокам',
+  'training.organizerHint': 'Чтобы создать тренировку, нужна роль организатора. Напишите',
+  'training.organizerHintAfter': 'в Telegram — поможем получить доступ.',
   'training.create': 'Новая тренировка',
   'training.edit': 'Редактировать тренировку',
   'training.title': 'Название',

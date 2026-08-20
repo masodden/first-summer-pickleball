@@ -103,7 +103,7 @@ interface Session {
   };
 }
 
-const login = (role: 'admin' | 'moderator' | 'user', telegramId: string, name: string) =>
+const login = (role: 'admin' | 'moderator' | 'organizer' | 'user', telegramId: string, name: string) =>
   request<Session>('POST', '/api/auth/dev', { body: { role, telegramId, name } });
 
 const RU_NAMES: [string, string][] = [
@@ -1047,25 +1047,35 @@ async function main(): Promise<void> {
   const skipLastCsvRows = skipLastCsvText.trim().split('\n').slice(1).filter(Boolean);
   check(skipLastCsv.ok && skipLastCsvRows.length === 1, 'в CSV только сыгранный матч');
 
-  section('Гость без DUPR: самозапись на тренировку');
+  section('Тренировки: отдельный таб /trainings');
+  const trainingOrganizer = await login(
+    'organizer',
+    `e2e-train-org-${RUN_TAG}`,
+    'Организатор тренировок',
+  );
+  check(trainingOrganizer.session.role === 'organizer', 'организатор заходит с ролью organizer');
   const trainingGuest = await login('user', `e2e-train-guest-${RUN_TAG}`, 'Гость Тренировки');
   check(
     trainingGuest.session.player?.isGuest === true,
     'для тренировки тоже создаётся гостевая карточка',
   );
+  const trainingDraft = {
+    title: `Тренировка для гостей ${RUN_TAG}`,
+    startsAt: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+    maxPlayers: 8,
+    pricePerCourtHour: 1000,
+    courtBlocks: [{ courts: 1, hours: 1 }],
+  };
+  await expectError(
+    'forbidden',
+    'игрок не создаёт тренировку — это вкладка организатора',
+    () => request('POST', '/api/trainings', { token: trainingGuest.token, body: trainingDraft }),
+  );
+
   const { training: guestTraining } = await request<{ training: { id: string } }>(
     'POST',
     '/api/trainings',
-    {
-      token: admin.token,
-      body: {
-        title: `Тренировка для гостей ${RUN_TAG}`,
-        startsAt: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
-        maxPlayers: 8,
-        pricePerCourtHour: 1000,
-        courtBlocks: [{ courts: 1, hours: 1 }],
-      },
-    },
+    { token: trainingOrganizer.token, body: trainingDraft },
   );
   const guestTrainingJoin = await request<{
     waitlisted: boolean;
@@ -1094,7 +1104,7 @@ async function main(): Promise<void> {
 
   const guestTrainingState = await request<{
     participants: { player: { id: string; isGuest: boolean } }[];
-  }>('GET', `/api/trainings/${guestTraining.id}/state`, { token: admin.token });
+  }>('GET', `/api/trainings/${guestTraining.id}/state`, { token: trainingOrganizer.token });
   check(
     guestTrainingState.participants.some(
       (row) => row.player.id === guestTrainDupr && !row.player.isGuest,
@@ -1114,7 +1124,7 @@ async function main(): Promise<void> {
       status: string;
     };
   }>('POST', '/api/trainings', {
-    token: admin.token,
+    token: trainingOrganizer.token,
     body: {
       title: `Тренировка ${RUN_TAG}`,
       startsAt: trainingStartsAt,
@@ -1134,7 +1144,7 @@ async function main(): Promise<void> {
   const trainingPlayers = advancedPlayers.slice(0, 4);
   for (const player of trainingPlayers) {
     await request('POST', `/api/trainings/${createdTraining.id}/participants`, {
-      token: admin.token,
+      token: trainingOrganizer.token,
       body: { playerId: player.id },
     });
   }
@@ -1154,21 +1164,23 @@ async function main(): Promise<void> {
       amountDue: number | null;
       status: string;
     }[];
-  }>('GET', `/api/trainings/${createdTraining.id}/state`, { token: admin.token });
+  }>('GET', `/api/trainings/${createdTraining.id}/state`, { token: trainingOrganizer.token });
   check(trainingState.training.participantCount === 4, 'на тренировку записались 4 игрока');
   await expectError('not_all_confirmed', 'финиш без подтверждений запрещён', () =>
-    request('POST', `/api/trainings/${createdTraining.id}/finish`, { token: admin.token }),
+    request('POST', `/api/trainings/${createdTraining.id}/finish`, {
+      token: trainingOrganizer.token,
+    }),
   );
 
   for (const player of trainingPlayers) {
     await request('PUT', `/api/trainings/${createdTraining.id}/participants/${player.id}/paid`, {
-      token: admin.token,
+      token: trainingOrganizer.token,
       body: { confirmedAndPaid: true },
     });
   }
 
   trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
-    token: admin.token,
+    token: trainingOrganizer.token,
   });
   check(trainingState.training.allConfirmed === true, 'все записавшиеся подтверждены');
   check(
@@ -1180,10 +1192,10 @@ async function main(): Promise<void> {
   await request(
     'PUT',
     `/api/trainings/${createdTraining.id}/participants/${editedPlayer.id}/amount`,
-    { token: admin.token, body: { amountDue: 1500 } },
+    { token: trainingOrganizer.token, body: { amountDue: 1500 } },
   );
   trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
-    token: admin.token,
+    token: trainingOrganizer.token,
   });
   const editedRow = trainingState.participants.find((row) => row.player.id === editedPlayer.id);
   check(editedRow?.amountDue === 1500 && editedRow.amount === 1500, 'ручная сумма сохраняется');
@@ -1194,19 +1206,24 @@ async function main(): Promise<void> {
     'у остальных остаётся автодоля',
   );
 
-  await request('POST', `/api/trainings/${createdTraining.id}/finish`, { token: admin.token });
+  await request('POST', `/api/trainings/${createdTraining.id}/finish`, {
+    token: trainingOrganizer.token,
+  });
   trainingState = await request('GET', `/api/trainings/${createdTraining.id}/state`, {
-    token: admin.token,
+    token: trainingOrganizer.token,
   });
   check(trainingState.training.status === 'finished', 'тренировку можно завершить после confirm');
 
   await expectError('tournament_wrong_status', 'после финиша суммы не правятся', () =>
     request('PUT', `/api/trainings/${createdTraining.id}/participants/${editedPlayer.id}/amount`, {
-      token: admin.token,
+      token: trainingOrganizer.token,
       body: { amountDue: 1600 },
     }),
   );
 
+  await expectError('forbidden', 'организатор не удаляет тренировку — только админ', () =>
+    request('DELETE', `/api/trainings/${createdTraining.id}`, { token: trainingOrganizer.token }),
+  );
   await request('DELETE', `/api/trainings/${createdTraining.id}`, { token: admin.token });
   await expectError('not_found', 'удалённая тренировка недоступна', () =>
     request('GET', `/api/trainings/${createdTraining.id}`),

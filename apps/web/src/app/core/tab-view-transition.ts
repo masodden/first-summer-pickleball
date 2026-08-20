@@ -1,8 +1,8 @@
 import { afterNextRender, Injector } from '@angular/core';
 import type { Router } from '@angular/router';
 
-/** Порядок табов слева направо (тренировки — тот же слот, что турниры). */
-const TAB_ORDER = ['tournaments', 'about', 'players', 'admin', 'settings'] as const;
+/** Порядок табов слева направо. */
+const TAB_ORDER = ['tournaments', 'trainings', 'about', 'players', 'admin', 'settings'] as const;
 
 type TabKey = (typeof TAB_ORDER)[number];
 
@@ -16,7 +16,6 @@ function rootSegmentFromUrl(url: string): string {
 }
 
 function tabIndex(rootSegment: string): number {
-  if (rootSegment === 'trainings') return 0;
   return TAB_ORDER.indexOf(rootSegment as TabKey);
 }
 

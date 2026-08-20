@@ -10,9 +10,10 @@ import { RouterLink } from '@angular/router';
 import { isTrainingActive, type TrainingStatus, type TrainingSummaryDto } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
+import { TelegramService } from '../../core/telegram';
+import { TournamentApi } from '../../core/tournament-api';
 import { TrainingApi } from '../../core/training-api';
 import { Ball, Racket } from '../../ui/ball';
-import { DomainSwitch } from '../../ui/domain-switch';
 import { StatusBadge } from '../../ui/status-badge';
 import { consumeFirstVisit } from '../../core/motion';
 
@@ -28,14 +29,17 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
   return a.startsAt.localeCompare(b.startsAt) || a.createdAt.localeCompare(b.createdAt);
 }
 
+/**
+ * Список тренировок — отдельный корневой таб.
+ */
 @Component({
   selector: 'app-training-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DomainSwitch, StatusBadge, Ball, Racket],
+  imports: [RouterLink, StatusBadge, Ball, Racket],
   template: `
     <div class="stack stack--4">
       <div class="row row--between header">
-        <app-domain-switch />
+        <h1>{{ t()('nav.trainings') }}</h1>
         @if (session.canManageTrainings()) {
           <a class="btn btn--primary btn--sm create" routerLink="/trainings/new">
             {{ t()('common.create') }}
@@ -61,6 +65,20 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
           {{ t()('training.statusFinished') }}
         </button>
       </div>
+
+      @if (showOrganizerHint()) {
+        <p class="small muted organizer-hint">
+          {{ t()('training.organizerHint') }}
+          <a
+            class="organizer-hint__link"
+            [href]="'https://t.me/' + clubContact()"
+            (click)="openClubContact($event)"
+          >
+            @@{{ clubContact() }}
+          </a>
+          {{ t()('training.organizerHintAfter') }}
+        </p>
+      }
 
       @if (trainings.isLoading()) {
         <div class="stack stack--3">
@@ -95,12 +113,14 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
                 <a class="glass card--tight tile" [routerLink]="['/trainings', item.id]">
                   <div class="row row--between">
                     <app-status-badge entity="training" [status]="badgeStatus(item.status)" />
-                    <span class="tiny faint numeric">{{ time(item.startsAt) }}</span>
+                    <span class="tile__time numeric">{{ time(item.startsAt) }}</span>
                   </div>
 
                   <div class="row">
                     <div class="grow stack tile__body">
-                      <h3 class="truncate">{{ item.title }}</h3>
+                      <div class="tile__title">
+                        <h3>{{ item.title }}</h3>
+                      </div>
                       <div class="row row--wrap tile__meta">
                         <span class="chip">
                           {{ t()('training.courtHours', { hours: formatHours(item.courtHours) }) }}
@@ -146,8 +166,23 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
       flex-wrap: nowrap;
     }
 
+    .header h1 {
+      min-width: 0;
+    }
+
     .create {
       flex: 0 0 auto;
+    }
+
+    .organizer-hint {
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .organizer-hint__link {
+      color: var(--accent-strong);
+      font-weight: 650;
+      margin: 0 0.15em;
     }
 
     .tile {
@@ -166,9 +201,29 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
       box-shadow: var(--glass-shadow-lg);
     }
 
+    .tile__time {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text-strong);
+      line-height: 1;
+    }
+
     .tile__body {
       gap: var(--space-2);
       min-width: 0;
+    }
+
+    .tile__title {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      min-width: 0;
+    }
+
+    .tile__title h3 {
+      min-width: 0;
+      line-height: 1.25;
+      overflow-wrap: break-word;
     }
 
     .tile__meta {
@@ -194,10 +249,16 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
 })
 export class TrainingListPage {
   private readonly api = inject(TrainingApi);
+  private readonly healthApi = inject(TournamentApi);
+  private readonly telegram = inject(TelegramService);
   protected readonly i18n = inject(I18nService);
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
   protected readonly stagger = consumeFirstVisit('training-list');
+  protected readonly clubContact = signal('Katevolchok');
+
+  /** Подсказка только обычным игрокам: организатор уже видит кнопку создания. */
+  protected readonly showOrganizerHint = computed(() => this.session.role() === 'user');
 
   protected readonly filter = signal<Filter>('active');
 
@@ -256,5 +317,16 @@ export class TrainingListPage {
     const count = Number(item.participantCount) || 0;
     if (max <= 0 || count <= 0) return 0;
     return Math.min(100, Math.round((count / max) * 100));
+  }
+
+  constructor() {
+    void this.healthApi.getHealth().then((health) => {
+      if (health.clubContactTelegram) this.clubContact.set(health.clubContactTelegram);
+    });
+  }
+
+  protected openClubContact(event: Event): void {
+    event.preventDefault();
+    this.telegram.openExternal(`https://t.me/${this.clubContact()}`);
   }
 }

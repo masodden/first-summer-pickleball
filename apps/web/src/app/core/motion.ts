@@ -69,16 +69,6 @@ export function classifyNav(fromUrl: string, toUrl: string): NavMotion {
     }
   }
 
-  if (
-    !from.id &&
-    !to.id &&
-    (from.root === 'tournaments' || from.root === 'trainings') &&
-    (to.root === 'tournaments' || to.root === 'trainings') &&
-    from.root !== to.root
-  ) {
-    return to.root === 'trainings' ? 'inner-forward' : 'inner-back';
-  }
-
   if (to.parts.length > from.parts.length) return 'push';
   if (to.parts.length < from.parts.length) return 'pop';
   return 'fade';

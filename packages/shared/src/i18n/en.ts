@@ -39,7 +39,7 @@ export const en: Record<TranslationKey, string> = {
   'common.pendingActions': 'Pending actions: {{count}}',
 
   'nav.tournaments': 'Tournaments',
-  'nav.trainings': 'Trainings',
+  'nav.trainings': 'Open Play',
   'nav.players': 'Players',
   'nav.profile': 'Profile',
   'nav.settings': 'Settings',
@@ -495,9 +495,10 @@ export const en: Record<TranslationKey, string> = {
   'public.title': 'Scoreboard',
   'public.spectatorHint': 'Live tournament scoreboard. Updates automatically.',
 
-  'training.list': 'Trainings',
   'training.empty': 'No trainings yet',
   'training.emptyHint': 'Create a training and share the link with players',
+  'training.organizerHint': 'To create a training you need the organiser role. Message',
+  'training.organizerHintAfter': 'on Telegram — we can help you get access.',
   'training.create': 'New training',
   'training.edit': 'Edit training',
   'training.title': 'Title',

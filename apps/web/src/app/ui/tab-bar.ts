@@ -21,20 +21,68 @@ function pathFromUrlTree(tree: UrlTree): string {
       <a
         href="/tournaments"
         class="tab"
-        [class.is-active]="tournamentsActive() || trainingsActive() || rootActive()"
+        [class.is-active]="tournamentsActive() || rootActive()"
         (click)="onTabClick($event, '/tournaments')"
       >
         <span class="tab__glyph">
           <svg class="tab__icon tab__icon--outline" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 6h16M4 12h16M4 18h10" />
+            <path d="M8 4.5h8v3.2c0 2.4-1.8 4.3-4 4.3s-4-1.9-4-4.3V4.5z" />
+            <path d="M8.2 6.4H5.6c.15 1.7 1.05 2.9 2.5 3.4" />
+            <path d="M15.8 6.4h2.6c-.15 1.7-1.05 2.9-2.5 3.4" />
+            <path d="M12 11.9v3.1" />
+            <path d="M10.3 15h3.4v3.6H10.3z" />
+            <path d="M8.8 18.6h6.4" />
           </svg>
           <svg class="tab__icon tab__icon--filled" viewBox="0 0 24 24" aria-hidden="true">
             <path
-              d="M3.5 5.25h17a1.25 1.25 0 010 2.5h-17a1.25 1.25 0 010-2.5zm0 5.5h17a1.25 1.25 0 010 2.5h-17a1.25 1.25 0 010-2.5zm0 5.5h11a1.25 1.25 0 010 2.5h-11a1.25 1.25 0 010-2.5z"
+              d="M7.25 3.75h9.5v3.7c0 2.85-2.05 5.2-4.75 5.55v1.75h2.15v2.1H9.85v-2.1h2.15v-1.75c-2.7-.35-4.75-2.7-4.75-5.55v-3.7zM7.4 5.7H4.55A3.4 3.4 0 007.15 10M16.6 5.7h2.85A3.4 3.4 0 0116.85 10M8.1 19.15h7.8v1.6H8.1z"
             />
           </svg>
         </span>
         <span>{{ t()('nav.tournaments') }}</span>
+      </a>
+      <a
+        href="/trainings"
+        class="tab"
+        [class.is-active]="trainingsActive()"
+        (click)="onTabClick($event, '/trainings')"
+      >
+        <span class="tab__glyph">
+          <svg
+            class="tab__icon tab__icon--outline tab__icon--ball"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <g transform="rotate(45 11.2 12)">
+              <path
+                d="M10 1.5h4A3.6 3.6 0 0 1 17.6 5.1v6.1A3.6 3.6 0 0 1 14 14.8H13.55v6.3a1.55 1.55 0 0 1-3.1 0v-6.3H10A3.6 3.6 0 0 1 6.4 11.2V5.1A3.6 3.6 0 0 1 10 1.5z"
+              />
+            </g>
+            <circle cx="19.6" cy="17.1" r="3.9" />
+            <g class="ball-holes">
+              <circle cx="19.6" cy="17.1" r="0.62" />
+              <circle cx="19.6" cy="14.82" r="0.54" />
+              <circle cx="21.62" cy="15.92" r="0.52" />
+              <circle cx="21.66" cy="18.28" r="0.54" />
+              <circle cx="19.6" cy="19.38" r="0.5" />
+              <circle cx="17.58" cy="18.28" r="0.54" />
+              <circle cx="17.54" cy="15.92" r="0.46" />
+            </g>
+          </svg>
+          <svg class="tab__icon tab__icon--filled" viewBox="0 0 24 24" aria-hidden="true">
+            <g transform="rotate(45 11.2 12)">
+              <path
+                d="M10 1.5h4A3.6 3.6 0 0 1 17.6 5.1v6.1A3.6 3.6 0 0 1 14 14.8H13.55v6.3a1.55 1.55 0 0 1-3.1 0v-6.3H10A3.6 3.6 0 0 1 6.4 11.2V5.1A3.6 3.6 0 0 1 10 1.5z"
+              />
+            </g>
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M19.6 13.2a3.9 3.9 0 1 1 0 7.8 3.9 3.9 0 1 1 0-7.8zM19.6 16.48a.62.62 0 1 1 0 1.24.62.62 0 1 1 0-1.24zM19.6 14.28a.54.54 0 1 1 0 1.08.54.54 0 1 1 0-1.08zM21.62 15.4a.52.52 0 1 1 0 1.04.52.52 0 1 1 0-1.04zM21.66 17.74a.54.54 0 1 1 0 1.08.54.54 0 1 1 0-1.08zM19.6 18.88a.5.5 0 1 1 0 1 .5.5 0 1 1 0-1zM17.58 17.74a.54.54 0 1 1 0 1.08.54.54 0 1 1 0-1.08zM17.54 15.46a.46.46 0 1 1 0 .92.46.46 0 1 1 0-.92z"
+            />
+          </svg>
+        </span>
+        <span>{{ t()('nav.trainings') }}</span>
       </a>
       @if (!preferences.hideAboutTab()) {
         <a
@@ -70,28 +118,30 @@ function pathFromUrlTree(tree: UrlTree): string {
           <span>{{ t()('nav.about') }}</span>
         </a>
       }
-      <a
-        href="/players"
-        class="tab"
-        [class.is-active]="playersActive()"
-        (click)="onTabClick($event, '/players')"
-      >
-        <span class="tab__glyph">
-          <svg class="tab__icon tab__icon--outline" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="9" cy="8" r="3.2" />
-            <path
-              d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M16 11.2a2.8 2.8 0 100-5.6M17 19h3.5c-.3-2.2-1.4-3.8-3-4.5"
-            />
-          </svg>
-          <svg class="tab__icon tab__icon--filled" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="9" cy="8" r="3.6" />
-            <path d="M3.2 19.5c.55-3.6 2.95-5.7 5.8-5.7s5.25 2.1 5.8 5.7H3.2z" />
-            <circle cx="16.5" cy="9.2" r="2.7" />
-            <path d="M16.2 14.2c2.05.35 3.45 1.9 3.85 4.3H14.9c.2-1.85 1-3.3 1.3-3.8z" />
-          </svg>
-        </span>
-        <span>{{ t()('nav.players') }}</span>
-      </a>
+      @if (session.isModerator()) {
+        <a
+          href="/players"
+          class="tab"
+          [class.is-active]="playersActive()"
+          (click)="onTabClick($event, '/players')"
+        >
+          <span class="tab__glyph">
+            <svg class="tab__icon tab__icon--outline" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="8" r="3.2" />
+              <path
+                d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M16 11.2a2.8 2.8 0 100-5.6M17 19h3.5c-.3-2.2-1.4-3.8-3-4.5"
+              />
+            </svg>
+            <svg class="tab__icon tab__icon--filled" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="8" r="3.6" />
+              <path d="M3.2 19.5c.55-3.6 2.95-5.7 5.8-5.7s5.25 2.1 5.8 5.7H3.2z" />
+              <circle cx="16.5" cy="9.2" r="2.7" />
+              <path d="M16.2 14.2c2.05.35 3.45 1.9 3.85 4.3H14.9c.2-1.85 1-3.3 1.3-3.8z" />
+            </svg>
+          </span>
+          <span>{{ t()('nav.players') }}</span>
+        </a>
+      }
       @if (session.isAdmin()) {
         <a
           href="/admin"

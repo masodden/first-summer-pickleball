@@ -33,7 +33,7 @@ export function createBot(env: Env): BotBundle | null {
       url = `${appUrl}/?invite=${encodeURIComponent(inviteToken)}`;
       text = 'Откройте приложение, чтобы привязать свою карточку игрока.';
     } else if (trainingId) {
-      url = `${appUrl}/?training=${encodeURIComponent(trainingId)}`;
+      url = `${appUrl}/trainings/${encodeURIComponent(trainingId)}`;
       text = 'Откройте приложение, чтобы перейти к тренировке.';
     } else if (tournamentId) {
       url = `${appUrl}/?tournament=${encodeURIComponent(tournamentId)}`;

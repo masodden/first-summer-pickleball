@@ -23,6 +23,13 @@ const isAdmin: CanMatchFn = () => {
   return inject(Router).parseUrl('/tournaments');
 };
 
+/** Справочник игроков: модератор и админ. Карточка `/players/:id` остаётся открытой. */
+const canSeePlayersDirectory: CanMatchFn = () => {
+  const session = inject(SessionStore);
+  if (session.isModerator()) return true;
+  return inject(Router).parseUrl('/tournaments');
+};
+
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'tournaments' },
   {
@@ -80,7 +87,7 @@ export const routes: Routes = [
     path: 'trainings',
     loadComponent: () =>
       import('./features/trainings/training-list').then((m) => m.TrainingListPage),
-    title: 'Тренировки',
+    title: 'Open Play',
   },
   {
     path: 'trainings/new',
@@ -121,6 +128,7 @@ export const routes: Routes = [
   },
   {
     path: 'players',
+    canMatch: [canSeePlayersDirectory],
     loadComponent: () =>
       import('./features/players/player-directory').then((m) => m.PlayerDirectoryPage),
     title: 'Игроки',

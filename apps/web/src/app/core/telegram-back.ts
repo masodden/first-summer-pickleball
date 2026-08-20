@@ -5,7 +5,10 @@ import { filter } from 'rxjs';
 import { ConfirmService } from './confirm';
 import { TelegramService } from './telegram';
 
-/** Корневые экраны таббара: BackButton скрыт, Android back сворачивает Mini App. */
+/**
+ * Корневые экраны таббара: BackButton скрыт, Android back сворачивает Mini App.
+ * Тренировки — отдельный таб (`/trainings`), не вложены в турниры.
+ */
 const ROOT_PATHS = new Set([
   '/tournaments',
   '/trainings',
