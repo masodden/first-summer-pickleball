@@ -44,7 +44,9 @@ export const appConfig: ApplicationConfig = {
         },
       }),
       withComponentInputBinding(),
-      withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
+      // Скролл живёт в `#main`, не в window: иначе desktop Telegram запоминает
+      // высоту предыдущего таба и оставляет пустое место / обрезает низ.
+      withInMemoryScrolling({ scrollPositionRestoration: 'disabled', anchorScrolling: 'disabled' }),
     ),
     provideAppInitializer(async () => {
       const telegram = inject(TelegramService);

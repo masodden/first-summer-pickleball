@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { NavigationEnd, NavigationStart, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, take } from 'rxjs';
 import { ApiClient } from './core/api';
 import { readTournamentDeepLink, readTrainingDeepLink } from './core/deep-link';
 import { I18nService } from './core/i18n';
+import { mainScrollBehavior } from './core/motion';
 import { PreferencesService } from './core/preferences';
 import { RealtimeService } from './core/realtime';
 import { SessionStore } from './core/session';
@@ -74,9 +75,15 @@ import { ToastHost } from './ui/toast-host';
   `,
   styles: `
     :host {
-      display: block;
-      min-height: 100dvh;
-      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: 100%;
+      overflow: hidden;
+      padding-bottom: calc(
+        env(safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) +
+          var(--app-tabbar-space)
+      );
     }
 
     .skip {
@@ -101,13 +108,12 @@ import { ToastHost } from './ui/toast-host';
     }
 
     .header {
-      position: sticky;
-      top: 0;
+      flex: 0 0 auto;
       z-index: 40;
-      padding-top: env(safe-area-inset-top, 0px);
+      padding-top: calc(
+        env(safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)
+      );
       background: linear-gradient(var(--bg-base) 60%, transparent);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
     }
 
     .header__inner {
@@ -156,8 +162,14 @@ import { ToastHost } from './ui/toast-host';
     .main {
       position: relative;
       z-index: 1;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       padding-top: var(--space-4);
-      padding-bottom: var(--space-6);
+      padding-bottom: var(--space-4);
       background: transparent;
     }
   `,
@@ -169,6 +181,8 @@ export class App {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly telegram = inject(TelegramService);
+  private lastMainUrl = this.router.url;
+  private readonly mainScrolls = new Map<string, number>();
 
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
@@ -176,6 +190,21 @@ export class App {
   constructor() {
     // Тема применяется к documentElement сразу при старте.
     inject(PreferencesService);
+
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+      const main = document.getElementById('main');
+      if (!main) return;
+      if (event instanceof NavigationStart) {
+        this.mainScrolls.set(this.lastMainUrl, main.scrollTop);
+        return;
+      }
+      if (!(event instanceof NavigationEnd)) return;
+      const nextUrl = event.urlAfterRedirects;
+      const behavior = mainScrollBehavior(this.lastMainUrl, nextUrl);
+      if (behavior === 'top') main.scrollTop = 0;
+      else if (behavior === 'restore') main.scrollTop = this.mainScrolls.get(nextUrl) ?? 0;
+      this.lastMainUrl = nextUrl;
+    });
 
     // t.me/bot/play?startapp=t_<uuid> → открыть карточку турнира, а не список.
     this.router.events

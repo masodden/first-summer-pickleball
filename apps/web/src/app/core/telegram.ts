@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { bindAppViewport } from './telegram-viewport';
 
 interface TelegramHaptics {
   impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
@@ -20,6 +21,9 @@ interface TelegramWebApp {
   colorScheme?: 'light' | 'dark';
   version?: string;
   platform?: string;
+  viewportHeight?: number;
+  viewportStableHeight?: number;
+  isExpanded?: boolean;
   BackButton?: TelegramBackButton;
   ready(): void;
   expand(): void;
@@ -109,6 +113,9 @@ export class TelegramService {
   }
 
   init(): void {
+    document.documentElement.dataset['tgPlatform'] = this.platform;
+    if (this.available) document.documentElement.classList.add('in-tg');
+    bindAppViewport(this.app);
     if (!this.app) return;
     this.app.ready();
     this.app.expand();

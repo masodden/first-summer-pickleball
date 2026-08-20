@@ -74,6 +74,14 @@ export function classifyNav(fromUrl: string, toUrl: string): NavMotion {
   return 'fade';
 }
 
+/** Как вести `#main` после навигации: скролл теперь не у window. */
+export function mainScrollBehavior(fromUrl: string, toUrl: string): 'top' | 'keep' | 'restore' {
+  const kind = classifyNav(fromUrl, toUrl);
+  if (kind === 'inner-forward' || kind === 'inner-back') return 'keep';
+  if (kind === 'pop') return 'restore';
+  return 'top';
+}
+
 export function applyNavViewTransition(fromUrl: string, toUrl: string): void {
   const root = document.documentElement;
   for (const name of NAV_CLASSES) root.classList.remove(name);

@@ -79,9 +79,9 @@ function afterRender(injector: Injector): Promise<void> {
 
 /**
  * Telegram-like горизонтальный свайп между табами без View Transitions.
- * Оба слоя (ghost и новый main) — position:fixed, чтобы translateX(+) не
- * расширял документ. Иначе на Android WebView появляется горизонтальный
- * скролл только «вперёд» и прыгает safe-area / таббар.
+ * Оба слоя (ghost и новый main) — position:fixed по текущему прямоугольнику
+ * `#main`, чтобы translateX(+) не расширял документ. Иначе в Telegram WebView
+ * появляется горизонтальный скролл только «вперёд» и прыгает safe-area / таббар.
  */
 export async function swipeToTab(
   router: Router,
@@ -103,9 +103,7 @@ export async function swipeToTab(
   markTabSwipeActive(true);
 
   const rect = main.getBoundingClientRect();
-  const header = document.querySelector('header.header');
-  const slotTop = header?.getBoundingClientRect().bottom ?? Math.max(rect.top, 0);
-  const slotHeight = Math.max(window.innerHeight - slotTop, 0);
+  const slotHeight = Math.max(rect.height, 0);
   document.documentElement.style.setProperty('--tab-swipe-x', `${Math.round(window.innerWidth)}px`);
 
   const ghost = main.cloneNode(true) as HTMLElement;
@@ -116,6 +114,7 @@ export async function swipeToTab(
   pinSwipeLayer(ghost, rect.top, rect.left, rect.width, rect.height, '35');
   ghost.style.pointerEvents = 'none';
   ghost.style.overflow = 'hidden';
+  ghost.scrollTop = main.scrollTop;
   ghost.style.viewTransitionName = 'none';
   document.body.appendChild(ghost);
 
@@ -125,7 +124,7 @@ export async function swipeToTab(
   spacer.style.pointerEvents = 'none';
   main.insertAdjacentElement('afterend', spacer);
 
-  pinSwipeLayer(main, slotTop, rect.left, rect.width, slotHeight, '36');
+  pinSwipeLayer(main, rect.top, rect.left, rect.width, slotHeight, '36');
   main.style.overflow = 'hidden';
   main.style.viewTransitionName = 'none';
   main.classList.add('tab-swipe-main', `tab-swipe-main--${direction}`, 'tab-swipe-main--prep');
@@ -135,6 +134,7 @@ export async function swipeToTab(
     // и ждём уже второй, когда пришёл список игроков.
     const painted = afterRender(injector);
     await router.navigateByUrl(target);
+    main.scrollTop = 0;
     await painted;
     await waitFrames(2);
 

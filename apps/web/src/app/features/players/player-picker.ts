@@ -192,7 +192,7 @@ import { SheetDismiss } from '../../ui/motion';
       flex-direction: column;
       gap: var(--space-3);
       width: min(100%, 520px);
-      max-height: min(86dvh, calc(100dvh - 2 * var(--space-4)));
+      max-height: min(86dvh, calc(var(--app-height, 100dvh) - 2 * var(--space-4)));
       overflow-y: auto;
       overscroll-behavior: contain;
       padding: var(--space-5) var(--space-4);
