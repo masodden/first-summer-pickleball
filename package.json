@@ -1,6 +1,6 @@
 {
   "name": "first-summer-pickleball",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "description": "PICKLEBALL Events — проводим локальные турниры по пиклболу",
   "packageManager": "pnpm@11.20.0",
