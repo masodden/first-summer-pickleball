@@ -492,9 +492,9 @@ export const ru = {
   'public.title': 'Табло',
   'public.spectatorHint': 'Живое табло турнира. Обновляется автоматически.',
 
-  'training.empty': 'Тренировок пока нет',
-  'training.emptyHint': 'Создайте тренировку и отправьте ссылку игрокам',
-  'training.organizerHint': 'Чтобы создать тренировку, нужна роль организатора. Напишите',
+  'training.empty': 'Открытых игр пока нет',
+  'training.emptyHint': 'Создайте игру и отправьте ссылку игрокам',
+  'training.organizerHint': 'Чтобы создать открытую игру, нужна роль организатора. Напишите',
   'training.organizerHintAfter': 'в Telegram — поможем получить доступ.',
   'training.create': 'Новая тренировка',
   'training.edit': 'Редактировать тренировку',

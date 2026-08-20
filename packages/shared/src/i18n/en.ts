@@ -495,9 +495,9 @@ export const en: Record<TranslationKey, string> = {
   'public.title': 'Scoreboard',
   'public.spectatorHint': 'Live tournament scoreboard. Updates automatically.',
 
-  'training.empty': 'No trainings yet',
-  'training.emptyHint': 'Create a training and share the link with players',
-  'training.organizerHint': 'To create a training you need the organiser role. Message',
+  'training.empty': 'No open games yet',
+  'training.emptyHint': 'Create a game and share the link with players',
+  'training.organizerHint': 'To create an open game you need the organiser role. Message',
   'training.organizerHintAfter': 'on Telegram — we can help you get access.',
   'training.create': 'New training',
   'training.edit': 'Edit training',

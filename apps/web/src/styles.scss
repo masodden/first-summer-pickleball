@@ -90,10 +90,11 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg-base: var(--sand-50);
-  --bg-gradient-1: rgba(199, 91, 57, 0.24);
-  --bg-gradient-2: rgba(194, 229, 50, 0.2);
-  --bg-gradient-3: rgba(239, 79, 157, 0.16);
+  /* Чуть глубже песка, чтобы белая пластина стекла отделялась от страницы. */
+  --bg-base: #f4ece3;
+  --bg-gradient-1: rgba(199, 91, 57, 0.22);
+  --bg-gradient-2: rgba(194, 229, 50, 0.16);
+  --bg-gradient-3: rgba(239, 79, 157, 0.14);
 
   --text-strong: var(--ink-900);
   --text-base: var(--ink-800);
@@ -101,32 +102,32 @@
   --text-faint: var(--ink-400);
   --text-inverse: #fff;
 
-  /* Стекло: полупрозрачная подложка, светлая кромка и мягкая тень. */
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-bg-strong: rgba(255, 255, 255, 0.82);
-  --glass-bg-subtle: rgba(255, 255, 255, 0.38);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-border-strong: rgba(36, 26, 22, 0.1);
-  --glass-shadow: 0 12px 40px -12px rgba(92, 39, 24, 0.28);
-  --glass-shadow-lg: 0 28px 70px -20px rgba(92, 39, 24, 0.34);
-  --glass-highlight: rgba(255, 255, 255, 0.9);
-  --glass-blur: 20px;
+  /*
+   * Кромка — не блик. В тёмной теме силуэт даёт светлый hairline на тёмном
+   * стекле; белая обводка на светлом стекле исчезает. Та же схема, наоборот:
+   * тёплая чернильная кромка рисует форму, --glass-highlight остаётся бликом.
+   */
+  --glass-bg: rgba(255, 252, 249, 0.78);
+  --glass-bg-strong: rgba(255, 252, 249, 0.92);
+  --glass-bg-subtle: rgba(255, 252, 249, 0.56);
+  --glass-border: rgba(92, 39, 24, 0.16);
+  --glass-border-strong: rgba(92, 39, 24, 0.24);
+  --glass-shadow: 0 8px 24px -14px rgba(92, 39, 24, 0.2);
+  --glass-shadow-lg: 0 14px 36px -16px rgba(92, 39, 24, 0.24);
+  --glass-highlight: rgba(255, 255, 255, 0.78);
+  --glass-blur: 18px;
 
-  --surface-input: rgba(255, 255, 255, 0.75);
-  --surface-hover: rgba(199, 91, 57, 0.08);
-  --divider: rgba(36, 26, 22, 0.09);
+  --surface-input: rgba(255, 252, 249, 0.9);
+  --surface-hover: rgba(199, 91, 57, 0.1);
+  --divider: rgba(92, 39, 24, 0.12);
 
   /*
-   * Кнопки и переключатели на светлом фоне.
-   *
-   * Стекло здесь белое, а карточки под ним тоже белые: если взять для кнопки
-   * ту же подложку и белую кромку, получится белое на белом — не видно ни
-   * фона, ни того, какой вариант выбран. Поэтому у неактивных кнопок подложка
-   * чуть темнее фона, а кромка нейтральная, а не светлая.
+   * Контролы чуть контрастнее карточек: на светлом интерактив должен
+   * читаться как «нажимается», а не как ещё одно белое пятно.
    */
-  --control-bg: rgba(36, 26, 22, 0.055);
-  --control-bg-hover: rgba(36, 26, 22, 0.095);
-  --control-border: rgba(36, 26, 22, 0.14);
+  --control-bg: rgba(92, 39, 24, 0.045);
+  --control-bg-hover: rgba(92, 39, 24, 0.08);
+  --control-border: var(--glass-border-strong);
 
   --accent: var(--clay-500);
   --accent-strong: var(--clay-600);
@@ -748,7 +749,7 @@ button {
 
 .chip--accent {
   background: var(--accent-soft);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   color: var(--accent-strong);
 }
 
@@ -766,19 +767,19 @@ button {
 
 .chip--go {
   background: var(--success-soft);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
   color: var(--success);
 }
 
 .chip--pink {
   background: rgba(239, 79, 157, 0.14);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--pink-500) 28%, transparent);
   color: var(--pink-600);
 }
 
 .chip--danger {
   background: var(--danger-soft);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--danger) 32%, transparent);
   color: var(--danger);
 }
 
@@ -790,6 +791,7 @@ button {
   padding: 2px 8px;
   border-radius: var(--radius-full);
   background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent-strong);
   font-family: var(--font-mono);
   font-size: 12.5px;
