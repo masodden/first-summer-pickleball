@@ -10,6 +10,7 @@ import { PreferencesService } from './core/preferences';
 import { RealtimeService } from './core/realtime';
 import { SessionStore } from './core/session';
 import { TelegramService } from './core/telegram';
+import { appScrollRoot } from './core/telegram-viewport';
 import { ToastService } from './core/toast';
 import { Ball } from './ui/ball';
 import { ConfirmHost } from './ui/confirm-host';
@@ -65,7 +66,9 @@ import { ToastHost } from './ui/toast-host';
     </header>
 
     <main id="main" class="shell main vt-main">
-      <router-outlet />
+      <div class="main__body">
+        <router-outlet />
+      </div>
     </main>
 
     <app-tab-bar />
@@ -75,15 +78,16 @@ import { ToastHost } from './ui/toast-host';
   `,
   styles: `
     :host {
+      display: block;
+      min-height: 100%;
+    }
+
+    :host-context(html[data-app-scroll='inner']) {
       display: flex;
       flex-direction: column;
       height: 100%;
       max-height: 100%;
       overflow: hidden;
-      padding-bottom: calc(
-        env(safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) +
-          var(--app-tabbar-space)
-      );
     }
 
     .skip {
@@ -108,12 +112,20 @@ import { ToastHost } from './ui/toast-host';
     }
 
     .header {
-      flex: 0 0 auto;
+      position: sticky;
+      top: 0;
       z-index: 40;
       padding-top: calc(
         env(safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)
       );
       background: linear-gradient(var(--bg-base) 60%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    :host-context(html[data-app-scroll='inner']) .header {
+      flex: 0 0 auto;
+      position: relative;
     }
 
     .header__inner {
@@ -162,15 +174,26 @@ import { ToastHost } from './ui/toast-host';
     .main {
       position: relative;
       z-index: 1;
+      padding-top: var(--space-4);
+      padding-bottom: 0;
+      background: transparent;
+    }
+
+    :host-context(html[data-app-scroll='inner']) .main {
       flex: 1 1 auto;
       min-height: 0;
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      padding-top: var(--space-4);
-      padding-bottom: var(--space-4);
-      background: transparent;
+    }
+
+    /* Отступ внутри скролла, не снаружи: страница уезжает под стеклянный таббар. */
+    .main__body {
+      padding-bottom: calc(
+        env(safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px) +
+          var(--app-tabbar-space)
+      );
     }
   `,
 })
@@ -192,17 +215,16 @@ export class App {
     inject(PreferencesService);
 
     this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
-      const main = document.getElementById('main');
-      if (!main) return;
+      const scroller = appScrollRoot();
       if (event instanceof NavigationStart) {
-        this.mainScrolls.set(this.lastMainUrl, main.scrollTop);
+        this.mainScrolls.set(this.lastMainUrl, scroller.scrollTop);
         return;
       }
       if (!(event instanceof NavigationEnd)) return;
       const nextUrl = event.urlAfterRedirects;
       const behavior = mainScrollBehavior(this.lastMainUrl, nextUrl);
-      if (behavior === 'top') main.scrollTop = 0;
-      else if (behavior === 'restore') main.scrollTop = this.mainScrolls.get(nextUrl) ?? 0;
+      if (behavior === 'top') scroller.scrollTop = 0;
+      else if (behavior === 'restore') scroller.scrollTop = this.mainScrolls.get(nextUrl) ?? 0;
       this.lastMainUrl = nextUrl;
     });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickAppHeight } from './telegram-viewport';
+import { pickAppHeight, usesInnerAppScroll } from './telegram-viewport';
 
 describe('pickAppHeight', () => {
   it('берёт стабильную высоту Telegram, если она есть', () => {
@@ -27,5 +27,18 @@ describe('pickAppHeight', () => {
   it('в обычном браузере падает на visualViewport, затем innerHeight', () => {
     expect(pickAppHeight({ visualHeight: 812, innerHeight: 900 })).toBe(812);
     expect(pickAppHeight({ innerHeight: 900 })).toBe(900);
+  });
+});
+
+describe('usesInnerAppScroll', () => {
+  it('на телефоне Telegram оставляет документный скролл для отскока', () => {
+    expect(usesInnerAppScroll('ios', () => true)).toBe(false);
+    expect(usesInnerAppScroll('android', () => true)).toBe(false);
+  });
+
+  it('на desktop Telegram берёт внутренний скролл', () => {
+    expect(usesInnerAppScroll('macos', () => true)).toBe(true);
+    expect(usesInnerAppScroll('tdesktop', () => true)).toBe(true);
+    expect(usesInnerAppScroll('weba', () => true)).toBe(true);
   });
 });

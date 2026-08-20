@@ -36,6 +36,31 @@ export function applyAppHeight(options: {
   return height;
 }
 
+/**
+ * На iOS/Android резиновый отскок двигает хедер и таббар, только если
+ * скроллится сам документ. На desktop Telegram тот же документ ломает высоту —
+ * там оставляем внутренний скролл.
+ */
+export function usesInnerAppScroll(
+  platform: string,
+  finePointer = (): boolean => window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+): boolean {
+  if (platform === 'ios' || platform === 'android') return false;
+  if (platform === 'web' || platform === 'unknown') return finePointer();
+  return true;
+}
+
+export function syncAppScrollMode(platform: string): void {
+  document.documentElement.dataset['appScroll'] = usesInnerAppScroll(platform) ? 'inner' : 'page';
+}
+
+export function appScrollRoot(): HTMLElement {
+  if (document.documentElement.dataset['appScroll'] === 'inner') {
+    return document.getElementById('main') ?? document.documentElement;
+  }
+  return (document.scrollingElement ?? document.documentElement) as HTMLElement;
+}
+
 type ViewportHost = {
   viewportHeight?: number;
   viewportStableHeight?: number;
