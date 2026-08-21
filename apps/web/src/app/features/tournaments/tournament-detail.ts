@@ -116,6 +116,16 @@ import { StatusBadge } from '../../ui/status-badge';
               </svg>
               {{ t()('tournament.boardLinkShort') }}
             </button>
+            @if (store.canManage() && item.status === 'registration') {
+              <button
+                type="button"
+                class="btn btn--sm btn--glass"
+                [disabled]="store.isBusy('announce')"
+                (click)="announceRegistration()"
+              >
+                {{ t()('tournament.announceRegistration') }}
+              </button>
+            }
 
             @if (store.canManage()) {
               @if (item.status === 'registration') {
@@ -542,6 +552,29 @@ export class TournamentDetailPage {
       this.toast.success(this.i18n.translate('tournament.appLinkCopied'), url);
     } catch {
       this.toast.info(this.i18n.translate('tournament.appLink'), url);
+    }
+  }
+
+  protected async announceRegistration(): Promise<void> {
+    const current = this.tournament();
+    if (!current) return;
+    try {
+      const { recipients } = await this.api.previewRegistrationAnnounce(current.id);
+      if (recipients === 0) {
+        this.toast.info(this.i18n.translate('tournament.announceRegistrationEmpty'));
+        return;
+      }
+      const confirmed = await this.confirm.ask({
+        title: this.i18n.translate('tournament.announceRegistration'),
+        message: this.i18n.translate('tournament.announceRegistrationConfirm', {
+          count: recipients,
+        }),
+        confirmLabel: this.i18n.translate('tournament.announceRegistrationSend'),
+      });
+      if (!confirmed) return;
+      await this.store.announceRegistration();
+    } catch (error) {
+      this.toast.failure(error, () => void this.announceRegistration());
     }
   }
 

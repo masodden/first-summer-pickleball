@@ -132,6 +132,14 @@ export class TournamentApi {
     return this.api.post(`/api/tournaments/${id}/registration/open`);
   }
 
+  previewRegistrationAnnounce(id: string): Promise<{ recipients: number }> {
+    return this.api.get(`/api/tournaments/${id}/registration-announce`);
+  }
+
+  announceRegistration(id: string): Promise<{ sent: number }> {
+    return this.api.post(`/api/tournaments/${id}/registration-announce`);
+  }
+
   start(id: string, seed?: number): Promise<{ tournament: TournamentDto }> {
     return this.api.post(`/api/tournaments/${id}/start`, seed === undefined ? {} : { seed }, {
       queueLabel: 'Создание турнира',

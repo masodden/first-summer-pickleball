@@ -176,6 +176,13 @@ export const ru = {
   'tournament.appLinkCopied': 'Ссылка скопирована — можно скинуть игрокам в чат',
   'tournament.appLinkMissingBot':
     'Не задан TELEGRAM_BOT_USERNAME на сервере — прямую ссылку в бота собрать нельзя',
+  'tournament.announceRegistration': 'Рассылка',
+  'tournament.announceRegistrationSend': 'Отправить',
+  'tournament.announceRegistrationConfirm':
+    'Пуш уйдёт {{count}} игрокам с Telegram. Уже записанные на этот турнир не получат. Уведомления можно отключить в настройках.',
+  'tournament.announceRegistrationSent': 'Рассылка отправлена: {{count}}',
+  'tournament.announceRegistrationEmpty':
+    'Некому отправлять: нет игроков с Telegram или все уже в составе',
   'tournament.switchTo': 'Перейти к турниру',
   'tournament.parallel': 'Параллельно',
   'tournament.info': 'Информация',

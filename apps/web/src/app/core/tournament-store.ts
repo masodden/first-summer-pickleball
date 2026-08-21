@@ -395,6 +395,19 @@ export class TournamentStore {
     });
   }
 
+  announceRegistration(): Promise<void> {
+    return this.run(
+      'announce',
+      async () => {
+        const { sent } = await this.api.announceRegistration(this.requireId());
+        this.toast.success(
+          this.i18n.translate('tournament.announceRegistrationSent', { count: sent }),
+        );
+      },
+      () => void this.announceRegistration(),
+    );
+  }
+
   start(): Promise<void> {
     return this.run('start', async () => {
       await this.api.start(this.requireId());

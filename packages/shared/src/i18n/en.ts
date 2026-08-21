@@ -178,6 +178,13 @@ export const en: Record<TranslationKey, string> = {
   'tournament.appLinkCopied': 'Link copied — share it with players in chat',
   'tournament.appLinkMissingBot':
     'TELEGRAM_BOT_USERNAME is not set on the server — cannot build an in-bot link',
+  'tournament.announceRegistration': 'Broadcast',
+  'tournament.announceRegistrationSend': 'Send',
+  'tournament.announceRegistrationConfirm':
+    'This will go to {{count}} players with Telegram. People already on this tournament roster will not get it. Notifications can be turned off in Settings.',
+  'tournament.announceRegistrationSent': 'Broadcast sent: {{count}}',
+  'tournament.announceRegistrationEmpty':
+    'Nobody to notify: no Telegram players, or everyone is already on the roster',
   'tournament.switchTo': 'Go to tournament',
   'tournament.parallel': 'Parallel',
   'tournament.info': 'Information',

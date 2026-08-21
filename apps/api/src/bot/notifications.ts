@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/index.js';
 import {
   accounts,
@@ -8,6 +8,16 @@ import {
   rounds,
   tournamentPlayers,
 } from '../db/schema.js';
+
+export interface ClubBroadcastButton {
+  text: string;
+  url: string;
+}
+
+export interface ClubBroadcastOptions {
+  excludePlayerIds?: readonly string[];
+  button?: ClubBroadcastButton;
+}
 
 export interface NotificationSender {
   sendToPlayers(playerIds: readonly string[], text: string): Promise<void>;
@@ -21,6 +31,12 @@ export interface NotificationSender {
    * Для старта и «раунд готов» — чтобы сообщение не ушло тем, кого нет в играх.
    */
   sendToSchedule(tournamentId: string, text: string, roundIndex?: number): Promise<void>;
+  /**
+   * Всем, кто заходил через Telegram и не отключил пуши.
+   * Для анонса записи: уже стоящих в составе этого турнира можно исключить.
+   */
+  countClub(options?: Pick<ClubBroadcastOptions, 'excludePlayerIds'>): Promise<number>;
+  sendToClub(text: string, options?: ClubBroadcastOptions): Promise<number>;
 }
 
 /** Заглушка на случай, когда токен бота не задан: приложение работает и без него. */
@@ -29,6 +45,12 @@ export function createNoopSender(): NotificationSender {
     async sendToPlayers() {},
     async sendToTournament() {},
     async sendToSchedule() {},
+    async countClub() {
+      return 0;
+    },
+    async sendToClub() {
+      return 0;
+    },
   };
 }
 
@@ -115,10 +137,38 @@ export function createTelegramSender(
     return [...ids];
   }
 
-  async function deliver(chatIds: readonly string[], text: string): Promise<void> {
+  async function chatIdsForClub(excludePlayerIds: readonly string[] = []): Promise<string[]> {
+    const exclude = [...new Set(excludePlayerIds.filter((id) => id.length > 0))];
+    const filters = [
+      eq(accounts.notificationsEnabled, true),
+      isNotNull(accounts.playerId),
+      sql`${accounts.telegramId} ~ '^[0-9]+$'`,
+    ];
+    if (exclude.length > 0) {
+      filters.push(notInArray(accounts.playerId, exclude));
+    }
+
+    const rows = await db
+      .select({ telegramId: accounts.telegramId })
+      .from(accounts)
+      .where(and(...filters));
+    return [...new Set(rows.map((row) => row.telegramId))];
+  }
+
+  async function deliver(
+    chatIds: readonly string[],
+    text: string,
+    button?: ClubBroadcastButton,
+  ): Promise<void> {
+    const options: Record<string, unknown> = { parse_mode: 'HTML' };
+    if (button) {
+      options['reply_markup'] = {
+        inline_keyboard: [[{ text: button.text, web_app: { url: button.url } }]],
+      };
+    }
     for (const chatId of chatIds) {
       try {
-        await api.sendMessage(chatId, text, { parse_mode: 'HTML' });
+        await api.sendMessage(chatId, text, options);
       } catch (error) {
         onError(error);
       }
@@ -137,6 +187,14 @@ export function createTelegramSender(
         await chatIdsForPlayers(await schedulePlayerIds(tournamentId, roundIndex)),
         text,
       );
+    },
+    async countClub(options) {
+      return (await chatIdsForClub(options?.excludePlayerIds ?? [])).length;
+    },
+    async sendToClub(text, options) {
+      const chatIds = await chatIdsForClub(options?.excludePlayerIds ?? []);
+      await deliver(chatIds, text, options?.button);
+      return chatIds.length;
     },
   };
 }

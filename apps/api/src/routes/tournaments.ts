@@ -46,8 +46,12 @@ import {
   resultsCsvContentDisposition,
   resultsCsvFilename,
 } from '../services/export.js';
-import { ApiError } from '../lib/errors.js';
+import { ApiError, wrongStatus } from '../lib/errors.js';
+import { recordAudit } from '../services/audit.js';
 import type { AppContext } from './context.js';
+import { and, eq, inArray } from 'drizzle-orm';
+import { tournamentPlayers } from '../db/schema.js';
+import type { Database } from '../db/index.js';
 
 const sortQuerySchema = z.object({
   sort: z
@@ -66,7 +70,7 @@ const sortQuerySchema = z.object({
 });
 
 export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext): void {
-  const { db, hub, notify } = ctx;
+  const { db, hub, notify, env } = ctx;
 
   app.get('/api/tournaments', async (request) => {
     const { listTournaments } = await import('../services/tournaments.js');
@@ -269,6 +273,51 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     },
   );
 
+  app.get<{ Params: { id: string } }>(
+    '/api/tournaments/:id/registration-announce',
+    async (request) => {
+      requireRole(request, 'moderator');
+      const tournament = await getTournamentRow(db, request.params.id);
+      if (tournament.status !== 'registration') {
+        throw wrongStatus('Рассылку можно отправить, пока открыта запись');
+      }
+      const excludePlayerIds = await rosterPlayerIds(db, tournament.id);
+      return { recipients: await notify.countClub({ excludePlayerIds }) };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/tournaments/:id/registration-announce',
+    async (request) => {
+      const viewer = requireRole(request, 'moderator');
+      const tournament = await getTournamentRow(db, request.params.id);
+      if (tournament.status !== 'registration') {
+        throw wrongStatus('Рассылку можно отправить, пока открыта запись');
+      }
+      const excludePlayerIds = await rosterPlayerIds(db, tournament.id);
+      const appUrl = env.PUBLIC_WEB_URL.replace(/\/$/, '');
+      const sent = await notify.sendToClub(
+        [
+          `<b>Открылась запись на «${escapeHtml(tournament.title)}»!</b>`,
+          '',
+          'Успей записаться — места разбирают быстро.',
+        ].join('\n'),
+        {
+          excludePlayerIds,
+          button: { text: 'Смотреть турниры', url: `${appUrl}/tournaments` },
+        },
+      );
+      await recordAudit(db, viewer, {
+        action: 'tournament.registration_announced',
+        entityType: 'tournament',
+        entityId: tournament.id,
+        tournamentId: tournament.id,
+        payload: { sent },
+      });
+      return { sent };
+    },
+  );
+
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/start', async (request) => {
     const viewer = requireRole(request, 'moderator');
     const body = parse(generateScheduleSchema, request.body ?? {});
@@ -396,4 +445,17 @@ function escapeHtml(value: string): string {
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
+}
+
+async function rosterPlayerIds(db: Database, tournamentId: string): Promise<string[]> {
+  const rows = await db
+    .select({ playerId: tournamentPlayers.playerId })
+    .from(tournamentPlayers)
+    .where(
+      and(
+        eq(tournamentPlayers.tournamentId, tournamentId),
+        inArray(tournamentPlayers.status, ['registered', 'waitlisted']),
+      ),
+    );
+  return rows.map((row) => row.playerId);
 }
