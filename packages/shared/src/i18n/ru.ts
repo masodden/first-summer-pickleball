@@ -465,6 +465,21 @@ export const ru = {
   'admin.auditLog': 'Журнал действий',
   'admin.bootstrapHint':
     'Здесь администраторы, модераторы и организаторы. Роль пишется на DUPR ID; PZQZKM и P5ML0M понизить нельзя.',
+  'admin.stats': 'Статистика',
+  'admin.statsHint':
+    'Уникальные люди, открывавшие Mini App. Сегодня — с полуночи по Москве, неделя и месяц — 7 и 30 дней.',
+  'admin.statsToday': 'Сегодня',
+  'admin.statsWeek': '7 дней',
+  'admin.statsMonth': '30 дней',
+  'admin.statsAll': 'Всего с Telegram',
+  'admin.statsPlayHint': 'Участники за последние 30 дней',
+  'admin.statsNew30d': 'Новые аккаунты за 30 дней',
+  'admin.statsIdentities': 'Гости · DUPR',
+  'admin.statsTournaments30d': 'Игроки турниров',
+  'admin.statsOpenPlay30d': 'Игроки Open Play',
+  'admin.statsAvgTournamentDupr': 'Средний DUPR турниров',
+  'admin.statsNeverJoined': 'Без записи на игру за всё время',
+  'admin.statsJoinSource': 'Сами · организатор',
 
   'errors.unauthorized': 'Нужно войти в приложение',
   'errors.forbidden': 'Недостаточно прав для этого действия',

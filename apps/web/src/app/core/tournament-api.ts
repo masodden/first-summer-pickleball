@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import type {
+  AdminStatsDto,
   ClaimRequestDto,
   CreatePlayerInput,
   CreateTournamentInput,
@@ -265,6 +266,10 @@ export class TournamentApi {
 
   listAccounts(): Promise<{ accounts: AccountRowDto[] }> {
     return this.api.get('/api/admin/accounts');
+  }
+
+  getAdminStats(): Promise<{ stats: AdminStatsDto }> {
+    return this.api.get('/api/admin/stats');
   }
 
   setAccountRole(id: string, role: Role): Promise<void> {

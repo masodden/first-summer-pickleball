@@ -468,6 +468,21 @@ export const en: Record<TranslationKey, string> = {
   'admin.auditLog': 'Activity log',
   'admin.bootstrapHint':
     'Administrators, moderators and organizers are listed. Roles are stored on the DUPR ID; PZQZKM and P5ML0M cannot be demoted.',
+  'admin.stats': 'Statistics',
+  'admin.statsHint':
+    'Unique people who opened the Mini App. Today starts at midnight Moscow time; week and month are 7 and 30 days.',
+  'admin.statsToday': 'Today',
+  'admin.statsWeek': '7 days',
+  'admin.statsMonth': '30 days',
+  'admin.statsAll': 'All-time via Telegram',
+  'admin.statsPlayHint': 'Players in the last 30 days',
+  'admin.statsNew30d': 'New accounts, 30 days',
+  'admin.statsIdentities': 'Guests · DUPR',
+  'admin.statsTournaments30d': 'Tournament players',
+  'admin.statsOpenPlay30d': 'Open Play players',
+  'admin.statsAvgTournamentDupr': 'Avg tournament DUPR',
+  'admin.statsNeverJoined': 'Never joined a game, all-time',
+  'admin.statsJoinSource': 'Self · organiser',
 
   'errors.unauthorized': 'You need to sign in',
   'errors.forbidden': 'Not enough permissions for this action',

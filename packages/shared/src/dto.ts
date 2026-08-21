@@ -231,6 +231,23 @@ export interface ImportReportDto {
   total: number;
 }
 
+/** Уникальные открытия Mini App и участие. Окна — календарь Europe/Moscow. */
+export interface AdminStatsDto {
+  uniqueToday: number;
+  unique7d: number;
+  unique30d: number;
+  uniqueAllTime: number;
+  uniqueNew30d: number;
+  uniqueGuests: number;
+  uniqueClaimed: number;
+  uniqueTournamentPlayers30d: number;
+  uniqueOpenPlayPlayers30d: number;
+  neverJoined: number;
+  selfJoined30d: number;
+  staffAdded30d: number;
+  avgTournamentDupr30d: number | null;
+}
+
 export interface PaginatedDto<T> {
   items: T[];
   total: number;

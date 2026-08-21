@@ -15,7 +15,7 @@ import { PlayerLine } from '../../ui/player-line';
 /**
  * Администрирование.
  *
- * Заявки на DUPR, список аккаунтов (модератор/игрок) и импорт справочника.
+ * Заявки на DUPR, список аккаунтов, статистика заходов и импорт справочника.
  * Admin только у PZQZKM и P5ML0M — назначить его здесь нельзя.
  */
 @Component({
@@ -141,6 +141,78 @@ import { PlayerLine } from '../../ui/player-line';
       </section>
 
       <section class="glass card--tight stack stack--3">
+        <h2>{{ t()('admin.stats') }}</h2>
+        <p class="tiny faint">{{ t()('admin.statsHint') }}</p>
+
+        @if (stats.isLoading()) {
+          <div class="skeleton" style="height: 280px"></div>
+        } @else if (stats.error()) {
+          <div class="center stack stack--3">
+            <p class="muted">{{ t()('errors.network') }}</p>
+            <button type="button" class="btn btn--glass" (click)="stats.reload()">
+              {{ t()('common.retry') }}
+            </button>
+          </div>
+        } @else if (stats.value(); as data) {
+          <div class="stats">
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.uniqueToday }}</span>
+              <span class="tiny faint">{{ t()('admin.statsToday') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.unique7d }}</span>
+              <span class="tiny faint">{{ t()('admin.statsWeek') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.unique30d }}</span>
+              <span class="tiny faint">{{ t()('admin.statsMonth') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.uniqueAllTime }}</span>
+              <span class="tiny faint">{{ t()('admin.statsAll') }}</span>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stats__cell">
+              <span class="stats__value numeric">+{{ data.uniqueNew30d }}</span>
+              <span class="tiny faint">{{ t()('admin.statsNew30d') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">
+                {{ data.uniqueGuests }} · {{ data.uniqueClaimed }}
+              </span>
+              <span class="tiny faint">{{ t()('admin.statsIdentities') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.neverJoined }}</span>
+              <span class="tiny faint">{{ t()('admin.statsNeverJoined') }}</span>
+            </div>
+          </div>
+          <p class="tiny faint">{{ t()('admin.statsPlayHint') }}</p>
+          <div class="stats">
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.uniqueTournamentPlayers30d }}</span>
+              <span class="tiny faint">{{ t()('admin.statsTournaments30d') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ data.uniqueOpenPlayPlayers30d }}</span>
+              <span class="tiny faint">{{ t()('admin.statsOpenPlay30d') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">{{ formatDupr(data.avgTournamentDupr30d) }}</span>
+              <span class="tiny faint">{{ t()('admin.statsAvgTournamentDupr') }}</span>
+            </div>
+            <div class="stats__cell">
+              <span class="stats__value numeric">
+                {{ data.selfJoined30d }} · {{ data.staffAdded30d }}
+              </span>
+              <span class="tiny faint">{{ t()('admin.statsJoinSource') }}</span>
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="glass card--tight stack stack--3">
         <h2>{{ t()('import.title') }}</h2>
         <p class="small muted">{{ t()('import.hint') }}</p>
 
@@ -184,6 +256,25 @@ import { PlayerLine } from '../../ui/player-line';
       padding: 2px var(--space-5) 2px var(--space-3);
       font-size: 13px;
     }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-3);
+    }
+
+    .stats__cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stats__value {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--text-strong);
+    }
   `,
 })
 export class AdminPage {
@@ -199,6 +290,10 @@ export class AdminPage {
 
   protected readonly accounts = resource({
     loader: () => this.api.listAccounts().then((response) => response.accounts),
+  });
+
+  protected readonly stats = resource({
+    loader: () => this.api.getAdminStats().then((response) => response.stats),
   });
 
   protected readonly claimsList = computed(() => this.claims.value() ?? []);
@@ -220,6 +315,10 @@ export class AdminPage {
             ? 'role.organizer'
             : 'role.user';
     return this.i18n.translate(key);
+  }
+
+  protected formatDupr(value: number | null): string {
+    return value === null ? '—' : value.toFixed(3);
   }
 
   protected async decide(claim: ClaimRequestDto, approve: boolean): Promise<void> {

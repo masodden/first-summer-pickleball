@@ -10,6 +10,7 @@ import {
   listPendingClaims,
   setAccountRole,
 } from '../services/accounts.js';
+import { getAdminStats } from '../services/stats-admin.js';
 import { auditLog, venues } from '../db/schema.js';
 import type { AppContext } from './context.js';
 
@@ -19,6 +20,11 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: AppContext): void
   app.get('/api/admin/accounts', async (request) => {
     requireRole(request, 'admin');
     return { accounts: await listAccounts(db) };
+  });
+
+  app.get('/api/admin/stats', async (request) => {
+    requireRole(request, 'admin');
+    return { stats: await getAdminStats(db) };
   });
 
   app.put<{ Params: { id: string } }>('/api/admin/accounts/:id/role', async (request) => {
