@@ -2,6 +2,10 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+overrides:
+  # GHSA-2v37-7h3g-55p8: Vite/Postcss тянут 3.3.17; патч только в 3.3.18.
+  'nanoid@<3.3.18': '3.3.18'
+
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true
@@ -9,9 +13,9 @@ allowBuilds:
   msgpackr-extract: true
 
 minimumReleaseAgeExclude:
-  - '@angular-devkit/architect@0.2201.3'
-  - '@angular-devkit/core@22.1.3'
-  - '@angular-devkit/schematics@22.1.3'
-  - '@angular/build@22.1.3'
-  - '@angular/cli@22.1.3'
-  - '@schematics/angular@22.1.3'
+  - '@angular-devkit/architect@0.2201.5'
+  - '@angular-devkit/core@22.1.5'
+  - '@angular-devkit/schematics@22.1.5'
+  - '@angular/build@22.1.5'
+  - '@angular/cli@22.1.5'
+  - '@schematics/angular@22.1.5'

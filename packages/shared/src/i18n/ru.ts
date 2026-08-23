@@ -518,7 +518,7 @@ export const ru = {
   'training.emptyHint': 'Создайте игру и отправьте ссылку игрокам',
   'training.organizerHint': 'Чтобы создать открытую игру, нужна роль организатора. Напишите',
   'training.organizerHintAfter': 'в Telegram — поможем получить доступ.',
-  'training.create': 'Новая тренировка',
+  'training.create': 'Создать',
   'training.edit': 'Редактировать тренировку',
   'training.title': 'Название',
   'training.startsAt': 'Дата и время',

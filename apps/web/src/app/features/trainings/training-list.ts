@@ -74,7 +74,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
             [href]="'https://t.me/' + clubContact()"
             (click)="openClubContact($event)"
           >
-            @@{{ clubContact() }}
+            {{ '@' + clubContact() }}
           </a>
           {{ t()('training.organizerHintAfter') }}
         </p>
@@ -100,7 +100,7 @@ function compareTrainings(a: TrainingSummaryDto, b: TrainingSummaryDto, finished
           @if (session.canManageTrainings()) {
             <p class="small">{{ t()('training.emptyHint') }}</p>
             <a class="btn btn--primary" routerLink="/trainings/new">
-              {{ t()('training.create') }}
+              {{ t()('common.create') }}
             </a>
           }
         </div>

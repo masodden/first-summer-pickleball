@@ -3,7 +3,7 @@
   "version": "0.9.4",
   "private": true,
   "description": "PICKLEBALL Events — проводим локальные турниры по пиклболу",
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@11.23.0",
   "engines": {
     "node": ">=22"
   },
@@ -29,6 +29,6 @@
   },
   "devDependencies": {
     "prettier": "^3.9.6",
-    "typescript": "~5.9.2"
+    "typescript": "~7.0.2"
   }
 }

@@ -521,7 +521,7 @@ export const en: Record<TranslationKey, string> = {
   'training.emptyHint': 'Create a game and share the link with players',
   'training.organizerHint': 'To create an open game you need the organiser role. Message',
   'training.organizerHintAfter': 'on Telegram — we can help you get access.',
-  'training.create': 'New training',
+  'training.create': 'Create',
   'training.edit': 'Edit training',
   'training.title': 'Title',
   'training.startsAt': 'Date and time',
