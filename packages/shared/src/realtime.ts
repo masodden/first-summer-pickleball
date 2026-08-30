@@ -1,4 +1,4 @@
-import type { MatchDto, ParticipantDto, RoundDto, StandingRowDto } from './dto.js';
+import type { MatchDto, ParticipantDto, RoundDto, StandingRowDto, TeamStandingRowDto } from './dto.js';
 
 /**
  * События WebSocket. Комната — конкретный турнир, поэтому у каждого события есть
@@ -25,7 +25,12 @@ export type ServerEvent =
   | { type: 'participants.updated'; tournamentId: string; participants: ParticipantDto[] }
   | { type: 'round.updated'; tournamentId: string; round: RoundDto }
   | { type: 'match.updated'; tournamentId: string; match: MatchDto }
-  | { type: 'standings.updated'; tournamentId: string; standings: StandingRowDto[] }
+  | {
+      type: 'standings.updated';
+      tournamentId: string;
+      standings: StandingRowDto[];
+      teamStandings?: TeamStandingRowDto[];
+    }
   | { type: 'schedule.rebuilt'; tournamentId: string; rounds: RoundDto[] }
   | { type: 'pong'; serverTime: string };
 

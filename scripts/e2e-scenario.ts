@@ -14,6 +14,7 @@
 import {
   DUPR_EVENT_PREFIX,
   WS_PATH,
+  classicSixPairBracket,
   type MatchDto,
   type RoundDto,
   type StandingRowDto,
@@ -1228,6 +1229,84 @@ async function main(): Promise<void> {
   await expectError('not_found', 'удалённая тренировка недоступна', () =>
     request('GET', `/api/trainings/${createdTraining.id}`),
   );
+
+  section('Фиксированные пары: связка и один групповой матч');
+  const pairPlayers = await createPlayers(admin.token, 'FP', 3.8);
+  const pairsTournament = await createTournament(admin.token, {
+    title: `Фиксированные пары ${RUN_TAG}`,
+    format: 'fixed_pairs',
+    startsAt,
+    courts: 1,
+    maxPlayers: 8,
+    pointsToWin: 11,
+    bracketConfig: classicSixPairBracket(),
+  });
+  check(pairsTournament.id.length > 0, 'турнир фиксированных пар создан');
+  const four = pairPlayers.slice(0, 4);
+  for (const player of four) {
+    await request('POST', `/api/tournaments/${pairsTournament.id}/participants`, {
+      token: admin.token,
+      body: { playerId: player.id },
+    });
+  }
+  await request(
+    'POST',
+    `/api/tournaments/${pairsTournament.id}/participants/${four[0]!.id}/partner`,
+    { token: admin.token, body: { partnerPlayerId: four[1]!.id } },
+  );
+  for (const player of four) {
+    await request('PUT', `/api/tournaments/${pairsTournament.id}/participants/${player.id}/paid`, {
+      token: admin.token,
+      body: { confirmedAndPaid: true },
+    });
+  }
+  await expectError('not_enough_players', 'старт без полной пары отклонён', () =>
+    request('POST', `/api/tournaments/${pairsTournament.id}/start`, {
+      token: admin.token,
+      body: {},
+    }),
+  );
+  await request(
+    'POST',
+    `/api/tournaments/${pairsTournament.id}/participants/${four[2]!.id}/partner`,
+    { token: admin.token, body: { partnerPlayerId: four[3]!.id } },
+  );
+  await request('POST', `/api/tournaments/${pairsTournament.id}/start`, {
+    token: admin.token,
+    body: {},
+  });
+  const pairsState = await state(pairsTournament.id, admin.token);
+  check(pairsState.tournament.status === 'running', 'турнир пар стартовал');
+  check(pairsState.rounds.length >= 1, 'есть групповой раунд');
+  const firstPairsMatch = pairsState.rounds[0]?.matches[0];
+  check(Boolean(firstPairsMatch), 'есть матч');
+  if (firstPairsMatch) {
+    check(firstPairsMatch.stage === 'group', 'матч групповой');
+    check(firstPairsMatch.teamA.players.length === 2, 'в команде A двое');
+    await request('POST', `/api/matches/${firstPairsMatch.id}/start`, {
+      token: admin.token,
+      body: { version: firstPairsMatch.version },
+    });
+    await request('PUT', `/api/matches/${firstPairsMatch.id}/score`, {
+      token: admin.token,
+      body: {
+        scoreA: 11,
+        scoreB: 7,
+        version: firstPairsMatch.version + 1,
+        games: [{ scoreA: 11, scoreB: 7 }],
+      },
+    });
+  }
+  const scoredPairs = await state(pairsTournament.id, admin.token);
+  const scoredMatch = scoredPairs.rounds
+    .flatMap((round) => round.matches)
+    .find((match) => match.teamA.score !== null);
+  check(
+    scoredMatch?.teamA.score === 11 && scoredMatch.teamB.score === 7,
+    'счёт группового матча записан',
+  );
+
+  await request('DELETE', `/api/tournaments/${pairsTournament.id}`, { token: admin.token });
 
   section('Права и удаление');
   await expectError('forbidden', 'модератор не удаляет турниры', () =>

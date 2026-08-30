@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,6 +13,7 @@ import type { ParticipantDto } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
 import { parseRatingInput, sanitizeRatingInput } from '../../core/rating-input';
+import { SessionStore } from '../../core/session';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
 import { TournamentStore } from '../../core/tournament-store';
@@ -34,7 +36,15 @@ import { SheetDismiss } from '../../ui/motion';
 @Component({
   selector: 'app-tournament-players',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PlayerLine, RatingChip, PlayerPicker, TournamentJoinPanel, SheetDismiss],
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    PlayerLine,
+    RatingChip,
+    PlayerPicker,
+    TournamentJoinPanel,
+    SheetDismiss,
+  ],
   template: `
     @if (tournament(); as item) {
       <div class="stack stack--4">
@@ -54,6 +64,9 @@ import { SheetDismiss } from '../../ui/motion';
                     })
                   }}
                 </span>
+                @if (store.isFixedPairs()) {
+                  <span class="tiny faint">{{ pairRosterHint() }}</span>
+                }
               </div>
               <span
                 class="chip"
@@ -82,79 +95,62 @@ import { SheetDismiss } from '../../ui/motion';
           }
 
           <div class="stack stack--2" [class.stagger]="stagger">
-            @for (participant of store.registered(); track participant.id; let index = $index) {
-              <div
-                class="glass person"
-                [class.person--confirmed]="participant.confirmedAndPaid"
-              >
-                <span class="person__index faint numeric">{{ index + 1 }}</span>
-
-                <app-player-line
-                  class="grow"
-                  [player]="participant.player"
-                  [avatarSize]="30"
-                  [showRating]="false"
-                  [subtitle]="participant.addedBySelf ? t()('participant.selfAdded') : null"
-                />
-
-                @if (editing() === participant.player.id) {
-                  <input
-                    class="input rating-input numeric"
-                    type="text"
-                    inputmode="decimal"
-                    autocomplete="off"
-                    [value]="draftRating()"
-                    (input)="draftRating.set(sanitizeRating(inputValue($event)))"
-                    (keydown.enter)="saveRating(participant)"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn--sm btn--primary"
-                    [disabled]="savingRating()"
-                    (click)="saveRating(participant)"
-                  >
-                    {{ t()('common.save') }}
-                  </button>
-                } @else {
-                  <button
-                    type="button"
-                    class="rating-button"
-                    [disabled]="!canEditRating()"
-                    [attr.aria-label]="t()('rating.edit')"
-                    (click)="startEditing(participant)"
-                  >
-                    <app-rating-chip [player]="participant.player" [showLabel]="false" />
-                  </button>
-                }
-
-                @if (
-                  store.canManage() &&
-                  (item.status === 'registration' || item.status === 'registration_closed')
-                ) {
-                  <div class="person__actions">
-                    <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
-                      <input
-                        type="checkbox"
-                        [checked]="participant.confirmedAndPaid"
-                        (change)="togglePaid(participant, $event)"
-                      />
-                      <span class="checkbox__box"></span>
-                    </label>
-
-                    <button
-                      type="button"
-                      class="btn btn--icon btn--ghost"
-                      [attr.aria-label]="t()('participant.remove')"
-                      [disabled]="store.isBusy('remove:' + participant.player.id)"
-                      (click)="store.removeParticipant(participant.player.id)"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
+            @if (store.isFixedPairs()) {
+              @for (pair of store.linkedPairs(); track pair[0].id; let index = $index) {
+                <article
+                  class="glass pair"
+                  [class.pair--confirmed]="pair[0].partnerLocked"
+                >
+                  <span class="pair__index faint numeric">{{ index + 1 }}</span>
+                  <div class="pair__body">
+                    @for (member of pair; track member.id) {
+                      <div class="pair__row">
+                        <ng-container
+                          [ngTemplateOutlet]="memberInner"
+                          [ngTemplateOutletContext]="{ participant: member, linked: true }"
+                        />
+                      </div>
+                    }
                   </div>
+                  @if (showPairActions(pair[0])) {
+                    <div class="pair__side">
+                      @if (canUnlinkPartner(pair[0])) {
+                        <button
+                          type="button"
+                          class="btn btn--icon btn--ghost"
+                          [attr.aria-label]="t()('partner.confirmUnlink')"
+                          (click)="unlink(pair[0])"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                            <path
+                              d="M8.5 15.5l-2 2a3.5 3.5 0 105 5l2-2M15.5 8.5l2-2a3.5 3.5 0 10-5-5l-2 2"
+                            />
+                            <path d="M4 4l16 16" />
+                          </svg>
+                        </button>
+                      }
+                    </div>
+                  }
+                </article>
+              }
+              @if (store.unpaired().length > 0) {
+                @if (store.linkedPairs().length > 0) {
+                  <p class="tiny faint">{{ t()('participant.unpaired') }}</p>
                 }
-              </div>
+                @for (participant of store.unpaired(); track participant.id) {
+                  <ng-container
+                    [ngTemplateOutlet]="personCard"
+                    [ngTemplateOutletContext]="{ participant, index: null, orphan: true }"
+                  />
+                }
+              }
+            } @else {
+              @for (participant of store.registered(); track participant.id; let index = $index) {
+                <ng-container
+                  [ngTemplateOutlet]="personCard"
+                  [ngTemplateOutletContext]="{ participant, index: index + 1, orphan: false }"
+                />
+              }
             }
           </div>
         </section>
@@ -215,7 +211,9 @@ import { SheetDismiss } from '../../ui/motion';
           item.status !== 'archived'
         ) {
           <section class="glass card--tight stack stack--2">
-            @if (store.allConfirmed()) {
+            @if (store.isFixedPairs() && store.unpaired().length > 0) {
+              <p class="small muted center">{{ t()('partner.needPairs') }}</p>
+            } @else if (store.allConfirmed()) {
               <p class="small strong center">{{ t()('checkin.allConfirmed') }}</p>
             } @else {
               <p class="small muted center">{{ t()('checkin.notAllConfirmed') }}</p>
@@ -234,6 +232,108 @@ import { SheetDismiss } from '../../ui/motion';
           </section>
         }
       </div>
+
+      <ng-template
+        #personCard
+        let-participant="participant"
+        let-index="index"
+        let-orphan="orphan"
+      >
+        <div
+          class="glass person"
+          [class.person--confirmed]="participant.confirmedAndPaid"
+          [class.person--orphan]="orphan"
+        >
+          <span class="person__index faint numeric">{{ index ?? '' }}</span>
+          <ng-container
+            [ngTemplateOutlet]="memberInner"
+            [ngTemplateOutletContext]="{ participant, linked: false }"
+          />
+        </div>
+      </ng-template>
+
+      <ng-template #memberInner let-participant="participant" let-linked="linked">
+        <app-player-line
+          class="grow"
+          [player]="participant.player"
+          [avatarSize]="30"
+          [showRating]="false"
+          [subtitle]="linked ? null : partnerSubtitle(participant)"
+        />
+
+        @if (editing() === participant.player.id) {
+          <input
+            class="input rating-input numeric"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            [value]="draftRating()"
+            (input)="draftRating.set(sanitizeRating(inputValue($event)))"
+            (keydown.enter)="saveRating(participant)"
+          />
+          <button
+            type="button"
+            class="btn btn--sm btn--primary"
+            [disabled]="savingRating()"
+            (click)="saveRating(participant)"
+          >
+            {{ t()('common.save') }}
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="rating-button"
+            [disabled]="!canEditRating()"
+            [attr.aria-label]="t()('rating.edit')"
+            (click)="startEditing(participant)"
+          >
+            <app-rating-chip [player]="participant.player" [showLabel]="false" />
+          </button>
+        }
+
+        @if (showPlayerActions(participant, linked)) {
+          <div class="person__actions">
+            @if (store.canManage()) {
+              <label class="checkbox" [attr.aria-label]="t()('checkin.paid')">
+                <input
+                  type="checkbox"
+                  [checked]="participant.confirmedAndPaid"
+                  (change)="togglePaid(participant, $event)"
+                />
+                <span class="checkbox__box"></span>
+              </label>
+            }
+
+            @if (!linked && canLinkPartner(participant)) {
+              <button
+                type="button"
+                class="btn btn--icon btn--glass"
+                [attr.aria-label]="t()('partner.link')"
+                (click)="onLinkClick(participant)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                  <path d="M10 13a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07L10 5.93" />
+                  <path d="M14 11a5 5 0 00-7.07 0L5.52 12.41a5 5 0 007.07 7.07L14 18.07" />
+                </svg>
+              </button>
+            }
+
+            @if (!linked && store.canManage()) {
+              <button
+                type="button"
+                class="btn btn--icon btn--ghost"
+                [attr.aria-label]="t()('participant.remove')"
+                [disabled]="store.isBusy('remove:' + participant.player.id)"
+                (click)="store.removeParticipant(participant.player.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            }
+          </div>
+        }
+      </ng-template>
 
       @if (picker()) {
         <app-player-picker
@@ -287,6 +387,47 @@ import { SheetDismiss } from '../../ui/motion';
           </div>
         </div>
       }
+
+      @if (pairing(); as anchor) {
+        <div class="overlay" (click)="pairing.set(null)">
+          <div
+            class="sheet glass card stack stack--3"
+            appSheetDismiss
+            (dismissed)="pairing.set(null)"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="row row--between">
+              <h3>{{ t()('partner.pick') }}</h3>
+              <button
+                type="button"
+                class="btn btn--icon btn--glass"
+                [attr.aria-label]="t()('common.close')"
+                (click)="pairing.set(null)"
+              >
+                <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <div class="stack stack--2 replace-list">
+              @for (candidate of unpairedExcept(anchor); track candidate.id) {
+                <button
+                  type="button"
+                  class="glass glass--subtle card--tight person replace-pick"
+                  (click)="confirmLink(anchor, candidate)"
+                >
+                  <app-player-line
+                    class="grow"
+                    [player]="candidate.player"
+                    [avatarSize]="30"
+                    [link]="false"
+                  />
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
     }
   `,
   styles: `
@@ -302,9 +443,63 @@ import { SheetDismiss } from '../../ui/motion';
         background var(--duration-base) ease;
     }
 
-    .person--confirmed {
-      border-color: color-mix(in srgb, var(--success) 35%, transparent);
-      background: color-mix(in srgb, var(--success) 10%, color-mix(in srgb, var(--glass-bg) 72%, transparent));
+    .person--confirmed,
+    .pair--confirmed {
+      border-color: color-mix(in srgb, var(--lime-400) 55%, var(--control-border));
+    }
+
+    .pair--confirmed {
+      background: color-mix(in srgb, var(--lime-400) 14%, var(--glass-bg, transparent));
+    }
+
+    .person--orphan {
+      border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr) auto;
+      gap: var(--space-2);
+      padding: 10px 12px;
+      align-items: stretch;
+    }
+
+    .pair__index {
+      width: 20px;
+      align-self: center;
+      text-align: right;
+      flex: 0 0 auto;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .pair__body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .pair__row {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .pair__row + .pair__row {
+      border-top: 1px dashed color-mix(in srgb, var(--glass-border) 80%, transparent);
+      padding-top: 8px;
+    }
+
+    .pair__side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
 
     .person__index {
@@ -316,11 +511,17 @@ import { SheetDismiss } from '../../ui/motion';
       line-height: 1;
     }
 
-    .person :deep(.line) {
+    .person--orphan {
+      border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+    }
+
+    .person :deep(.line),
+    .pair :deep(.line) {
       gap: var(--space-2);
     }
 
-    .person :deep(.line__name) {
+    .person :deep(.line__name),
+    .pair :deep(.line__name) {
       font-size: 13px;
     }
 
@@ -422,12 +623,14 @@ export class TournamentPlayersTab {
   private readonly i18n = inject(I18nService);
 
   protected readonly store = inject(TournamentStore);
+  private readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
   protected readonly stagger = consumeFirstVisit('tournament-players');
   protected readonly tournament = this.store.tournament;
 
   protected readonly picker = signal(false);
   protected readonly replacing = signal<ParticipantDto | null>(null);
+  protected readonly pairing = signal<ParticipantDto | null>(null);
   protected readonly editing = signal<string | null>(null);
   protected readonly draftRating = signal('');
   protected readonly savingRating = signal(false);
@@ -446,11 +649,14 @@ export class TournamentPlayersTab {
     // Как у player-picker: sheet внутри main, таббар снаружи с большим z-index —
     // пока открыта замена, прячем навигацию, чтобы не перехватывала тапы.
     let releaseOverlay: (() => void) | null = null;
-    const onBack = (): void => this.replacing.set(null);
+    const onBack = (): void => {
+      this.replacing.set(null);
+      this.pairing.set(null);
+    };
     document.addEventListener('fsp:back', onBack);
 
     effect(() => {
-      const open = this.replacing() !== null;
+      const open = this.replacing() !== null || this.pairing() !== null;
       document.documentElement.classList.toggle('fsp-overlay-open', open);
       if (open && !releaseOverlay) {
         releaseOverlay = backNav.acquireOverlay();
@@ -465,6 +671,115 @@ export class TournamentPlayersTab {
       document.removeEventListener('fsp:back', onBack);
       releaseOverlay?.();
     });
+  }
+
+  protected pairRosterHint(): string {
+    const pairs = this.i18n.pairs(this.store.pairCount());
+    const unpaired = this.store.unpaired().length;
+    if (unpaired === 0) return pairs;
+    return this.i18n.translate('partner.rosterMixed', { pairs, unpaired });
+  }
+
+  protected partnerSubtitle(participant: ParticipantDto): string | null {
+    if (this.store.isFixedPairs()) {
+      if (participant.partner?.fullName) {
+        return `${participant.partner.fullName}${participant.partnerLocked ? ` · ${this.i18n.translate('partner.locked')}` : ''}`;
+      }
+      return this.i18n.translate('participant.unpaired');
+    }
+    return participant.addedBySelf ? this.i18n.translate('participant.selfAdded') : null;
+  }
+
+  protected registrationOpen(): boolean {
+    const status = this.tournament()?.status;
+    return status === 'registration' || status === 'registration_closed';
+  }
+
+  protected showPlayerActions(participant: ParticipantDto, linked: boolean): boolean {
+    if (!this.registrationOpen()) return false;
+    if (this.store.canManage()) return true;
+    return !linked && this.canLinkPartner(participant);
+  }
+
+  protected showPairActions(participant: ParticipantDto): boolean {
+    return this.registrationOpen() && this.canUnlinkPartner(participant);
+  }
+
+  protected canLinkPartner(participant: ParticipantDto): boolean {
+    if (!this.store.isFixedPairs() || participant.partnerLocked || participant.partnerPlayerId) {
+      return false;
+    }
+    if (this.store.canManage()) return true;
+    const me = this.session.playerId();
+    if (!me) return false;
+    const mine = this.store.myParticipation();
+    if (mine?.status === 'waitlisted') return false;
+    if (participant.player.id === me) return this.store.unpaired().length > 1;
+    if (!mine) return this.store.tournament()?.status === 'registration';
+    return mine.status === 'registered' && !mine.partnerPlayerId;
+  }
+
+  protected canUnlinkPartner(participant: ParticipantDto): boolean {
+    if (!this.store.isFixedPairs() || !participant.partnerPlayerId || participant.partnerLocked) {
+      return false;
+    }
+    if (this.store.canManage()) return true;
+    const me = this.session.playerId();
+    return me === participant.player.id || me === participant.partnerPlayerId;
+  }
+
+  protected unpairedExcept(anchor: ParticipantDto): ParticipantDto[] {
+    return this.store.unpaired().filter((item) => item.player.id !== anchor.player.id);
+  }
+
+  protected onLinkClick(participant: ParticipantDto): void {
+    const me = this.session.playerId();
+    if (this.store.canManage() || participant.player.id === me) {
+      this.openPartnerPicker(participant);
+      return;
+    }
+    void this.linkWithParticipant(participant);
+  }
+
+  protected openPartnerPicker(participant: ParticipantDto): void {
+    this.pairing.set(participant);
+  }
+
+  protected async linkWithParticipant(target: ParticipantDto): Promise<void> {
+    const me = this.session.playerId();
+    if (!me) return;
+    const join = this.store.myParticipation() === null;
+    const ok = await this.confirm.ask({
+      title: this.i18n.translate('partner.link'),
+      message: this.i18n.translate(join ? 'partner.confirmJoin' : 'partner.confirmLink', {
+        name: target.player.fullName,
+      }),
+      confirmLabel: this.i18n.translate('partner.link'),
+    });
+    if (!ok) return;
+    await this.store.linkPartner(join ? target.player.id : me, join ? me : target.player.id);
+  }
+
+  protected async confirmLink(anchor: ParticipantDto, partner: ParticipantDto): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: this.i18n.translate('partner.link'),
+      message: this.i18n.translate('partner.confirmLink', { name: partner.player.fullName }),
+      confirmLabel: this.i18n.translate('partner.link'),
+    });
+    if (!ok) return;
+    this.pairing.set(null);
+    await this.store.linkPartner(anchor.player.id, partner.player.id);
+  }
+
+  protected async unlink(participant: ParticipantDto): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: this.i18n.translate('partner.confirmUnlink'),
+      confirmLabel: this.i18n.translate('common.yes'),
+      cancelLabel: this.i18n.translate('common.no'),
+      danger: true,
+    });
+    if (!ok) return;
+    await this.store.unlinkPartner(participant.player.id);
   }
 
   protected async add(playerId: string): Promise<void> {
@@ -501,9 +816,14 @@ export class TournamentPlayersTab {
   protected async start(): Promise<void> {
     const confirmed = await this.confirm.ask({
       title: this.i18n.translate('tournament.start'),
-      message: this.i18n.translate('tournament.startConfirm', {
-        count: this.store.registered().length,
-      }),
+      message: this.i18n.translate(
+        this.store.isFixedPairs() ? 'tournament.startConfirmPairs' : 'tournament.startConfirm',
+        {
+          count: this.store.isFixedPairs()
+            ? this.store.pairCount()
+            : this.store.registered().length,
+        },
+      ),
       confirmLabel: this.i18n.translate('tournament.start'),
     });
     if (confirmed) await this.store.start();

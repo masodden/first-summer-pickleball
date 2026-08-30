@@ -51,8 +51,31 @@ export const ROLE_WEIGHT: Record<Role, number> = {
   admin: 3,
 };
 
-export const TOURNAMENT_FORMATS = ['americano', 'mexicano'] as const;
+export const TOURNAMENT_FORMATS = ['americano', 'mexicano', 'fixed_pairs'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
+
+export function isFixedPairsFormat(format: TournamentFormat): boolean {
+  return format === 'fixed_pairs';
+}
+
+export function formatNameKey(
+  format: TournamentFormat,
+): 'format.americano' | 'format.mexicano' | 'format.fixed_pairs' {
+  if (format === 'mexicano') return 'format.mexicano';
+  if (format === 'fixed_pairs') return 'format.fixed_pairs';
+  return 'format.americano';
+}
+
+export function formatDescriptionKey(
+  format: TournamentFormat,
+):
+  | 'format.americano.description'
+  | 'format.mexicano.description'
+  | 'format.fixed_pairs.description' {
+  if (format === 'mexicano') return 'format.mexicano.description';
+  if (format === 'fixed_pairs') return 'format.fixed_pairs.description';
+  return 'format.americano.description';
+}
 
 export const TOURNAMENT_STATUSES = [
   'registration',
@@ -183,6 +206,64 @@ export function isValidDuprId(raw: string): boolean {
 export function isBootstrapAdminDupr(raw: string | null | undefined): boolean {
   if (!raw) return false;
   return (BOOTSTRAP_ADMIN_DUPR_IDS as readonly string[]).includes(normalizeDuprId(raw));
+}
+
+export function isUnpairedParticipant(
+  item: {
+    status: string;
+    player: { id: string };
+    partnerPlayerId: string | null;
+  },
+  byId: ReadonlyMap<string, { status: string; partnerPlayerId: string | null }>,
+): boolean {
+  if (item.status !== 'registered') return false;
+  const partnerId = item.partnerPlayerId;
+  if (!partnerId) return true;
+  const partner = byId.get(partnerId);
+  return !partner || partner.status !== 'registered' || partner.partnerPlayerId !== item.player.id;
+}
+
+type LinkableParticipant = {
+  player: { id: string };
+  partnerPlayerId: string | null;
+};
+
+/**
+ * Взаимные связки — пары для UI. В БД по-прежнему две строки участников:
+ * группировка только для отображения, идентификаторы игроков не меняются.
+ */
+export function groupLinkedRoster<T extends LinkableParticipant>(
+  items: readonly T[],
+): { pairs: [T, T][]; unpaired: T[] } {
+  const byId = new Map(
+    items.map((item) => [
+      item.player.id,
+      { status: 'registered', partnerPlayerId: item.partnerPlayerId },
+    ]),
+  );
+  const seen = new Set<string>();
+  const pairs: [T, T][] = [];
+  const unpaired: T[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.player.id)) continue;
+    if (isUnpairedParticipant({ ...item, status: 'registered' }, byId)) {
+      seen.add(item.player.id);
+      unpaired.push(item);
+      continue;
+    }
+    const partner = items.find((other) => other.player.id === item.partnerPlayerId);
+    if (!partner) {
+      seen.add(item.player.id);
+      unpaired.push(item);
+      continue;
+    }
+    seen.add(item.player.id);
+    seen.add(partner.player.id);
+    pairs.push([item, partner]);
+  }
+
+  return { pairs, unpaired };
 }
 
 /** Итоговый статус турнира: завершён или убран в архив. */

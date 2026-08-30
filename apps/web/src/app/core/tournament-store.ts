@@ -1,10 +1,17 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import {
   formatDuprExportFilename,
+  groupLinkedRoster,
+  isFixedPairsFormat,
+  isUnpairedParticipant,
+  validateBracketConfig,
   type MatchDto,
+  type TranslationKey,
+  type MatchGameDto,
   type ParticipantDto,
   type RoundDto,
   type StandingRowDto,
+  type TeamStandingRowDto,
   type TournamentDto,
   type UpdateTournamentInput,
 } from '@fsp/shared';
@@ -42,6 +49,7 @@ export class TournamentStore {
   private readonly participantsSignal = signal<ParticipantDto[]>([]);
   private readonly roundsSignal = signal<RoundDto[]>([]);
   private readonly standingsSignal = signal<StandingRowDto[]>([]);
+  private readonly teamStandingsSignal = signal<TeamStandingRowDto[]>([]);
   private readonly loadingSignal = signal(true);
   private readonly errorSignal = signal<ApiFailure | null>(null);
   private readonly busySignal = signal<Set<string>>(new Set());
@@ -52,6 +60,7 @@ export class TournamentStore {
   readonly participants = this.participantsSignal.asReadonly();
   readonly rounds = this.roundsSignal.asReadonly();
   readonly standings = this.standingsSignal.asReadonly();
+  readonly teamStandings = this.teamStandingsSignal.asReadonly();
   readonly loading = this.loadingSignal.asReadonly();
   readonly loadError = this.errorSignal.asReadonly();
   readonly connection = this.realtime.state;
@@ -74,6 +83,23 @@ export class TournamentStore {
   );
   readonly canManage = computed(() => this.tournamentSignal()?.canManage ?? false);
   readonly isMexicano = computed(() => this.tournamentSignal()?.format === 'mexicano');
+  readonly isFixedPairs = computed(() => {
+    const format = this.tournamentSignal()?.format;
+    return format ? isFixedPairsFormat(format) : false;
+  });
+  readonly unpaired = computed(() => {
+    const items = this.registered();
+    const byId = new Map(items.map((item) => [item.player.id, item]));
+    return items.filter((item) => isUnpairedParticipant(item, byId));
+  });
+  readonly linkedPairs = computed(() => groupLinkedRoster(this.registered()).pairs);
+  readonly pairCount = computed(() => this.linkedPairs().length);
+  /** На вкладке: пары, когда все слинкованы; иначе игроки (ещё есть без пары). */
+  readonly rosterTabCount = computed(() => {
+    if (!this.isFixedPairs()) return this.registered().length;
+    if (this.registered().length > 0 && this.unpaired().length === 0) return this.pairCount();
+    return this.registered().length;
+  });
   readonly roundCount = computed(() => this.roundsSignal().length);
   readonly viewRound = this.viewRoundSignal.asReadonly();
   readonly currentRound = computed<RoundDto | null>(
@@ -124,7 +150,8 @@ export class TournamentStore {
   });
 
   readonly canStartViewedRound = computed(() => {
-    if (!this.canRunRound() || !this.previousRoundClosed() || this.otherRoundLive()) return false;
+    if (!this.canRunRound()) return false;
+    if (!this.isFixedPairs() && (!this.previousRoundClosed() || this.otherRoundLive())) return false;
     const state = this.roundState();
     return state === 'scheduled' || state === 'skipped';
   });
@@ -134,6 +161,7 @@ export class TournamentStore {
     () =>
       this.canRunRound() &&
       !this.isMexicano() &&
+      !this.isFixedPairs() &&
       this.previousRoundClosed() &&
       this.roundState() === 'scheduled',
   );
@@ -141,6 +169,25 @@ export class TournamentStore {
   readonly canUnskipViewedRound = computed(
     () => this.canRunRound() && this.roundState() === 'skipped' && !this.otherRoundLive(),
   );
+
+  /** Кто сейчас на корте — чтобы не стартовать ту же пару из другого раунда. */
+  readonly livePlayerIds = computed(() => {
+    const ids = new Set<string>();
+    for (const round of this.roundsSignal()) {
+      for (const match of round.matches) {
+        if (match.status !== 'running' && match.status !== 'paused') continue;
+        for (const player of [...match.teamA.players, ...match.teamB.players]) {
+          ids.add(player.id);
+        }
+      }
+    }
+    return ids;
+  });
+
+  matchPlayersBusy(match: MatchDto): boolean {
+    const live = this.livePlayerIds();
+    return [...match.teamA.players, ...match.teamB.players].some((player) => live.has(player.id));
+  }
 
   /**
    * Матч, по которому считается общий таймер раунда. Все корты стартуют
@@ -166,11 +213,42 @@ export class TournamentStore {
     if (tournament.status !== 'registration' && tournament.status !== 'registration_closed') {
       return false;
     }
+    if (this.isFixedPairs()) {
+      const config = tournament.bracketConfig;
+      return (
+        this.allConfirmed() &&
+        this.unpaired().length === 0 &&
+        this.registered().length >= 4 &&
+        this.registered().length % 2 === 0 &&
+        config !== null &&
+        validateBracketConfig(config).length === 0
+      );
+    }
     return this.allConfirmed() && this.registered().length >= 4;
+  });
+
+  readonly startBlockedReason = computed((): TranslationKey => {
+    if (this.canStart()) return 'tournament.startHint';
+    if (this.isFixedPairs()) {
+      const config = this.tournamentSignal()?.bracketConfig;
+      if (!config || validateBracketConfig(config).length > 0) return 'bracket.cannotStart';
+      if (this.unpaired().length > 0) return 'partner.needPairs';
+    }
+    return 'checkin.notAllConfirmed';
   });
 
   /** Перемешать пары можно, пока ни один матч не начали. */
   readonly canReshuffle = computed(() => {
+    const tournament = this.tournamentSignal();
+    if (!tournament?.canManage || tournament.status !== 'running') return false;
+    if (this.isFixedPairs()) return false;
+    return this.roundsSignal().every((round) =>
+      round.matches.every((match) => match.status === 'scheduled'),
+    );
+  });
+
+  /** Откат к «регистрация завершена» — пока ни один матч не начат. */
+  readonly canUnstart = computed(() => {
     const tournament = this.tournamentSignal();
     if (!tournament?.canManage || tournament.status !== 'running') return false;
     return this.roundsSignal().every((round) =>
@@ -178,15 +256,13 @@ export class TournamentStore {
     );
   });
 
-  /** Откат к «регистрация завершена» — те же условия, что и у решафла. */
-  readonly canUnstart = computed(() => this.canReshuffle());
-
   readonly canCreateNextRound = computed(() => {
     const tournament = this.tournamentSignal();
     if (!tournament?.canManage || tournament.status !== 'running') return false;
     const rounds = this.roundsSignal();
     const last = rounds[rounds.length - 1];
     if (last && !last.allScored) return false;
+    if (this.isFixedPairs()) return false;
     if (tournament.roundsPlanned !== null && rounds.length >= tournament.roundsPlanned)
       return false;
     return true;
@@ -268,6 +344,7 @@ export class TournamentStore {
       this.participantsSignal.set(state.participants);
       this.roundsSignal.set(state.rounds);
       this.standingsSignal.set(state.standings);
+      this.teamStandingsSignal.set(state.teamStandings ?? []);
       this.errorSignal.set(null);
     } catch (error) {
       if (error instanceof ApiFailure) this.errorSignal.set(error);
@@ -363,6 +440,22 @@ export class TournamentStore {
       },
       () => void this.setPaid(playerId, value),
     );
+  }
+
+  linkPartner(playerId: string, partnerPlayerId: string): Promise<void> {
+    return this.run(`partner:${playerId}`, async () => {
+      await this.api.linkPartner(this.requireId(), playerId, partnerPlayerId);
+      await this.load({ silent: true });
+      this.toast.success(this.i18n.translate('partner.linked'));
+    });
+  }
+
+  unlinkPartner(playerId: string): Promise<void> {
+    return this.run(`partner:${playerId}`, async () => {
+      await this.api.unlinkPartner(this.requireId(), playerId);
+      await this.load({ silent: true });
+      this.toast.success(this.i18n.translate('partner.unlinked'));
+    });
   }
 
   promote(playerId: string, replacePlayerId?: string): Promise<void> {
@@ -528,12 +621,20 @@ export class TournamentStore {
 
   // --- Матчи ---
 
-  setScore(match: MatchDto, scoreA: number, scoreB: number): Promise<void> {
+  setScore(match: MatchDto, scoreA: number, scoreB: number, games?: MatchGameDto[]): Promise<void> {
     return this.matchAction(
       match,
-      () => this.api.setScore(match.id, scoreA, scoreB, match.version),
+      () => this.api.setScore(match.id, scoreA, scoreB, match.version, games),
       'score.saved',
     );
+  }
+
+  startMatch(match: MatchDto): Promise<void> {
+    return this.matchAction(match, () => this.api.startMatch(match.id, match.version));
+  }
+
+  pauseMatch(match: MatchDto): Promise<void> {
+    return this.matchAction(match, () => this.api.pauseMatch(match.id, match.version));
   }
 
   private matchAction(
@@ -564,8 +665,9 @@ export class TournamentStore {
     const id = this.idSignal();
     if (!id) return;
     try {
-      const { standings } = await this.api.getStandings(id);
+      const { standings, teamStandings } = await this.api.getStandings(id);
       this.standingsSignal.set(standings);
+      this.teamStandingsSignal.set(teamStandings ?? []);
     } catch {
       // Таблица не критична: она всё равно придёт событием WebSocket.
     }
@@ -661,6 +763,7 @@ export class TournamentStore {
         break;
       case 'standings.updated':
         this.standingsSignal.set(event.standings);
+        if (event.teamStandings) this.teamStandingsSignal.set(event.teamStandings);
         break;
       case 'schedule.rebuilt':
         this.roundsSignal.set(event.rounds);

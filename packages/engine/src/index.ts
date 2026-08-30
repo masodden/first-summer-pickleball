@@ -7,3 +7,5 @@ export * from './courts.js';
 export * from './americano.js';
 export * from './mexicano.js';
 export * from './standings.js';
+export * from './fixed-pairs.js';
+export * from './team-standings.js';

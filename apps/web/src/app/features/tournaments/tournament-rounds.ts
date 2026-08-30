@@ -27,7 +27,7 @@ import { MatchCard } from './match-card';
           <h3>{{ t()('match.noRounds') }}</h3>
           @if (store.canManage()) {
             <p class="small">
-              {{ store.canStart() ? t()('tournament.startHint') : t()('checkin.notAllConfirmed') }}
+              {{ store.canStart() ? t()('tournament.startHint') : t()(store.startBlockedReason()) }}
             </p>
             <button
               type="button"
@@ -114,7 +114,7 @@ import { MatchCard } from './match-card';
                   <div class="round-control__actions">
                     @switch (store.roundState()) {
                       @case ('scheduled') {
-                        @if (!store.isMexicano()) {
+                        @if (!store.isMexicano() && !store.isFixedPairs()) {
                           <button
                             type="button"
                             class="btn btn--icon btn--glass"
@@ -250,6 +250,8 @@ import { MatchCard } from './match-card';
               <button type="button" class="btn btn--sm btn--glass btn--block" (click)="reshuffle()">
                 {{ t()('match.reshuffle') }}
               </button>
+            }
+            @if (store.canManage() && store.canUnstart()) {
               <button
                 type="button"
                 class="btn btn--sm btn--glass btn--block"

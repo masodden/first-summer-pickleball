@@ -37,7 +37,11 @@ export function toPlayerDto(row: PlayerRow, options: { isClaimed?: boolean } = {
   };
 }
 
-export function toParticipantDto(row: TournamentPlayerRow, player: PlayerDto): ParticipantDto {
+export function toParticipantDto(
+  row: TournamentPlayerRow,
+  player: PlayerDto,
+  extras: { partner?: PlayerDto | null; partnerLocked?: boolean } = {},
+): ParticipantDto {
   return {
     id: row.id,
     player,
@@ -45,8 +49,32 @@ export function toParticipantDto(row: TournamentPlayerRow, player: PlayerDto): P
     confirmedAndPaid: row.confirmedAndPaid,
     waitlistPosition: row.waitlistPosition,
     addedBySelf: row.addedBySelf,
+    partnerPlayerId: row.partnerPlayerId ?? null,
+    partner: extras.partner ?? null,
+    partnerLocked: extras.partnerLocked ?? false,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+export function attachPartners(
+  items: readonly { participant: TournamentPlayerRow; player: PlayerDto }[],
+): ParticipantDto[] {
+  const byId = new Map(items.map((item) => [item.participant.playerId, item]));
+  return items.map((item) => {
+    const partnerId = item.participant.partnerPlayerId;
+    const partnerItem = partnerId ? byId.get(partnerId) : undefined;
+    const partnerLocked = Boolean(
+      partnerId &&
+        partnerItem &&
+        partnerItem.participant.partnerPlayerId === item.participant.playerId &&
+        item.participant.confirmedAndPaid &&
+        partnerItem.participant.confirmedAndPaid,
+    );
+    return toParticipantDto(item.participant, item.player, {
+      partner: partnerItem ? partnerItem.player : null,
+      partnerLocked,
+    });
+  });
 }
 
 export function toRatingHistoryDto(row: RatingHistoryRow): PlayerRatingHistoryEntryDto {

@@ -12,6 +12,9 @@ export interface MatchPlan {
   court: number;
   teamA: Team;
   teamB: Team;
+  stage?: 'group' | 'playoff' | 'consolation';
+  groupIndex?: number | null;
+  bracketSlot?: string | null;
 }
 
 export interface RoundPlan {

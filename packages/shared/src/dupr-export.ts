@@ -107,6 +107,21 @@ function playerDuprId(player: { duprId: string | null } | undefined): string {
   return player?.duprId ?? '';
 }
 
+/** Геймы серии → game1…game5; одиночный матч — только game1 из счёта. */
+function gameScores(match: MatchDto): Array<string | number> {
+  const cells: Array<string | number> = [];
+  const games = match.games?.length ? match.games : [{ scoreA: match.teamA.score ?? 0, scoreB: match.teamB.score ?? 0 }];
+  for (let index = 0; index < 5; index += 1) {
+    const game = games[index];
+    if (game) {
+      cells.push(game.scoreA, game.scoreB);
+    } else {
+      cells.push('', '');
+    }
+  }
+  return cells;
+}
+
 /** Матч готов к выгрузке: есть счёт и по два игрока в командах. */
 export function isDuprExportableMatch(match: MatchDto): boolean {
   if (match.status === 'skipped') return false;
@@ -148,16 +163,7 @@ export function buildDuprResultsCsv(
         playerName(b2),
         playerDuprId(b2),
         '', // playerB2ExternalId
-        match.teamA.score,
-        match.teamB.score,
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
+        ...gameScores(match),
         location,
         'SIDEOUT',
       ]),

@@ -1,5 +1,16 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
-import { courtLabel, isMatchClosed, isTournamentClosed, type MatchDto, type MatchStatus } from '@fsp/shared';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
+import {
+  courtLabel,
+  gameScoreIssue,
+  gameSettingsForMatch,
+  isFixedPairsFormat,
+  isMatchClosed,
+  isTournamentClosed,
+  parseBracketConfig,
+  type MatchDto,
+  type MatchGameDto,
+  type MatchStatus,
+} from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
   matchPlayers,
@@ -13,6 +24,8 @@ import { ApiError, conflictVersion, forbidden, notFound, wrongStatus } from '../
 import { toPlayerDto } from './mappers.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
+import { syncFixedPairsBracket } from './bracket-sync.js';
+import { matchDtoExtras } from './match-dto.js';
 
 export async function loadMatchDto(db: Database, matchId: string): Promise<MatchDto> {
   const [row] = await db
@@ -52,6 +65,7 @@ export async function loadMatchDto(db: Database, matchId: string): Promise<Match
     durationMs:
       row.tournament.matchDurationMin === null ? null : row.tournament.matchDurationMin * 60_000,
     version: row.match.version,
+    ...matchDtoExtras(row.match, row.tournament),
   };
 }
 
@@ -129,6 +143,10 @@ export async function startMatch(
 
   if (!ALLOWED_START.includes(match.status)) {
     throw new ApiError('match_wrong_status', 'Матч уже начат или завершён');
+  }
+
+  if (isFixedPairsFormat(tournament.format)) {
+    await assertPlayersFree(db, tournament.id, matchId);
   }
 
   const now = new Date();
@@ -255,17 +273,74 @@ export async function reopenMatch(
   return loadMatchDto(db, matchId);
 }
 
+function assertValidGame(
+  game: MatchGameDto,
+  pointsToWin: number,
+  winByTwo: boolean,
+): void {
+  const issue = gameScoreIssue(game.scoreA, game.scoreB, { pointsToWin, winByTwo });
+  if (issue === 'tie') {
+    throw new ApiError('validation_failed', 'В гейме нужен победитель');
+  }
+  if (issue === 'winByTwo') {
+    throw new ApiError('validation_failed', 'Нужна победа с разницей в два очка');
+  }
+  if (issue) {
+    throw new ApiError('validation_failed', `Гейм играют до ${pointsToWin}`);
+  }
+}
+
+function resolveScorePayload(
+  tournament: TournamentRow,
+  match: MatchRow,
+  input: { scoreA: number; scoreB: number; games?: MatchGameDto[] },
+): { scoreA: number; scoreB: number; games: MatchGameDto[] | null } {
+  const config = parseBracketConfig(tournament.format, tournament.bracketConfig, tournament.pointsToWin);
+  if (!isFixedPairsFormat(tournament.format) || !config) {
+    return { scoreA: input.scoreA, scoreB: input.scoreB, games: null };
+  }
+  const settings = gameSettingsForMatch(config, {
+    stage: match.stage,
+    bracketSlot: match.bracketSlot,
+  });
+  if (settings.winsToTake <= 1) {
+    const game = input.games?.[0] ?? { scoreA: input.scoreA, scoreB: input.scoreB };
+    assertValidGame(game, settings.pointsToWin, settings.winByTwo);
+    return { scoreA: game.scoreA, scoreB: game.scoreB, games: [game] };
+  }
+  const games = input.games ?? [];
+  if (games.length === 0) {
+    throw new ApiError('validation_failed', 'Для серии укажите счёт каждого гейма');
+  }
+  let winsA = 0;
+  let winsB = 0;
+  for (const game of games) {
+    if (winsA === settings.winsToTake || winsB === settings.winsToTake) {
+      throw new ApiError('validation_failed', 'Лишние геймы после победы в серии');
+    }
+    assertValidGame(game, settings.pointsToWin, settings.winByTwo);
+    if (game.scoreA > game.scoreB) winsA += 1;
+    else winsB += 1;
+  }
+  if (winsA !== settings.winsToTake && winsB !== settings.winsToTake) {
+    throw new ApiError('validation_failed', 'Серия ещё не завершена');
+  }
+  return { scoreA: winsA, scoreB: winsB, games };
+}
+
 export async function setMatchScore(
   db: Database,
   matchId: string,
-  input: { scoreA: number; scoreB: number; version: number },
+  input: { scoreA: number; scoreB: number; games?: MatchGameDto[]; version: number },
   actor: Viewer,
 ): Promise<MatchDto> {
   const { match, tournament } = await loadMatchContext(db, matchId);
   assertEditable(tournament, actor);
   ensureVersion(match, input.version);
 
-  if (tournament.tieRule === 'golden_point' && input.scoreA === input.scoreB) {
+  const resolved = resolveScorePayload(tournament, match, input);
+
+  if (tournament.tieRule === 'golden_point' && resolved.scoreA === resolved.scoreB) {
     throw new ApiError('validation_failed', 'В этом турнире ничья не допускается');
   }
 
@@ -278,9 +353,9 @@ export async function setMatchScore(
     db,
     matchId,
     {
-      scoreA: input.scoreA,
-      scoreB: input.scoreB,
-      // Введённый счёт означает, что игра закончилась.
+      scoreA: resolved.scoreA,
+      scoreB: resolved.scoreB,
+      games: resolved.games,
       status: 'finished',
       finishedAt: match.finishedAt ?? now,
       startedAt: match.startedAt ?? now,
@@ -296,9 +371,13 @@ export async function setMatchScore(
     tournamentId: tournament.id,
     payload: {
       from: { scoreA: match.scoreA, scoreB: match.scoreB },
-      to: { scoreA: input.scoreA, scoreB: input.scoreB },
+      to: { scoreA: resolved.scoreA, scoreB: resolved.scoreB },
     },
   });
+
+  if (isFixedPairsFormat(tournament.format)) {
+    await syncFixedPairsBracket(db, tournament);
+  }
 
   return loadMatchDto(db, matchId);
 }
@@ -313,7 +392,7 @@ export async function clearMatchScore(
   assertEditable(tournament, options.actor);
   ensureVersion(match, options.version);
 
-  await applyMatchPatch(db, matchId, { scoreA: null, scoreB: null }, match.version);
+  await applyMatchPatch(db, matchId, { scoreA: null, scoreB: null, games: null }, match.version);
   await recordAudit(db, options.actor, {
     action: 'match.score_cleared',
     entityType: 'match',
@@ -360,6 +439,9 @@ export async function applyRoundAction(
   if (rows.length === 0) throw notFound('Раунд не найден');
 
   if (action === 'skip') {
+    if (isFixedPairsFormat(tournament.format)) {
+      throw wrongStatus('В формате фиксированных пар раунд не пропускают');
+    }
     if (tournament.format === 'mexicano') {
       throw wrongStatus(
         'В mexicano раунд нельзя пропустить: следующий строится по результатам текущего',
@@ -378,16 +460,33 @@ export async function applyRoundAction(
   }
 
   if (action === 'start') {
-    await assertPreviousRoundClosed(db, tournamentId, roundIndex);
-    await assertNoOtherLiveRound(db, tournamentId, roundIndex);
+    if (!isFixedPairsFormat(tournament.format)) {
+      await assertPreviousRoundClosed(db, tournamentId, roundIndex);
+      await assertNoOtherLiveRound(db, tournamentId, roundIndex);
+    }
   }
 
   const now = new Date();
+  const busyPlayers =
+    action === 'start' && isFixedPairsFormat(tournament.format)
+      ? await livePlayerIds(db, tournamentId, { exceptRoundIndex: roundIndex })
+      : null;
+  let started = 0;
 
   for (const match of rows) {
     const patch = roundPatchFor(match, action, now);
     if (!patch) continue;
+    if (busyPlayers) {
+      const lineup = await matchPlayerIds(db, match.id);
+      if (lineup.some((playerId) => busyPlayers.has(playerId))) continue;
+      for (const playerId of lineup) busyPlayers.add(playerId);
+      started += 1;
+    }
     await applyMatchPatch(db, match.id, patch, match.version);
+  }
+
+  if (busyPlayers && started === 0 && rows.some((match) => match.status === 'scheduled')) {
+    throw wrongStatus('Свободных пар нет: игроки ещё на других кортах');
   }
 
   const auditAction =
@@ -408,6 +507,53 @@ export async function applyRoundAction(
     tournamentId,
     payload: { courts: rows.length },
   });
+}
+
+/** Игроки, которые сейчас на корте. */
+async function livePlayerIds(
+  db: Database,
+  tournamentId: string,
+  options: { exceptMatchId?: string; exceptRoundIndex?: number } = {},
+): Promise<Set<string>> {
+  const filters = [
+    eq(matches.tournamentId, tournamentId),
+    inArray(matches.status, ['running', 'paused']),
+  ];
+  if (options.exceptMatchId) filters.push(ne(matches.id, options.exceptMatchId));
+  if (options.exceptRoundIndex !== undefined) {
+    filters.push(ne(matches.roundIndex, options.exceptRoundIndex));
+  }
+  const live = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(and(...filters));
+  if (live.length === 0) return new Set();
+  const lineup = await db
+    .select({ playerId: matchPlayers.playerId })
+    .from(matchPlayers)
+    .where(
+      inArray(
+        matchPlayers.matchId,
+        live.map((row) => row.id),
+      ),
+    );
+  return new Set(lineup.map((row) => row.playerId));
+}
+
+async function matchPlayerIds(db: Database, matchId: string): Promise<string[]> {
+  const rows = await db
+    .select({ playerId: matchPlayers.playerId })
+    .from(matchPlayers)
+    .where(eq(matchPlayers.matchId, matchId));
+  return rows.map((row) => row.playerId);
+}
+
+async function assertPlayersFree(db: Database, tournamentId: string, matchId: string): Promise<void> {
+  const mine = await matchPlayerIds(db, matchId);
+  const busy = await livePlayerIds(db, tournamentId, { exceptMatchId: matchId });
+  if (mine.some((playerId) => busy.has(playerId))) {
+    throw wrongStatus('Эти игроки ещё играют на другом корте');
+  }
 }
 
 /** Предыдущий раунд должен быть закрыт, иначе на площадке пересекаются игры. */

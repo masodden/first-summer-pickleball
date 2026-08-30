@@ -1,4 +1,5 @@
 export * from './domain.js';
+export * from './bracket.js';
 export * from './dto.js';
 export * from './realtime.js';
 export * from './errors.js';
@@ -17,5 +18,6 @@ export type {
   UpdateTrainingInput,
   SetTrainingAmountInput,
   MatchScoreInput,
+  LinkPartnerInput,
   ImportPlayersInput,
 } from './schemas.js';

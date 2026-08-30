@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { ServerEvent } from '@fsp/shared';
+import { isFixedPairsFormat, knownSlotHeading, type MatchDto, type ServerEvent } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { RealtimeService } from '../../core/realtime';
 import { patchMatchInRounds, upsertRound } from '../../core/round-sync';
@@ -19,6 +19,7 @@ import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { StatusBadge } from '../../ui/status-badge';
 import { FlipMove, ScoreTick } from '../../ui/motion';
+import { PairResults } from '../tournaments/pair-results';
 
 /**
  * Публичное табло по короткой ссылке.
@@ -30,7 +31,7 @@ import { FlipMove, ScoreTick } from '../../ui/motion';
 @Component({
   selector: 'app-public-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball, ScoreTick, FlipMove],
+  imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball, ScoreTick, FlipMove, PairResults],
   template: `
     @if (loading() && !board()) {
       <div class="stack stack--3">
@@ -63,7 +64,7 @@ import { FlipMove, ScoreTick } from '../../ui/motion';
               @for (match of round.matches; track match.id) {
                 <div class="glass card--tight stack stack--2">
                   <div class="row row--between">
-                    <span class="tiny faint">{{ i18n.court(match.courtName) }}</span>
+                    <span class="tiny faint">{{ courtLine(match) }}</span>
                     <span class="tiny faint">
                       {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
                     </span>
@@ -85,8 +86,20 @@ import { FlipMove, ScoreTick } from '../../ui/motion';
         }
 
         <section class="stack stack--2">
-          <h2>{{ t()('standings.title') }}</h2>
-          @if (data.standings.length === 0) {
+          <h2>{{ t()(isFixedPairs(data) ? 'standings.results' : 'standings.title') }}</h2>
+          @if (isFixedPairs(data)) {
+            @if (data.teamStandings.length === 0 && !hasKnockout(data)) {
+              <div class="glass glass--subtle card--tight center small muted">
+                {{ t()('standings.empty') }}
+              </div>
+            } @else {
+              <app-pair-results
+                [teamStandings]="data.teamStandings"
+                [rounds]="data.rounds"
+                [config]="data.bracketConfig"
+              />
+            }
+          } @else if (data.standings.length === 0) {
             <div class="glass glass--subtle card--tight center small muted">
               {{ t()('standings.empty') }}
             </div>
@@ -269,6 +282,24 @@ export class PublicBoardPage {
     return rounds.find((round) => !round.allScored) ?? rounds[rounds.length - 1] ?? null;
   });
 
+  protected isFixedPairs(data: PublicBoardDto): boolean {
+    return isFixedPairsFormat(data.tournament.format);
+  }
+
+  protected hasKnockout(data: PublicBoardDto): boolean {
+    return data.rounds.some((round) =>
+      round.matches.some((match) => match.stage === 'playoff' || match.stage === 'consolation'),
+    );
+  }
+
+  protected courtLine(match: MatchDto): string {
+    const court = this.i18n.court(match.courtName);
+    const config = this.board()?.bracketConfig;
+    const heading =
+      config && match.bracketSlot ? knownSlotHeading(config, match.bracketSlot) : null;
+    return heading ? `${court} · ${heading}` : court;
+  }
+
   private applyEvent(event: ServerEvent, tournamentId: string, slug: string): void {
     if (!('tournamentId' in event) || event.tournamentId !== tournamentId) return;
 
@@ -287,7 +318,15 @@ export class PublicBoardPage {
         this.board.update((data) => (data ? { ...data, rounds: event.rounds } : data));
         break;
       case 'standings.updated':
-        this.board.update((data) => (data ? { ...data, standings: event.standings } : data));
+        this.board.update((data) =>
+          data
+            ? {
+                ...data,
+                standings: event.standings,
+                teamStandings: event.teamStandings ?? data.teamStandings,
+              }
+            : data,
+        );
         break;
       case 'participants.updated':
         this.board.update((data) =>

@@ -12,7 +12,13 @@ import { Router } from '@angular/router';
 import {
   WINNER_RULE_IDS,
   WINNER_RULE_SORT,
+  classicTwelvePairBracket,
+  formatDescriptionKey,
+  formatNameKey,
+  isFixedPairsFormat,
   matchWinnerRule,
+  validateBracketConfig,
+  type BracketConfig,
   type CreateTournamentInput,
   type TieRule,
   type TournamentFormat,
@@ -22,8 +28,10 @@ import {
 import { I18nService } from '../../core/i18n';
 import { ToastService } from '../../core/toast';
 import { TournamentApi } from '../../core/tournament-api';
+import { BracketEditor } from './bracket-editor';
 
 const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
+const FIXED_PAIRS_PLAYER_PRESETS = [24, 16, 12, 8] as const;
 
 /**
  * Создание и редактирование турнира.
@@ -35,6 +43,7 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
 @Component({
   selector: 'app-tournament-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [BracketEditor],
   template: `
     <div class="stack stack--4">
       <h1>{{ isEdit() ? t()('tournament.edit') : t()('tournament.createTitle') }}</h1>
@@ -69,47 +78,41 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
 
         <div class="field">
           <span class="field__label">{{ t()('tournament.format') }}</span>
-          <div class="row">
+          <div class="row row--wrap">
             @for (option of formats; track option) {
               <button
                 type="button"
                 class="btn btn--sm grow"
                 [class.btn--primary]="format() === option"
                 [class.btn--glass]="format() !== option"
-                (click)="format.set(option)"
+                (click)="setFormat(option)"
               >
-                {{ t()(option === 'americano' ? 'format.americano' : 'format.mexicano') }}
+                {{ t()(formatNameKey(option)) }}
               </button>
             }
           </div>
-          <span class="field__hint">
-            {{
-              t()(
-                format() === 'americano'
-                  ? 'format.americano.description'
-                  : 'format.mexicano.description'
-              )
-            }}
-          </span>
+          <span class="field__hint">{{ t()(formatDescriptionKey(format())) }}</span>
         </div>
 
-        <label class="field">
-          <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
-          <select
-            class="select"
-            [value]="winnerRule()"
-            (change)="winnerRule.set(winnerRuleFrom($event))"
-          >
-            @for (rule of winnerRules; track rule) {
-              <option [value]="rule">{{ winnerRuleLabel(rule) }}</option>
-            }
-          </select>
-        </label>
+        @if (!isFixedPairs()) {
+          <label class="field">
+            <span class="field__label">{{ t()('tournament.standingsSort') }}</span>
+            <select
+              class="select"
+              [value]="winnerRule()"
+              (change)="winnerRule.set(winnerRuleFrom($event))"
+            >
+              @for (rule of winnerRules; track rule) {
+                <option [value]="rule">{{ winnerRuleLabel(rule) }}</option>
+              }
+            </select>
+          </label>
+        }
 
         <div class="field">
           <span class="field__label">{{ t()('tournament.maxPlayers') }}</span>
-          <div class="row row--wrap">
-            @for (preset of presets; track preset) {
+          <div class="player-count" [class.player-count--tight]="isFixedPairs()">
+            @for (preset of playerPresets(); track preset) {
               <button
                 type="button"
                 class="chip"
@@ -144,17 +147,19 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
             <span class="field__hint">{{ courtsHint() }}</span>
           </label>
 
-          <label class="field grow">
-            <span class="field__label">{{ t()('tournament.pointsToWin') }}</span>
-            <input
-              class="input numeric"
-              type="number"
-              min="1"
-              max="99"
-              [value]="pointsToWinText()"
-              (input)="pointsToWinText.set(text($event))"
-            />
-          </label>
+          @if (!isFixedPairs()) {
+            <label class="field grow">
+              <span class="field__label">{{ t()('tournament.pointsToWin') }}</span>
+              <input
+                class="input numeric"
+                type="number"
+                min="1"
+                max="99"
+                [value]="pointsToWinText()"
+                (input)="pointsToWinText.set(text($event))"
+              />
+            </label>
+          }
         </div>
 
         @if (courtSlots().length > 0) {
@@ -178,60 +183,62 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
           </div>
         }
 
-        <div class="row row--wrap row--fields">
-          <label class="field grow">
-            <span class="field__label">{{ t()('tournament.matchDuration') }}</span>
-            <input
-              class="input numeric"
-              type="number"
-              min="1"
-              max="180"
-              [value]="matchDuration()"
-              (input)="matchDuration.set(text($event))"
-            />
-            <span class="field__hint">{{ t()('tournament.matchDurationHint') }}</span>
-          </label>
+        @if (!isFixedPairs()) {
+          <div class="row row--wrap row--fields">
+            <label class="field grow">
+              <span class="field__label">{{ t()('tournament.matchDuration') }}</span>
+              <input
+                class="input numeric"
+                type="number"
+                min="1"
+                max="180"
+                [value]="matchDuration()"
+                (input)="matchDuration.set(text($event))"
+              />
+              <span class="field__hint">{{ t()('tournament.matchDurationHint') }}</span>
+            </label>
 
-          <label class="field grow">
-            <span class="field__label">{{ t()('tournament.rounds') }}</span>
-            <input
-              class="input numeric"
-              type="number"
-              min="1"
-              max="60"
-              [value]="rounds()"
-              [placeholder]="t()('tournament.roundsInfinite')"
-              (input)="rounds.set(text($event))"
-            />
-            <span class="field__hint">
-              {{ suggestedRounds() ? roundsSuggestion() : t()('tournament.roundsHint') }}
-            </span>
-          </label>
-        </div>
-
-        <label class="field">
-          <span class="field__label">{{ t()('tournament.tieRule') }}</span>
-          <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">
-            <option value="draw">{{ t()('tie.draw') }}</option>
-            <option value="golden_point">{{ t()('tie.golden_point') }}</option>
-          </select>
-        </label>
-
-        <div class="row row--between">
-          <div class="stack stack--1 grow">
-            <span class="field__label">{{ t()('tournament.ratingBalance') }}</span>
-            <span class="field__hint">{{ t()('tournament.ratingBalanceHint') }}</span>
+            <label class="field grow">
+              <span class="field__label">{{ t()('tournament.rounds') }}</span>
+              <input
+                class="input numeric"
+                type="number"
+                min="1"
+                max="60"
+                [value]="rounds()"
+                [placeholder]="t()('tournament.roundsInfinite')"
+                (input)="rounds.set(text($event))"
+              />
+              <span class="field__hint">
+                {{ suggestedRounds() ? roundsSuggestion() : t()('tournament.roundsHint') }}
+              </span>
+            </label>
           </div>
-          <label class="switch">
-            <input
-              type="checkbox"
-              [checked]="ratingBalance()"
-              (change)="ratingBalance.set(checked($event))"
-            />
-            <span class="switch__track"></span>
-            <span class="switch__thumb"></span>
+
+          <label class="field">
+            <span class="field__label">{{ t()('tournament.tieRule') }}</span>
+            <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">
+              <option value="draw">{{ t()('tie.draw') }}</option>
+              <option value="golden_point">{{ t()('tie.golden_point') }}</option>
+            </select>
           </label>
-        </div>
+
+          <div class="row row--between">
+            <div class="stack stack--1 grow">
+              <span class="field__label">{{ t()('tournament.ratingBalance') }}</span>
+              <span class="field__hint">{{ t()('tournament.ratingBalanceHint') }}</span>
+            </div>
+            <label class="switch">
+              <input
+                type="checkbox"
+                [checked]="ratingBalance()"
+                (change)="ratingBalance.set(checked($event))"
+              />
+              <span class="switch__track"></span>
+              <span class="switch__thumb"></span>
+            </label>
+          </div>
+        }
 
         <label class="field">
           <span class="field__label">{{ t()('tournament.entryFee') }}</span>
@@ -243,6 +250,15 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
             (input)="entryFee.set(text($event))"
           />
         </label>
+
+        @if (isFixedPairs()) {
+          <app-bracket-editor
+            [config]="bracketConfig()"
+            [maxPlayers]="maxPlayers()"
+            (changed)="bracketConfig.set($event)"
+            (presetApplied)="applyBracketPreset($event)"
+          />
+        }
       </section>
 
       <section class="glass card--tight stack stack--4">
@@ -322,6 +338,29 @@ const PLAYER_PRESETS = [4, 8, 12, 16, 20, 24] as const;
     </div>
   `,
   styles: `
+    .player-count {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .player-count--tight {
+      flex-wrap: nowrap;
+    }
+
+    .player-count--tight .chip {
+      flex: 1 1 0;
+      justify-content: center;
+      min-width: 0;
+      padding-inline: 8px;
+    }
+
+    .player-count--tight .compact {
+      width: 72px;
+      flex: 0 0 72px;
+    }
+
     .compact {
       width: 88px;
       min-height: 34px;
@@ -354,9 +393,14 @@ export class TournamentFormPage {
 
   readonly id = input<string>();
 
-  protected readonly formats: TournamentFormat[] = ['americano', 'mexicano'];
-  protected readonly presets = PLAYER_PRESETS;
+  protected readonly formats: TournamentFormat[] = ['americano', 'mexicano', 'fixed_pairs'];
+  protected readonly formatNameKey = formatNameKey;
+  protected readonly formatDescriptionKey = formatDescriptionKey;
   protected readonly winnerRules = WINNER_RULE_IDS;
+
+  protected readonly playerPresets = computed(() =>
+    this.isFixedPairs() ? FIXED_PAIRS_PLAYER_PRESETS : PLAYER_PRESETS,
+  );
 
   protected readonly title = signal('');
   protected readonly category = signal('');
@@ -372,6 +416,7 @@ export class TournamentFormPage {
   protected readonly tieRule = signal<TieRule>('draw');
   protected readonly winnerRule = signal<WinnerRuleId>('points_diff');
   protected readonly ratingBalance = signal(true);
+  protected readonly bracketConfig = signal<BracketConfig>(classicTwelvePairBracket());
   protected readonly entryFee = signal('');
   protected readonly venueName = signal('');
   protected readonly venueAddress = signal('');
@@ -383,6 +428,7 @@ export class TournamentFormPage {
   protected readonly courtNames = signal<string[]>([]);
 
   protected readonly isEdit = computed(() => Boolean(this.id()));
+  protected readonly isFixedPairs = computed(() => isFixedPairsFormat(this.format()));
 
   protected readonly courts = computed(() => toNumberOrNull(this.courtsText()) ?? 0);
   protected readonly maxPlayers = computed(() => toNumberOrNull(this.maxPlayersText()) ?? 0);
@@ -412,14 +458,19 @@ export class TournamentFormPage {
     return players - 1;
   });
 
-  protected readonly valid = computed(
-    () =>
+  protected readonly valid = computed(() => {
+    const base =
       this.title().trim().length >= 2 &&
       this.startsAt().length > 0 &&
       this.courts() >= 1 &&
-      this.maxPlayers() >= 4 &&
-      this.pointsToWin() >= 1,
-  );
+      this.maxPlayers() >= 4;
+    if (!this.isFixedPairs()) return base && this.pointsToWin() >= 1;
+    return (
+      base &&
+      this.bracketConfig().groupGames.pointsToWin >= 1 &&
+      validateBracketConfig(this.bracketConfig()).length === 0
+    );
+  });
 
   constructor() {
     effect(() => {
@@ -444,6 +495,7 @@ export class TournamentFormPage {
       this.description.set(tournament.description ?? '');
       this.formatDescription.set(tournament.formatDescription ?? '');
       this.courtNames.set([...(tournament.courtNames ?? [])]);
+      if (tournament.bracketConfig) this.bracketConfig.set(tournament.bracketConfig);
     });
   }
 
@@ -513,6 +565,19 @@ export class TournamentFormPage {
     }
   }
 
+  protected setFormat(option: TournamentFormat): void {
+    this.format.set(option);
+    if (this.isEdit() || !isFixedPairsFormat(option)) return;
+    this.maxPlayersText.set('24');
+    this.courtsText.set('6');
+    this.bracketConfig.set(classicTwelvePairBracket());
+  }
+
+  protected applyBracketPreset(preset: { players: number; courts: number }): void {
+    this.maxPlayersText.set(preset.players.toString());
+    this.courtsText.set(preset.courts.toString());
+  }
+
   protected applyVenue(venue: VenueDto): void {
     this.venueName.set(venue.name);
     this.venueAddress.set(venue.address ?? '');
@@ -536,18 +601,21 @@ export class TournamentFormPage {
       courts: this.courts(),
       courtNames: this.courtSlots().map((slot) => this.courtName(slot).trim()),
       maxPlayers: this.maxPlayers(),
-      pointsToWin: this.pointsToWin(),
-      matchDurationMin: toNumberOrNull(this.matchDuration()),
-      roundsPlanned: toNumberOrNull(this.rounds()) ?? this.suggestedRounds(),
-      tieRule: this.tieRule(),
+      pointsToWin: this.isFixedPairs()
+        ? this.bracketConfig().groupGames.pointsToWin
+        : this.pointsToWin(),
+      matchDurationMin: this.isFixedPairs() ? null : toNumberOrNull(this.matchDuration()),
+      roundsPlanned: this.isFixedPairs() ? null : (toNumberOrNull(this.rounds()) ?? this.suggestedRounds()),
+      tieRule: this.isFixedPairs() ? 'golden_point' : this.tieRule(),
       standingsSort: [...WINNER_RULE_SORT[this.winnerRule()]],
-      ratingBalance: this.ratingBalance(),
+      ratingBalance: this.isFixedPairs() ? false : this.ratingBalance(),
       entryFee: toNumberOrNull(this.entryFee()),
       description: this.description().replace(/\r\n?/g, '\n').trim() || null,
       formatDescription: this.formatDescription().replace(/\r\n?/g, '\n').trim() || null,
       venueName: this.venueName().trim() || null,
       venueAddress: this.venueAddress().trim() || null,
       venueMapUrl: this.venueMapUrl().trim() || null,
+      bracketConfig: this.isFixedPairs() ? this.bracketConfig() : null,
     };
 
     try {

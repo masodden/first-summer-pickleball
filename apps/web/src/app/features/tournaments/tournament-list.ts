@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { TournamentSummaryDto } from '@fsp/shared';
-import { isTournamentActive } from '@fsp/shared';
+import { formatNameKey, isFixedPairsFormat, isTournamentActive } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { SessionStore } from '../../core/session';
 import { TournamentApi } from '../../core/tournament-api';
@@ -166,12 +166,7 @@ function compareTournaments(
                         {{ item.venueName ?? t()('common.notSet') }}
                       </span>
                       <span class="numeric">
-                        {{
-                          t()('tournament.participantsCount', {
-                            count: item.participantCount,
-                            max: item.maxPlayers,
-                          })
-                        }}
+                        {{ occupancy(item) }}
                       </span>
                     </div>
                     <div
@@ -179,12 +174,7 @@ function compareTournaments(
                       role="progressbar"
                       [attr.aria-valuenow]="item.participantCount"
                       [attr.aria-valuemax]="item.maxPlayers"
-                      [attr.aria-label]="
-                        t()('tournament.participantsCount', {
-                          count: item.participantCount,
-                          max: item.maxPlayers,
-                        })
-                      "
+                      [attr.aria-label]="occupancy(item)"
                     >
                       <span class="progress__fill" [style.width]="fill(item) + '%'"></span>
                     </div>
@@ -336,7 +326,22 @@ export class TournamentListPage {
   }
 
   protected format(value: TournamentSummaryDto['format']): string {
-    return this.i18n.translate(value === 'americano' ? 'format.americano' : 'format.mexicano');
+    return this.i18n.translate(formatNameKey(value));
+  }
+
+  protected occupancy(item: TournamentSummaryDto): string {
+    if (isFixedPairsFormat(item.format)) {
+      const count = Math.floor(item.participantCount / 2);
+      const max = Math.floor(item.maxPlayers / 2);
+      if (count > 0 && count === max) {
+        return this.i18n.translate('tournament.pairsCount', { count });
+      }
+      return this.i18n.translate('tournament.pairsCountOf', { count, max });
+    }
+    return this.i18n.translate('tournament.participantsCount', {
+      count: item.participantCount,
+      max: item.maxPlayers,
+    });
   }
 
   protected fill(item: TournamentSummaryDto): number {

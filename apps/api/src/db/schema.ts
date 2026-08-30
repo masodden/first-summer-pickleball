@@ -12,12 +12,17 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { BracketConfig } from '@fsp/shared';
 
 export const roleEnum = pgEnum('role', ['admin', 'moderator', 'organizer', 'user']);
 export const localeEnum = pgEnum('locale', ['ru', 'en']);
 export const ratingSourceEnum = pgEnum('rating_source', ['import', 'moderator', 'self']);
 export const claimStatusEnum = pgEnum('claim_status', ['pending', 'approved', 'rejected']);
-export const tournamentFormatEnum = pgEnum('tournament_format', ['americano', 'mexicano']);
+export const tournamentFormatEnum = pgEnum('tournament_format', [
+  'americano',
+  'mexicano',
+  'fixed_pairs',
+]);
 export const tournamentStatusEnum = pgEnum('tournament_status', [
   'registration',
   'registration_closed',
@@ -216,6 +221,8 @@ export const tournaments = pgTable(
     finishedAt: timestamp({ withTimezone: true }),
     /** Мягкое удаление: история турниров не теряется. */
     deletedAt: timestamp({ withTimezone: true }),
+    /** Сетка фиксированных пар; null у americano/mexicano. */
+    bracketConfig: jsonb().$type<BracketConfig>(),
   },
   (table) => [
     uniqueIndex('tournaments_public_slug_key').on(table.publicSlug),
@@ -238,6 +245,8 @@ export const tournamentPlayers = pgTable(
     confirmedAndPaid: boolean().notNull().default(false),
     waitlistPosition: integer(),
     addedBySelf: boolean().notNull().default(false),
+    /** Партнёр в том же турнире; связь двусторонняя. */
+    partnerPlayerId: text().references(() => players.id, { onDelete: 'set null' }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -284,6 +293,11 @@ export const matches = pgTable(
     version: integer().notNull().default(0),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Геймы серии для плей-офф; null у americano/mexicano. */
+    games: jsonb().$type<{ scoreA: number; scoreB: number }[]>(),
+    stage: text(),
+    groupIndex: integer(),
+    bracketSlot: text(),
   },
   (table) => [
     unique('matches_court_unique').on(table.roundId, table.court),

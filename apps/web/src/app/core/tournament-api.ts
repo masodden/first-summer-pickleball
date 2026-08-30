@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import type {
   AdminStatsDto,
+  BracketConfig,
   ClaimRequestDto,
   CreatePlayerInput,
   CreateTournamentInput,
@@ -14,6 +15,7 @@ import type {
   RoundDto,
   StandingRowDto,
   StandingsSortKey,
+  TeamStandingRowDto,
   TournamentDto,
   TournamentStateDto,
   TournamentSummaryDto,
@@ -56,7 +58,7 @@ export class TournamentApi {
   getStandings(
     id: string,
     sort?: readonly StandingsSortKey[],
-  ): Promise<{ standings: StandingRowDto[] }> {
+  ): Promise<{ standings: StandingRowDto[]; teamStandings: TeamStandingRowDto[] }> {
     return this.api.get(`/api/tournaments/${id}/standings`, {
       ...(sort?.length ? { query: { sort: sort.join(',') } } : {}),
     });
@@ -111,6 +113,24 @@ export class TournamentApi {
       { confirmedAndPaid },
       { queueLabel: 'Отметка об оплате' },
     );
+  }
+
+  linkPartner(
+    id: string,
+    playerId: string,
+    partnerPlayerId: string,
+  ): Promise<{ participant: ParticipantDto }> {
+    return this.api.post(
+      `/api/tournaments/${id}/participants/${playerId}/partner`,
+      { partnerPlayerId },
+      { queueLabel: 'Связка пары' },
+    );
+  }
+
+  unlinkPartner(id: string, playerId: string): Promise<{ participant: ParticipantDto }> {
+    return this.api.delete(`/api/tournaments/${id}/participants/${playerId}/partner`, {
+      queueLabel: 'Отвязка пары',
+    });
   }
 
   promote(
@@ -196,11 +216,28 @@ export class TournamentApi {
     scoreA: number,
     scoreB: number,
     version: number,
+    games?: { scoreA: number; scoreB: number }[],
   ): Promise<{ match: MatchDto }> {
     return this.api.put(
       `/api/matches/${matchId}/score`,
-      { scoreA, scoreB, version },
+      { scoreA, scoreB, version, ...(games ? { games } : {}) },
       { queueLabel: 'Счёт матча' },
+    );
+  }
+
+  startMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
+    return this.api.post(
+      `/api/matches/${matchId}/start`,
+      { version },
+      { queueLabel: 'Старт матча' },
+    );
+  }
+
+  pauseMatch(matchId: string, version: number): Promise<{ match: MatchDto }> {
+    return this.api.post(
+      `/api/matches/${matchId}/pause`,
+      { version },
+      { queueLabel: 'Пауза матча' },
     );
   }
 
@@ -310,5 +347,7 @@ export interface PublicBoardDto {
   description: string | null;
   rounds: RoundDto[];
   standings: StandingRowDto[];
+  teamStandings: TeamStandingRowDto[];
   participants: ParticipantDto[];
+  bracketConfig: BracketConfig | null;
 }

@@ -80,6 +80,34 @@ export const standingsSortSchema = z.array(z.enum(STANDINGS_SORT_KEYS)).min(1).m
  */
 export const courtNamesSchema = z.array(z.string().trim().max(24)).max(20).nullable().optional();
 
+const bracketGameSchema = z.object({
+  winsToTake: z.number().int().min(1).max(3),
+  pointsToWin: z.number().int().min(1).max(99),
+  winByTwo: z.boolean(),
+});
+
+const bracketSlotSchema = z.object({
+  id: z.string().trim().min(1).max(40),
+  sourceA: z.string().trim().min(1).max(40),
+  sourceB: z.string().trim().min(1).max(40),
+});
+
+const bracketStageSchema = z.object({
+  id: z.string().trim().min(1).max(40),
+  kind: z.enum(['playoff', 'consolation']),
+  name: z.string().trim().min(1).max(80),
+  games: bracketGameSchema,
+  slots: z.array(bracketSlotSchema).min(1).max(32),
+});
+
+export const bracketConfigSchema = z.object({
+  groupCount: z.number().int().min(1).max(8),
+  groupMatchesPerPairing: z.number().int().min(1).max(3),
+  groupGames: bracketGameSchema,
+  stages: z.array(bracketStageSchema).max(24),
+  pairGroups: z.record(z.string(), z.number().int().min(0).max(7)).optional(),
+});
+
 export const trainingCourtBlockSchema = z.object({
   courts: z.number().int().min(1).max(20),
   hours: z.number().min(0.5).max(24).multipleOf(0.5),
@@ -125,6 +153,7 @@ export const createTournamentSchema = z.object({
   venueName: z.string().trim().max(160).nullable().optional(),
   venueAddress: z.string().trim().max(400).nullable().optional(),
   venueMapUrl: z.string().url().max(500).nullable().optional(),
+  bracketConfig: bracketConfigSchema.nullable().optional(),
 });
 
 export const updateTournamentSchema = createTournamentSchema.partial();
@@ -147,15 +176,25 @@ export const reshuffleSchema = z.object({
   seed: z.number().int().optional(),
 });
 
+export const matchGameSchema = z.object({
+  scoreA: z.number().int().min(0).max(200),
+  scoreB: z.number().int().min(0).max(200),
+});
+
 export const matchScoreSchema = z.object({
   scoreA: z.number().int().min(0).max(200),
   scoreB: z.number().int().min(0).max(200),
+  games: z.array(matchGameSchema).max(5).optional(),
   /** Оптимистичная блокировка: сервер отклонит устаревшую версию. */
   version: z.number().int().min(0),
 });
 
 export const matchActionSchema = z.object({
   version: z.number().int().min(0),
+});
+
+export const linkPartnerSchema = z.object({
+  partnerPlayerId: z.string().trim().min(1).max(64),
 });
 
 /** Роль клуба на карточке игрока (DUPR). Зашитых админов понизить нельзя. */
@@ -179,4 +218,5 @@ export type CreateTrainingInput = z.infer<typeof createTrainingSchema>;
 export type UpdateTrainingInput = z.infer<typeof updateTrainingSchema>;
 export type SetTrainingAmountInput = z.infer<typeof setTrainingAmountSchema>;
 export type MatchScoreInput = z.infer<typeof matchScoreSchema>;
+export type LinkPartnerInput = z.infer<typeof linkPartnerSchema>;
 export type ImportPlayersInput = z.infer<typeof importPlayersSchema>;

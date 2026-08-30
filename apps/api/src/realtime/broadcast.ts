@@ -1,22 +1,39 @@
 import type { MatchDto } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import { getTournamentRow, listParticipants } from '../services/tournaments.js';
-import { computeTournamentStandings, loadRound, loadRounds } from '../services/state.js';
+import { computeTournamentStandings, computeTournamentTeamStandings, loadRound, loadRounds } from '../services/state.js';
 import type { RealtimeHub, RealtimeSocket } from './hub.js';
 
 /**
  * Рассылка изменений. Таблица пересчитывается почти при любом действии, поэтому
  * она уезжает вместе с большинством событий — зрители видят живой счёт.
  */
+async function emitStandings(
+  db: Database,
+  hub: RealtimeHub,
+  tournamentId: string,
+  send: (payload: {
+    type: 'standings.updated';
+    tournamentId: string;
+    standings: Awaited<ReturnType<typeof computeTournamentStandings>>;
+    teamStandings: Awaited<ReturnType<typeof computeTournamentTeamStandings>>;
+  }) => void,
+): Promise<void> {
+  const row = await getTournamentRow(db, tournamentId);
+  const [standings, teamStandings] = await Promise.all([
+    computeTournamentStandings(db, row),
+    computeTournamentTeamStandings(db, row),
+  ]);
+  send({ type: 'standings.updated', tournamentId, standings, teamStandings });
+}
+
 export async function broadcastStandings(
   db: Database,
   hub: RealtimeHub,
   tournamentId: string,
 ): Promise<void> {
   if (hub.roomSize(tournamentId) === 0) return;
-  const row = await getTournamentRow(db, tournamentId);
-  const standings = await computeTournamentStandings(db, row);
-  hub.broadcast(tournamentId, { type: 'standings.updated', tournamentId, standings });
+  await emitStandings(db, hub, tournamentId, (payload) => hub.broadcast(tournamentId, payload));
 }
 
 export async function broadcastParticipants(
@@ -67,8 +84,7 @@ export async function pushTournamentSnapshot(
     hub.send(socket, { type: 'schedule.rebuilt', tournamentId, rounds });
     const { participants } = await listParticipants(db, tournamentId);
     hub.send(socket, { type: 'participants.updated', tournamentId, participants });
-    const standings = await computeTournamentStandings(db, row);
-    hub.send(socket, { type: 'standings.updated', tournamentId, standings });
+    await emitStandings(db, hub, tournamentId, (payload) => hub.send(socket, payload));
     hub.send(socket, { type: 'tournament.changed', tournamentId });
   } catch {
     // Турнир уже удалили — клиент узнает с HTTP.
@@ -85,8 +101,7 @@ export async function broadcastSchedule(
   const rounds = await loadRounds(db, row);
   hub.broadcast(tournamentId, { type: 'schedule.rebuilt', tournamentId, rounds });
   hub.broadcast(tournamentId, { type: 'tournament.changed', tournamentId });
-  const standings = await computeTournamentStandings(db, row);
-  hub.broadcast(tournamentId, { type: 'standings.updated', tournamentId, standings });
+  await emitStandings(db, hub, tournamentId, (payload) => hub.broadcast(tournamentId, payload));
 }
 
 /**

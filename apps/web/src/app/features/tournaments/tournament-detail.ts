@@ -17,7 +17,7 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import type { TournamentFormat, TournamentSummaryDto } from '@fsp/shared';
+import { formatNameKey, type TournamentFormat, type TournamentSummaryDto, type TranslationKey } from '@fsp/shared';
 import { ConfirmService } from '../../core/confirm';
 import { tournamentMiniAppLink } from '../../core/deep-link';
 import { I18nService } from '../../core/i18n';
@@ -153,9 +153,7 @@ import { StatusBadge } from '../../ui/status-badge';
                   type="button"
                   class="btn btn--sm btn--go"
                   [disabled]="!store.canStart() || store.isBusy('start')"
-                  [title]="
-                    store.canStart() ? t()('tournament.startHint') : t()('checkin.notAllConfirmed')
-                  "
+                  [title]="t()(store.startBlockedReason())"
                   (click)="start()"
                 >
                   {{ t()('tournament.startShort') }}
@@ -217,12 +215,7 @@ import { StatusBadge } from '../../ui/status-badge';
                   {{ t()('tournament.unarchive') }}
                 </button>
               }
-              @if (
-                moreOpen() ||
-                (item.status !== 'running' &&
-                  item.status !== 'finished' &&
-                  item.status !== 'archived')
-              ) {
+              @if (moreOpen() || overflowActionCount() < 2) {
                 @if (store.canUnstart()) {
                   <button
                     type="button"
@@ -246,11 +239,7 @@ import { StatusBadge } from '../../ui/status-badge';
               }
             }
           </div>
-          @if (
-            store.canManage() &&
-            (item.status === 'running' ||
-              (item.canDelete && (item.status === 'finished' || item.status === 'archived')))
-          ) {
+          @if (showMoreToggle()) {
             <button type="button" class="more" (click)="moreOpen.set(!moreOpen())">
               {{ moreOpen() ? t()('common.close') : t()('common.more') }}
             </button>
@@ -263,8 +252,8 @@ import { StatusBadge } from '../../ui/status-badge';
               {{ t()('tournament.info') }}
             </a>
             <a class="tab" routerLinkActive="is-active" [routerLink]="['./players']">
-              {{ t()('participant.list') }}
-              <span class="tab__count numeric">{{ store.registered().length }}</span>
+              {{ t()(rosterTabKey()) }}
+              <span class="tab__count numeric">{{ store.rosterTabCount() }}</span>
             </a>
             <a class="tab" routerLinkActive="is-active" [routerLink]="['./rounds']">
               {{ t()('match.courtsTab') }}
@@ -273,7 +262,7 @@ import { StatusBadge } from '../../ui/status-badge';
               }
             </a>
             <a class="tab" routerLinkActive="is-active" [routerLink]="['./standings']">
-              {{ t()('standings.title') }}
+              {{ t()(store.isFixedPairs() ? 'standings.results' : 'standings.title') }}
             </a>
           </div>
         </nav>
@@ -411,10 +400,35 @@ export class TournamentDetailPage {
   protected readonly t = this.i18n.t;
   protected readonly moreOpen = signal(false);
 
+  /**
+   * Сколько действий прячем за «Ещё»: только на идущем / завершённом / в архиве.
+   * На регистрации они все на виду.
+   */
+  protected readonly overflowActionCount = computed(() => {
+    const item = this.tournament();
+    if (!item?.canManage) return 0;
+    if (item.status !== 'running' && item.status !== 'finished' && item.status !== 'archived') {
+      return 0;
+    }
+    let count = 0;
+    if (this.store.canUnstart()) count += 1;
+    if (item.status !== 'finished' && item.status !== 'archived') count += 1;
+    if (item.canDelete) count += 1;
+    return count;
+  });
+
+  protected readonly showMoreToggle = computed(() => this.overflowActionCount() >= 2);
+
   /** Приходит из маршрута благодаря `withComponentInputBinding`. */
   readonly id = input.required<string>();
 
   protected readonly tournament = this.store.tournament;
+
+  protected readonly rosterTabKey = computed((): TranslationKey =>
+    this.store.isFixedPairs() && this.store.unpaired().length === 0
+      ? 'participant.pairs'
+      : 'participant.list',
+  );
 
   private readonly allTournaments = resource({
     loader: () => this.api.listTournaments().then((response) => response.items),
@@ -451,15 +465,20 @@ export class TournamentDetailPage {
   }
 
   protected formatLabel(format: TournamentFormat): string {
-    return this.i18n.translate(format === 'mexicano' ? 'format.mexicano' : 'format.americano');
+    return format ? this.i18n.translate(formatNameKey(format)) : '';
   }
 
   protected async start(): Promise<void> {
     const confirmed = await this.confirm.ask({
       title: this.i18n.translate('tournament.start'),
-      message: this.i18n.translate('tournament.startConfirm', {
-        count: this.store.registered().length,
-      }),
+      message: this.i18n.translate(
+        this.store.isFixedPairs() ? 'tournament.startConfirmPairs' : 'tournament.startConfirm',
+        {
+          count: this.store.isFixedPairs()
+            ? this.store.pairCount()
+            : this.store.registered().length,
+        },
+      ),
       confirmLabel: this.i18n.translate('tournament.start'),
     });
     if (!confirmed) return;

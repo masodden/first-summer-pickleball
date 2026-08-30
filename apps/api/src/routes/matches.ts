@@ -12,7 +12,7 @@ import {
   setMatchScore,
   startMatch,
 } from '../services/matches.js';
-import { broadcastMatch, broadcastRound, broadcastStandings } from '../realtime/broadcast.js';
+import { broadcastMatch, broadcastRound, broadcastSchedule, broadcastStandings } from '../realtime/broadcast.js';
 import type { AppContext } from './context.js';
 
 export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -55,7 +55,11 @@ export function registerMatchRoutes(app: FastifyInstance, ctx: AppContext): void
     const tournamentId = await getMatchTournamentId(db, request.params.id);
     broadcastMatch(hub, tournamentId, match);
     await broadcastRound(db, hub, tournamentId, match.roundIndex);
-    await broadcastStandings(db, hub, tournamentId);
+    if (match.stage) {
+      await broadcastSchedule(db, hub, tournamentId);
+    } else {
+      await broadcastStandings(db, hub, tournamentId);
+    }
     return { match };
   });
 

@@ -11,6 +11,7 @@ import type {
   TournamentStatus,
   TrainingStatus,
 } from './domain.js';
+import type { BracketConfig } from './bracket.js';
 
 /**
  * Игрок. Ключ — DUPR ID, поэтому у настоящих игроков `id === duprId`.
@@ -83,6 +84,11 @@ export interface ParticipantDto {
   confirmedAndPaid: boolean;
   waitlistPosition: number | null;
   addedBySelf: boolean;
+  /** Партнёр в формате фиксированных пар; иначе null. */
+  partnerPlayerId: string | null;
+  partner: PlayerDto | null;
+  /** Связка заперта: оба в паре отмечены оплатившими. */
+  partnerLocked: boolean;
   createdAt: string;
 }
 
@@ -124,11 +130,18 @@ export interface TournamentDto extends TournamentSummaryDto {
   canManage: boolean;
   canDelete: boolean;
   myParticipation: ParticipantDto | null;
+  /** Конфиг сетки; null у americano/mexicano. */
+  bracketConfig: BracketConfig | null;
 }
 
 export interface MatchTeamDto {
   players: PlayerDto[];
   score: number | null;
+}
+
+export interface MatchGameDto {
+  scoreA: number;
+  scoreB: number;
 }
 
 export interface MatchDto {
@@ -148,6 +161,12 @@ export interface MatchDto {
   /** Полная длительность матча в миллисекундах, если турнир играется по таймеру. */
   durationMs: number | null;
   version: number;
+  /** Геймы серии; null — обычный одиночный счёт americano/mexicano. */
+  games: MatchGameDto[] | null;
+  stage: 'group' | 'playoff' | 'consolation' | null;
+  groupIndex: number | null;
+  bracketSlot: string | null;
+  winsToTake: number;
 }
 
 export interface RoundDto {
@@ -175,11 +194,26 @@ export interface StandingRowDto {
   medal: 'gold' | 'silver' | 'bronze' | null;
 }
 
+export interface TeamStandingRowDto {
+  rank: number;
+  players: [PlayerDto, PlayerDto];
+  groupIndex: number;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  diff: number;
+  medal: 'gold' | 'silver' | 'bronze' | null;
+}
+
 export interface TournamentStateDto {
   tournament: TournamentDto;
   participants: ParticipantDto[];
   rounds: RoundDto[];
   standings: StandingRowDto[];
+  teamStandings: TeamStandingRowDto[];
 }
 
 export interface SessionDto {

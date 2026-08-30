@@ -5,6 +5,7 @@ import { I18nService } from '../../core/i18n';
 import { TournamentStore } from '../../core/tournament-store';
 import { Avatar } from '../../ui/player-line';
 import { FlipMove } from '../../ui/motion';
+import { PairResults } from './pair-results';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -24,17 +25,29 @@ interface Column {
 @Component({
   selector: 'app-tournament-standings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Avatar, FlipMove],
+  imports: [RouterLink, Avatar, FlipMove, PairResults],
   template: `
     <div class="stack stack--3">
       <div class="row row--between">
-        <h2>{{ t()('standings.title') }}</h2>
+        <h2>{{ t()(store.isFixedPairs() ? 'standings.results' : 'standings.title') }}</h2>
         @if (tournament()?.status === 'running') {
           <span class="chip chip--go chip--live">{{ t()('standings.live') }}</span>
         }
       </div>
 
-      @if (rows().length === 0) {
+        @if (store.isFixedPairs()) {
+          @if (store.teamStandings().length === 0 && !hasKnockout()) {
+            <div class="glass card empty-state">
+              <p>{{ t()('standings.empty') }}</p>
+            </div>
+          } @else {
+            <app-pair-results
+              [teamStandings]="store.teamStandings()"
+              [rounds]="store.rounds()"
+              [config]="tournament()?.bracketConfig ?? null"
+            />
+          }
+        } @else if (rows().length === 0) {
         <div class="glass card empty-state">
           <p>{{ t()('standings.empty') }}</p>
         </div>
@@ -182,6 +195,14 @@ export class TournamentStandingsTab {
   protected readonly store = inject(TournamentStore);
   protected readonly t = this.i18n.t;
   protected readonly tournament = this.store.tournament;
+
+  protected readonly hasKnockout = computed(() =>
+    this.store
+      .rounds()
+      .some((round) =>
+        round.matches.some((match) => match.stage === 'playoff' || match.stage === 'consolation'),
+      ),
+  );
 
   private readonly override = signal<StandingsSortKey | null>(null);
   private readonly directionSignal = signal<SortDirection>('desc');

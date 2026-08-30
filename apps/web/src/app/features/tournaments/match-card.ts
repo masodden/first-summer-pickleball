@@ -8,13 +8,33 @@ import {
   input,
   signal,
 } from '@angular/core';
-import type { MatchDto } from '@fsp/shared';
+import {
+  gameScoreIssue,
+  gameSettingsForMatch,
+  knownSlotHeading,
+  seriesScoreIssue,
+  type MatchDto,
+} from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
 import { TelegramService } from '../../core/telegram';
 import { TournamentStore } from '../../core/tournament-store';
 import { Avatar } from '../../ui/player-line';
 import { RatingChip } from '../../ui/rating-chip';
 import { ScoreTick } from '../../ui/motion';
+
+function seriesSlotCount(winsToTake: number): number {
+  return Math.max(1, winsToTake * 2 - 1);
+}
+
+function padSeriesGames(
+  games: readonly { scoreA: number; scoreB: number }[],
+  winsToTake: number,
+): { scoreA: number; scoreB: number }[] {
+  const max = seriesSlotCount(winsToTake);
+  const next = games.slice(0, max).map((game) => ({ ...game }));
+  while (next.length < max) next.push({ scoreA: 0, scoreB: 0 });
+  return next;
+}
 
 /**
  * Карточка корта.
@@ -72,7 +92,7 @@ import { ScoreTick } from '../../ui/motion';
               }
             </div>
 
-            @if (scoreEntry()) {
+            @if (scoreEntry() && !isSeries()) {
               <div class="score-editor">
                 <button
                   type="button"
@@ -103,7 +123,31 @@ import { ScoreTick } from '../../ui/motion';
         }
       </div>
 
-      @if (scoreEntry()) {
+      @if (isSeries() && (scoreEntry() || hasScore())) {
+        <p class="tiny center muted">
+          {{ t()('match.series', { a: seriesWins().a, b: seriesWins().b }) }}
+        </p>
+        @for (game of gameSlots(); track $index; let index = $index) {
+          <div class="row row--between game-row">
+            <span class="tiny faint">{{ t()('match.game', { number: index + 1 }) }}</span>
+            @if (scoreEntry()) {
+              <div class="score-editor">
+                <button type="button" class="step" (click)="bumpGame(index, 'a', -1)">−</button>
+                <app-score-tick class="score score--game" [value]="game.scoreA" />
+                <button type="button" class="step" (click)="bumpGame(index, 'a', 1)">+</button>
+                <span class="tiny faint">:</span>
+                <button type="button" class="step" (click)="bumpGame(index, 'b', -1)">−</button>
+                <app-score-tick class="score score--game" [value]="game.scoreB" />
+                <button type="button" class="step" (click)="bumpGame(index, 'b', 1)">+</button>
+              </div>
+            } @else {
+              <span class="numeric strong">{{ game.scoreA }}:{{ game.scoreB }}</span>
+            }
+          </div>
+        }
+      }
+
+      @if (scoreEntry() && !isSeries()) {
         <div class="presets">
           @for (preset of presets(); track preset[0] + ':' + preset[1]) {
             <button
@@ -131,11 +175,44 @@ import { ScoreTick } from '../../ui/motion';
             {{ t()('score.save') }}
           </button>
         </div>
-        @if (!scoreValid()) {
-          <p class="tiny center" style="color: var(--danger)">{{ t()('score.tieNotAllowed') }}</p>
+        @if (scoreHint(); as hint) {
+          <p class="tiny center" style="color: var(--danger)">{{ hint }}</p>
+        }
+      } @else if (scoreEntry() && isSeries()) {
+        <div class="row">
+          @if (hasScore() && editing()) {
+            <button type="button" class="btn btn--sm btn--glass grow" (click)="cancelEditing()">
+              {{ t()('common.cancel') }}
+            </button>
+          }
+          <button
+            type="button"
+            class="btn btn--sm btn--primary grow"
+            [disabled]="!scoreValid() || busy()"
+            (click)="save()"
+          >
+            {{ t()('score.save') }}
+          </button>
+        </div>
+        @if (scoreHint(); as hint) {
+          <p class="tiny center" style="color: var(--danger)">{{ hint }}</p>
         }
       } @else if (canManage() && match().status === 'scheduled') {
-        <p class="tiny center muted">{{ t()('match.roundNotStarted') }}</p>
+        @if (store.isFixedPairs()) {
+          <button
+            type="button"
+            class="btn btn--sm btn--go btn--block"
+            [disabled]="busy() || store.matchPlayersBusy(match())"
+            (click)="store.startMatch(match())"
+          >
+            {{ t()('match.startMatch') }}
+          </button>
+          @if (store.matchPlayersBusy(match())) {
+            <p class="tiny center muted">{{ t()('match.playersBusy') }}</p>
+          }
+        } @else {
+          <p class="tiny center muted">{{ t()('match.roundNotStarted') }}</p>
+        }
       } @else if (canManage() && match().status === 'finished' && hasScore()) {
         <button type="button" class="btn btn--sm btn--glass btn--block" (click)="startEditing()">
           {{ t()('score.edit') }}
@@ -235,9 +312,9 @@ import { ScoreTick } from '../../ui/motion';
       color: inherit;
     }
 
-    .score--empty {
-      color: var(--text-faint);
-      font-weight: 600;
+    .score--game {
+      font-size: 18px;
+      min-width: 28px;
     }
 
     .score-editor {
@@ -322,6 +399,16 @@ export class MatchCard {
     effect(() => {
       const match = this.match();
       if (this.editing()) return;
+      if (match.games?.length) {
+        this.draftGames.set(padSeriesGames(match.games, match.winsToTake));
+      } else {
+        this.draftGames.set(
+          padSeriesGames(
+            [{ scoreA: this.pointsToWin(), scoreB: 0 }],
+            match.winsToTake,
+          ),
+        );
+      }
       if (match.teamA.score === null && match.teamB.score === null) {
         this.draftA.set(this.pointsToWin());
         this.draftB.set(0);
@@ -333,7 +420,41 @@ export class MatchCard {
   }
 
   protected readonly canManage = this.store.canManage;
-  protected readonly courtLabel = computed(() => this.i18n.court(this.match().courtName));
+  protected readonly gameSettings = computed(() => {
+    const tournament = this.store.tournament();
+    const config = tournament?.bracketConfig ?? null;
+    if (config) return gameSettingsForMatch(config, this.match());
+    return {
+      winsToTake: 1,
+      pointsToWin: tournament?.pointsToWin ?? 11,
+      winByTwo: false,
+    };
+  });
+  protected readonly courtLabel = computed(() => {
+    const match = this.match();
+    const court = this.i18n.court(match.courtName);
+    const config = this.store.tournament()?.bracketConfig;
+    const heading =
+      config && match.bracketSlot ? knownSlotHeading(config, match.bracketSlot) : null;
+    return heading ? `${court} · ${heading}` : court;
+  });
+  protected readonly isSeries = computed(() => this.match().winsToTake > 1);
+  protected readonly draftGames = signal<{ scoreA: number; scoreB: number }[]>([]);
+  protected readonly gameSlots = computed(() => {
+    if (!this.isSeries()) return [];
+    if (this.scoreEntry()) return this.draftGames();
+    return this.match().games ?? [];
+  });
+  protected readonly seriesWins = computed(() => {
+    const games = this.scoreEntry() ? this.draftGames() : (this.match().games ?? []);
+    let a = 0;
+    let b = 0;
+    for (const game of games) {
+      if (game.scoreA > game.scoreB) a += 1;
+      else if (game.scoreB > game.scoreA) b += 1;
+    }
+    return { a, b };
+  });
   protected readonly busy = computed(() => this.store.isBusy(`match:${this.match().id}`));
   protected readonly hasScore = computed(
     () => this.match().teamA.score !== null && this.match().teamB.score !== null,
@@ -350,7 +471,7 @@ export class MatchCard {
     return this.editing() || !this.hasScore();
   });
 
-  protected readonly pointsToWin = computed(() => this.store.tournament()?.pointsToWin ?? 11);
+  protected readonly pointsToWin = computed(() => this.gameSettings().pointsToWin);
 
   /**
    * Четыре быстрых счёта: победа до лимита, близкий (минус 2) и более спокойный
@@ -376,10 +497,32 @@ export class MatchCard {
     });
   });
 
-  protected readonly scoreValid = computed(() => {
+  protected readonly scoreIssue = computed(() => {
+    const settings = this.gameSettings();
+    if (this.isSeries()) {
+      return seriesScoreIssue(this.draftGames(), {
+        ...settings,
+        winsToTake: this.match().winsToTake,
+      });
+    }
+    const timed = (this.store.tournament()?.matchDurationMin ?? 0) > 0;
+    if (this.store.isFixedPairs() || !timed) {
+      return gameScoreIssue(this.draftA(), this.draftB(), settings);
+    }
     const tieAllowed = this.store.tournament()?.tieRule === 'draw';
-    if (this.draftA() === this.draftB() && !tieAllowed) return false;
-    return this.draftA() >= 0 && this.draftB() >= 0;
+    if (this.draftA() === this.draftB() && !tieAllowed) return 'tie';
+    return null;
+  });
+
+  protected readonly scoreValid = computed(() => this.scoreIssue() === null);
+
+  protected readonly scoreHint = computed(() => {
+    const issue = this.scoreIssue();
+    if (!issue) return null;
+    if (issue === 'tie') return this.i18n.translate('score.tieNotAllowed');
+    if (issue === 'winByTwo') return this.i18n.translate('score.needWinByTwo');
+    if (issue === 'incomplete' || issue === 'extra') return null;
+    return this.i18n.translate('score.needPoints', { points: this.pointsToWin() });
   });
 
   protected isWinner(first: boolean): boolean {
@@ -392,6 +535,7 @@ export class MatchCard {
     const match = this.match();
     this.draftA.set(match.teamA.score ?? this.pointsToWin());
     this.draftB.set(match.teamB.score ?? 0);
+    this.draftGames.set(padSeriesGames(match.games ?? this.draftGames(), match.winsToTake));
     this.editing.set(true);
   }
 
@@ -416,9 +560,39 @@ export class MatchCard {
     this.editing.set(true);
   }
 
+  protected bumpGame(index: number, side: 'a' | 'b', delta: number): void {
+    this.telegram.tap();
+    const winsToTake = this.match().winsToTake;
+    this.draftGames.update((games) => {
+      const next = padSeriesGames(games, winsToTake);
+      const game = next[index] ?? { scoreA: 0, scoreB: 0 };
+      if (side === 'a') game.scoreA = Math.max(0, Math.min(200, game.scoreA + delta));
+      else game.scoreB = Math.max(0, Math.min(200, game.scoreB + delta));
+      next[index] = game;
+      return next;
+    });
+    this.editing.set(true);
+  }
+
   protected async save(): Promise<void> {
     if (!this.scoreValid()) return;
-    await this.store.setScore(this.match(), this.draftA(), this.draftB());
+    if (this.isSeries()) {
+      const settings = this.gameSettings();
+      const finished: { scoreA: number; scoreB: number }[] = [];
+      const need = this.match().winsToTake;
+      let winsA = 0;
+      let winsB = 0;
+      for (const game of this.draftGames()) {
+        if (winsA === need || winsB === need) break;
+        if (gameScoreIssue(game.scoreA, game.scoreB, settings)) continue;
+        finished.push(game);
+        if (game.scoreA > game.scoreB) winsA += 1;
+        else winsB += 1;
+      }
+      await this.store.setScore(this.match(), winsA, winsB, finished);
+    } else {
+      await this.store.setScore(this.match(), this.draftA(), this.draftB());
+    }
     this.editing.set(false);
   }
 

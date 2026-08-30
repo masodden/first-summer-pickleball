@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { and, eq, isNull } from 'drizzle-orm';
 import { tournaments } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
-import { computeTournamentStandings, loadRounds } from '../services/state.js';
+import { parseBracketConfig } from '@fsp/shared';
+import { computeTournamentStandings, computeTournamentTeamStandings, loadRounds } from '../services/state.js';
 import { listParticipants, loadCounts, toSummaryDto } from '../services/tournaments.js';
 import type { AppContext } from './context.js';
 
@@ -21,10 +22,11 @@ export function registerPublicRoutes(app: FastifyInstance, ctx: AppContext): voi
       .limit(1);
     if (!row) throw notFound('Турнир не найден');
 
-    const [counts, rounds, standings, participants] = await Promise.all([
+    const [counts, rounds, standings, teamStandings, participants] = await Promise.all([
       loadCounts(db, row.id),
       loadRounds(db, row),
       computeTournamentStandings(db, row),
+      computeTournamentTeamStandings(db, row),
       listParticipants(db, row.id),
     ]);
 
@@ -38,7 +40,9 @@ export function registerPublicRoutes(app: FastifyInstance, ctx: AppContext): voi
       description: row.description,
       rounds,
       standings,
+      teamStandings,
       participants: participants.participants,
+      bracketConfig: parseBracketConfig(row.format, row.bracketConfig, row.pointsToWin),
     };
   });
 }

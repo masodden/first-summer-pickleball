@@ -1,12 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import { and, asc, count, desc, eq, inArray, isNull, max, ne, notInArray, sql } from 'drizzle-orm';
 import {
+  classicTwelvePairBracket,
   isTournamentClosed,
   normalizeCourtNames,
+  parseBracketConfig,
+  type BracketConfig,
   type CreateTournamentInput,
   type ParticipantDto,
   type StandingsSortKey,
   type TournamentDto,
+  type TournamentFormat,
   type TournamentSummaryDto,
   type UpdateTournamentInput,
 } from '@fsp/shared';
@@ -22,7 +26,7 @@ import {
   type TournamentRow,
 } from '../db/schema.js';
 import { ApiError, forbidden, notFound, wrongStatus } from '../lib/errors.js';
-import { toParticipantDto, toPlayerDto } from './mappers.js';
+import { toParticipantDto, toPlayerDto, attachPartners } from './mappers.js';
 import { canManageTournaments, isAdmin, type Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
 
@@ -74,6 +78,22 @@ async function loadCounts(db: Database, tournamentId: string): Promise<Tournamen
   };
 }
 
+function bracketConfigForRow(row: TournamentRow): BracketConfig | null {
+  return parseBracketConfig(row.format, row.bracketConfig, row.pointsToWin);
+}
+
+function bracketConfigToStore(
+  format: TournamentFormat,
+  input: BracketConfig | null | undefined,
+  pointsToWin: number,
+  current: unknown = null,
+): BracketConfig | null {
+  if (format !== 'fixed_pairs') return null;
+  if (input) return input;
+  const parsed = parseBracketConfig(format, current, pointsToWin);
+  return parsed ?? classicTwelvePairBracket();
+}
+
 export function toSummaryDto(row: TournamentRow, counts: TournamentCounts): TournamentSummaryDto {
   return {
     id: row.id,
@@ -117,6 +137,7 @@ export function toTournamentDto(
     canManage: canManageTournaments(viewer),
     canDelete: isAdmin(viewer),
     myParticipation,
+    bracketConfig: bracketConfigForRow(row),
   };
 }
 
@@ -211,7 +232,28 @@ async function findParticipation(
     )
     .limit(1);
   if (!row) return null;
-  return toParticipantDto(row.participant, toPlayerDto(row.player));
+  const [dto] = attachPartners([
+    { participant: row.participant, player: toPlayerDto(row.player) },
+  ]);
+  if (!dto) return null;
+  if (!row.participant.partnerPlayerId) return dto;
+
+  const [partnerJoin] = await db
+    .select({ participant: tournamentPlayers, player: players })
+    .from(tournamentPlayers)
+    .innerJoin(players, eq(players.id, tournamentPlayers.playerId))
+    .where(
+      and(
+        eq(tournamentPlayers.tournamentId, tournamentId),
+        eq(tournamentPlayers.playerId, row.participant.partnerPlayerId),
+      ),
+    )
+    .limit(1);
+  if (!partnerJoin) return dto;
+  return attachPartners([
+    { participant: row.participant, player: toPlayerDto(row.player) },
+    { participant: partnerJoin.participant, player: toPlayerDto(partnerJoin.player) },
+  ])[0] ?? dto;
 }
 
 export async function getTournamentDto(
@@ -247,7 +289,7 @@ export async function createTournament(
       roundsPlanned: input.roundsPlanned ?? null,
       tieRule: input.tieRule ?? 'draw',
       standingsSort: input.standingsSort ?? ['wins', 'points', 'diff'],
-      ratingBalance: input.ratingBalance ?? true,
+      ratingBalance: input.format === 'fixed_pairs' ? false : (input.ratingBalance ?? true),
       entryFee: input.entryFee ?? null,
       description: input.description ?? null,
       formatDescription: input.formatDescription ?? null,
@@ -256,6 +298,7 @@ export async function createTournament(
       venueMapUrl: input.venueMapUrl ?? null,
       publicSlug: createSlug(),
       createdByAccountId: actor.accountId,
+      bracketConfig: bracketConfigToStore(input.format, input.bracketConfig, input.pointsToWin),
     })
     .returning();
 
@@ -312,6 +355,17 @@ export async function updateTournament(
   assign('venueAddress', input.venueAddress);
   assign('venueMapUrl', input.venueMapUrl);
   if (input.startsAt !== undefined) patch.startsAt = new Date(input.startsAt);
+
+  const nextFormat = input.format ?? current.format;
+  const nextPoints = input.pointsToWin ?? current.pointsToWin;
+  if (input.bracketConfig !== undefined || input.format !== undefined) {
+    patch.bracketConfig = bracketConfigToStore(
+      nextFormat,
+      input.bracketConfig,
+      nextPoints,
+      current.bracketConfig,
+    );
+  }
 
   // Названия хранятся по одному на корт, поэтому при смене их количества список
   // подрезается или дополняется — иначе подписи разъехались бы с кортами.
@@ -562,6 +616,9 @@ export async function removeParticipant(
   }
 
   await db.delete(tournamentPlayers).where(eq(tournamentPlayers.id, existing.id));
+  if (existing.partnerPlayerId) {
+    await clearPartnerLink(db, tournamentId, existing.playerId, existing.partnerPlayerId);
+  }
 
   // Освободилось место — поднимаем первого из листа ожидания.
   if (existing.status === 'registered') {
@@ -624,8 +681,6 @@ export async function setParticipantPaid(
     .returning();
   if (!row) throw notFound('Заявка не найдена');
 
-  const [player] = await db.select().from(players).where(eq(players.id, playerId)).limit(1);
-
   await recordAudit(db, actor, {
     action: 'participant.paid',
     entityType: 'participant',
@@ -634,7 +689,10 @@ export async function setParticipantPaid(
     payload: { playerId, confirmedAndPaid },
   });
 
-  return toParticipantDto(row, toPlayerDto(player as PlayerRow));
+  const { participants } = await listParticipants(db, tournamentId);
+  const dto = participants.find((item) => item.player.id === playerId);
+  if (!dto) throw notFound('Заявка не найдена');
+  return dto;
 }
 
 export async function promoteFromWaitlist(
@@ -684,6 +742,17 @@ export async function promoteFromWaitlist(
     if (!outgoing) throw notFound('Игрок для замены не найден в составе');
 
     await db.transaction(async (tx) => {
+      if (outgoing.partnerPlayerId) {
+        await tx
+          .update(tournamentPlayers)
+          .set({ partnerPlayerId: null, updatedAt: new Date() })
+          .where(
+            and(
+              eq(tournamentPlayers.tournamentId, tournamentId),
+              eq(tournamentPlayers.playerId, outgoing.partnerPlayerId),
+            ),
+          );
+      }
       await tx.delete(tournamentPlayers).where(eq(tournamentPlayers.id, outgoing.id));
       await tx
         .update(tournamentPlayers)
@@ -745,9 +814,13 @@ export async function listParticipants(
       asc(tournamentPlayers.createdAt),
     );
 
+  const items = joined.map((row) => ({
+    participant: row.participant,
+    player: toPlayerDto(row.player),
+  }));
   return {
     rows: joined.map((row) => row.participant),
-    participants: joined.map((row) => toParticipantDto(row.participant, toPlayerDto(row.player))),
+    participants: attachPartners(items),
   };
 }
 
@@ -967,3 +1040,21 @@ export async function unstartTournament(
 }
 
 export { loadCounts };
+
+export async function clearPartnerLink(
+  db: Database,
+  tournamentId: string,
+  playerId: string,
+  partnerPlayerId: string,
+): Promise<void> {
+  await db
+    .update(tournamentPlayers)
+    .set({ partnerPlayerId: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(tournamentPlayers.tournamentId, tournamentId),
+        eq(tournamentPlayers.playerId, partnerPlayerId),
+        eq(tournamentPlayers.partnerPlayerId, playerId),
+      ),
+    );
+}

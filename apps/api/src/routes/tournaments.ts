@@ -5,6 +5,7 @@ import {
   addParticipantSchema,
   createTournamentSchema,
   generateScheduleSchema,
+  linkPartnerSchema,
   reshuffleSchema,
   setPaidSchema,
   updateTournamentSchema,
@@ -30,9 +31,10 @@ import {
   unstartTournament,
   updateTournament,
 } from '../services/tournaments.js';
+import { linkPartner, unlinkPartner } from '../services/partners.js';
 import { appendRound, reshuffleSchedule, startTournament } from '../services/schedule.js';
 import { applyRoundAction } from '../services/matches.js';
-import { computeTournamentStandings, getTournamentState, loadRounds } from '../services/state.js';
+import { computeTournamentStandings, computeTournamentTeamStandings, getTournamentState, loadRounds } from '../services/state.js';
 import {
   broadcastParticipants,
   broadcastSchedule,
@@ -52,6 +54,17 @@ import type { AppContext } from './context.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import { tournamentPlayers } from '../db/schema.js';
 import type { Database } from '../db/index.js';
+import {
+  partnerLinkedByOrganizerMessage,
+  partnerLinkedByPlayerMessage,
+  partnerUnlinkedByOrganizerMessage,
+  partnerUnlinkedByPlayerMessage,
+  participationConfirmedMessage,
+  tournamentFinishedMessage,
+  tournamentStartedMessage,
+  registrationAnnounceMessage,
+  escapeTelegramHtml,
+} from '../bot/copy.js';
 
 const sortQuerySchema = z.object({
   sort: z
@@ -98,7 +111,11 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
   app.get<{ Params: { id: string } }>('/api/tournaments/:id/standings', async (request) => {
     const query = parse(sortQuerySchema, request.query ?? {});
     const row = await getTournamentRow(db, request.params.id);
-    return { standings: await computeTournamentStandings(db, row, query.sort) };
+    const [standings, teamStandings] = await Promise.all([
+      computeTournamentStandings(db, row, query.sort),
+      computeTournamentTeamStandings(db, row),
+    ]);
+    return { standings, teamStandings };
   });
 
   app.get<{ Params: { id: string } }>('/api/tournaments/:id/rounds', async (request) => {
@@ -162,7 +179,7 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       );
       await broadcastParticipants(db, hub, request.params.id);
       if (removed) {
-        const title = escapeHtml(tournament.title);
+        const title = escapeTelegramHtml(tournament.title);
         const text =
           removed.status === 'waitlisted'
             ? `Вас убрали из листа ожидания турнира «${title}».`
@@ -216,8 +233,83 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
         const tournament = await getTournamentRow(db, request.params.id);
         await notify.sendToPlayers(
           [request.params.playerId],
-          `Ваше участие в турнире «${escapeHtml(tournament.title)}» подтверждено, битва будет эпичной!`,
+          participationConfirmedMessage(
+            tournament.title,
+            tournament.startsAt,
+            participant.partner?.fullName ?? null,
+          ),
         );
+      }
+      return { participant };
+    },
+  );
+
+  app.post<{ Params: { id: string; playerId: string } }>(
+    '/api/tournaments/:id/participants/:playerId/partner',
+    async (request) => {
+      const viewer = requireViewer(request);
+      const body = parse(linkPartnerSchema, request.body);
+      const participant = await linkPartner(
+        db,
+        request.params.id,
+        request.params.playerId,
+        body.partnerPlayerId,
+        viewer,
+      );
+      await broadcastParticipants(db, hub, request.params.id);
+      const partner = participant.partner;
+      if (partner) {
+        const tournament = await getTournamentRow(db, request.params.id);
+        const actorId = viewer.playerId;
+        if (actorId === participant.player.id || actorId === partner.id) {
+          const actor = actorId === participant.player.id ? participant.player : partner;
+          const other = actorId === participant.player.id ? partner : participant.player;
+          await notify.sendToPlayers(
+            [other.id],
+            partnerLinkedByPlayerMessage(actor.fullName, tournament.title),
+          );
+        } else {
+          await notify.sendToPlayers(
+            [participant.player.id],
+            partnerLinkedByOrganizerMessage(partner.fullName, tournament.title),
+          );
+          await notify.sendToPlayers(
+            [partner.id],
+            partnerLinkedByOrganizerMessage(participant.player.fullName, tournament.title),
+          );
+        }
+      }
+      return { participant };
+    },
+  );
+
+  app.delete<{ Params: { id: string; playerId: string } }>(
+    '/api/tournaments/:id/participants/:playerId/partner',
+    async (request) => {
+      const viewer = requireViewer(request);
+      const { participants } = await listParticipants(db, request.params.id);
+      const current = participants.find((item) => item.player.id === request.params.playerId);
+      const other = current?.partner ?? null;
+      const otherId = current?.partnerPlayerId ?? null;
+      const participant = await unlinkPartner(db, request.params.id, request.params.playerId, viewer);
+      await broadcastParticipants(db, hub, request.params.id);
+      if (current && other && otherId) {
+        const tournament = await getTournamentRow(db, request.params.id);
+        const actorId = viewer.playerId;
+        if (actorId === request.params.playerId || actorId === otherId) {
+          const actorName =
+            actorId === request.params.playerId ? current.player.fullName : other.fullName;
+          const recipientId = actorId === request.params.playerId ? otherId : request.params.playerId;
+          await notify.sendToPlayers(
+            [recipientId],
+            partnerUnlinkedByPlayerMessage(actorName, tournament.title),
+          );
+        } else {
+          await notify.sendToPlayers(
+            [request.params.playerId, otherId],
+            partnerUnlinkedByOrganizerMessage(tournament.title),
+          );
+        }
       }
       return { participant };
     },
@@ -297,11 +389,11 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       const excludePlayerIds = await rosterPlayerIds(db, tournament.id);
       const appUrl = env.PUBLIC_WEB_URL.replace(/\/$/, '');
       const sent = await notify.sendToClub(
-        [
-          `<b>Открылась запись на «${escapeHtml(tournament.title)}»!</b>`,
-          '',
-          'Успей записаться — места разбирают быстро.',
-        ].join('\n'),
+        registrationAnnounceMessage({
+          title: tournament.title,
+          startsAt: tournament.startsAt,
+          venueName: tournament.venueName,
+        }),
         {
           excludePlayerIds,
           button: { text: 'Смотреть турниры', url: `${appUrl}/tournaments` },
@@ -330,7 +422,13 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     // Только тем, кто стоит в только что собранном расписании — не всему клубу.
     await notify.sendToSchedule(
       request.params.id,
-      `Турнир «${escapeHtml(tournament.title)}» скоро начнётся. Откройте приложение, чтобы посмотреть свои игры.`,
+      tournamentStartedMessage({
+        title: tournament.title,
+        startsAt: tournament.startsAt,
+        venueName: tournament.venueName,
+        venueAddress: tournament.venueAddress,
+        venueMapUrl: tournament.venueMapUrl,
+      }),
     );
     return { tournament: await getTournamentDto(db, request.params.id, viewer) };
   });
@@ -390,16 +488,13 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
       db,
       await getTournamentRow(db, request.params.id),
     );
-    const podium = standings
-      .slice(0, 3)
-      .filter((row) => row.played > 0)
-      .map((row, index) => `${index + 1}. ${row.player.fullName} — ${row.pointsFor}`)
-      .join('\n');
+    const teams = await computeTournamentTeamStandings(
+      db,
+      await getTournamentRow(db, request.params.id),
+    );
     await notify.sendToTournament(
       request.params.id,
-      podium
-        ? `Турнир «${escapeHtml(tournament.title)}» завершён.\n${escapeHtml(podium)}`
-        : `Турнир «${escapeHtml(tournament.title)}» завершён.`,
+      tournamentFinishedMessage(tournament.title, teams, standings),
     );
     return { tournament };
   });
@@ -437,14 +532,6 @@ export function registerTournamentRoutes(app: FastifyInstance, ctx: AppContext):
     // Без BOM: шаблон DUPR импортирует обычный UTF-8 CSV.
     return csv;
   });
-}
-
-/** Telegram HTML: иначе кавычки и имена с `<` ломают parse_mode. */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
 }
 
 async function rosterPlayerIds(db: Database, tournamentId: string): Promise<string[]> {

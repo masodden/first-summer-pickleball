@@ -39,6 +39,7 @@ function match(partial: {
   status?: MatchDto['status'];
   teamA?: PlayerDto[];
   teamB?: PlayerDto[];
+  games?: MatchDto['games'];
 }): MatchDto {
   const teamA = partial.teamA ?? [player('AAAA11', 'Anna One'), player('AAAA22', 'Anna Two')];
   const teamB = partial.teamB ?? [player('BBBB11', 'Boris One'), player('BBBB22', 'Boris Two')];
@@ -56,6 +57,11 @@ function match(partial: {
     finishedAt: null,
     durationMs: null,
     version: 1,
+    games: partial.games ?? null,
+    stage: null,
+    groupIndex: null,
+    bracketSlot: null,
+    winsToTake: 1,
   };
 }
 
@@ -192,6 +198,22 @@ describe('buildDuprResultsCsv', () => {
     expect(row.slice(17, 25)).toEqual(['', '', '', '', '', '', '', '']);
     expect(row[25]).toBe('Центр Пиклбола, Красногорск, Москва, Россия');
     expect(row[26]).toBe('SIDEOUT');
+  });
+
+  it('для серии Bo3 заполняет game1–3, остальные пустые', () => {
+    const csv = buildDuprResultsCsv(tournament, [
+      match({
+        scoreA: 2,
+        scoreB: 1,
+        games: [
+          { scoreA: 11, scoreB: 8 },
+          { scoreA: 9, scoreB: 11 },
+          { scoreA: 11, scoreB: 6 },
+        ],
+      }),
+    ]);
+    const row = parseCsvRow(csv.trimEnd().split('\n')[1]!);
+    expect(row.slice(15, 25)).toEqual(['11', '8', '9', '11', '11', '6', '', '', '', '']);
   });
 
   it('пропускает незавершённые матчи и экспортирует несколько сыгранных', () => {

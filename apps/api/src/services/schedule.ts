@@ -1,16 +1,26 @@
 import { and, asc, count, eq, ne, notInArray } from 'drizzle-orm';
 import {
   ScheduleError,
+  buildFixedPairsGroupSchedule,
   generateAmericanoSchedule,
   generateMexicanoRound,
+  combinedPairRating,
+  makePair,
   matchesPerRound,
   nextAmericanoRound,
   type EnginePlayer,
+  type EnginePair,
+  type MatchPlan,
   type RoundPlan,
   type SchedulePlan,
   type Team,
 } from '@fsp/engine';
-import type { StandingsSortKey } from '@fsp/shared';
+import {
+  isFixedPairsFormat,
+  parseBracketConfig,
+  validateBracketConfig,
+  type StandingsSortKey,
+} from '@fsp/shared';
 import { isTournamentClosed } from '@fsp/shared';
 import type { Database } from '../db/index.js';
 import {
@@ -26,6 +36,7 @@ import {
 import { ApiError, forbidden, wrongStatus } from '../lib/errors.js';
 import { canManageTournaments, type Viewer } from '../auth/context.js';
 import { getTournamentRow } from './tournaments.js';
+import { loadRegisteredPairs } from './partners.js';
 import { computeTournamentStandings, loadCourtHistory } from './state.js';
 import { recordAudit } from './audit.js';
 
@@ -63,29 +74,42 @@ async function hasStartedMatches(db: Database, tournamentId: string): Promise<bo
   return Number(row?.total ?? 0) > 0;
 }
 
-async function persistRound(db: Database, tournamentId: string, plan: RoundPlan): Promise<void> {
+async function persistMatchLineup(
+  db: Database,
+  tournamentId: string,
+  roundId: string,
+  roundIndex: number,
+  match: MatchPlan,
+): Promise<void> {
+  const [created] = await db
+    .insert(matches)
+    .values({
+      tournamentId,
+      roundId,
+      roundIndex,
+      court: match.court,
+      stage: match.stage ?? null,
+      groupIndex: match.groupIndex ?? null,
+      bracketSlot: match.bracketSlot ?? null,
+    })
+    .returning();
+  if (!created) throw new ApiError('internal', 'Не удалось создать матч');
+
+  const lineup = [
+    { team: 'A' as const, ids: match.teamA },
+    { team: 'B' as const, ids: match.teamB },
+  ].flatMap(({ team, ids }) =>
+    ids.map((playerId, slot) => ({ matchId: created.id, playerId, team, slot })),
+  );
+  await db.insert(matchPlayers).values(lineup);
+}
+
+export async function persistRound(db: Database, tournamentId: string, plan: RoundPlan): Promise<void> {
   const [round] = await db.insert(rounds).values({ tournamentId, index: plan.index }).returning();
   if (!round) throw new ApiError('internal', 'Не удалось создать раунд');
 
   for (const match of plan.matches) {
-    const [created] = await db
-      .insert(matches)
-      .values({
-        tournamentId,
-        roundId: round.id,
-        roundIndex: plan.index,
-        court: match.court,
-      })
-      .returning();
-    if (!created) throw new ApiError('internal', 'Не удалось создать матч');
-
-    const lineup = [
-      { team: 'A' as const, ids: match.teamA },
-      { team: 'B' as const, ids: match.teamB },
-    ].flatMap(({ team, ids }) =>
-      ids.map((playerId, slot) => ({ matchId: created.id, playerId, team, slot })),
-    );
-    await db.insert(matchPlayers).values(lineup);
+    await persistMatchLineup(db, tournamentId, round.id, plan.index, match);
   }
 
   if (plan.sittingOut.length > 0) {
@@ -93,6 +117,21 @@ async function persistRound(db: Database, tournamentId: string, plan: RoundPlan)
       .insert(roundSitouts)
       .values(plan.sittingOut.map((playerId) => ({ roundId: round.id, playerId })));
   }
+}
+
+export async function persistMatchInRound(
+  db: Database,
+  tournamentId: string,
+  roundIndex: number,
+  match: MatchPlan,
+): Promise<void> {
+  const [row] = await db
+    .select({ roundId: matches.roundId })
+    .from(matches)
+    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.roundIndex, roundIndex)))
+    .limit(1);
+  if (!row) throw new ApiError('internal', 'Раунд для матча не найден');
+  await persistMatchLineup(db, tournamentId, row.roundId, roundIndex, match);
 }
 
 async function persistSchedule(
@@ -167,14 +206,6 @@ export async function startTournament(
   if (tournament.status === 'running') throw wrongStatus('Турнир уже идёт');
   if (isTournamentClosed(tournament.status)) throw wrongStatus('Турнир уже завершён');
 
-  const roster = await loadRoster(db, tournamentId);
-  if (roster.length < 4) {
-    throw new ApiError('not_enough_players', 'Для парной игры нужно минимум четыре игрока');
-  }
-  if (matchesPerRound(roster.length, tournament.courts) < 1) {
-    throw new ApiError('not_enough_players', 'Игроков не хватает даже на один корт');
-  }
-
   const [pending] = await db
     .select({ total: count() })
     .from(tournamentPlayers)
@@ -189,15 +220,62 @@ export async function startTournament(
     throw new ApiError('not_all_confirmed', 'Сначала подтвердите всех участников');
   }
 
+  const roster = await loadRoster(db, tournamentId);
   const seed = options.seed ?? Math.floor(Math.random() * 1_000_000) + 1;
 
-  if (tournament.format === 'americano') {
-    const plan = buildAmericano(tournament, roster, seed);
-    await persistSchedule(db, tournamentId, plan);
+  if (isFixedPairsFormat(tournament.format)) {
+    const { pairs, orphans } = await loadRegisteredPairs(db, tournamentId);
+    if (orphans.length > 0 || pairs.length < 2) {
+      throw new ApiError(
+        'not_enough_players',
+        'Соберите все пары: в составе не должно остаться игроков без партнёра',
+      );
+    }
+    const config = parseBracketConfig(tournament.format, tournament.bracketConfig, tournament.pointsToWin);
+    if (!config) {
+      throw new ApiError('validation_failed', 'Не задана сетка турнира');
+    }
+    if (validateBracketConfig(config).length > 0) {
+      throw new ApiError(
+        'schedule_impossible',
+        'Сетка неполная: нужен финал и матч за 3-е место, все пары в матчах должны быть выбраны',
+      );
+    }
+    const enginePairs: EnginePair[] = pairs.map(({ a, b }) =>
+      makePair(
+        a.player.id,
+        b.player.id,
+        combinedPairRating(a.player.doublesRating, b.player.doublesRating),
+      ),
+    );
+    try {
+      const plan = buildFixedPairsGroupSchedule({
+        pairs: enginePairs,
+        courts: tournament.courts,
+        groupCount: config.groupCount,
+        groupMatchesPerPairing: config.groupMatchesPerPairing,
+        pairGroups: config.pairGroups,
+      });
+      await persistSchedule(db, tournamentId, plan);
+    } catch (error) {
+      toScheduleError(error);
+    }
   } else {
-    const plan = buildMexicanoFirstRound(tournament, roster, seed);
-    await db.delete(rounds).where(eq(rounds.tournamentId, tournamentId));
-    await persistRound(db, tournamentId, plan);
+    if (roster.length < 4) {
+      throw new ApiError('not_enough_players', 'Для парной игры нужно минимум четыре игрока');
+    }
+    if (matchesPerRound(roster.length, tournament.courts) < 1) {
+      throw new ApiError('not_enough_players', 'Игроков не хватает даже на один корт');
+    }
+
+    if (tournament.format === 'americano') {
+      const plan = buildAmericano(tournament, roster, seed);
+      await persistSchedule(db, tournamentId, plan);
+    } else {
+      const plan = buildMexicanoFirstRound(tournament, roster, seed);
+      await db.delete(rounds).where(eq(rounds.tournamentId, tournamentId));
+      await persistRound(db, tournamentId, plan);
+    }
   }
 
   await db
@@ -231,6 +309,9 @@ export async function reshuffleSchedule(
   }
   if (await hasStartedMatches(db, tournamentId)) {
     throw wrongStatus('Перемешать можно только до начала первого матча');
+  }
+  if (isFixedPairsFormat(tournament.format)) {
+    throw wrongStatus('В формате фиксированных пар пары не перемешиваются');
   }
 
   const roster = await loadRoster(db, tournamentId);
@@ -271,6 +352,9 @@ export async function appendRound(
   const tournament = await getTournamentRow(db, tournamentId);
   if (!canManageTournaments(actor)) throw forbidden();
   if (tournament.status !== 'running') throw wrongStatus('Турнир не идёт');
+  if (isFixedPairsFormat(tournament.format)) {
+    throw wrongStatus('Следующий раунд в этом формате появляется из сетки, а не вручную');
+  }
 
   const roundRows = await db
     .select()
