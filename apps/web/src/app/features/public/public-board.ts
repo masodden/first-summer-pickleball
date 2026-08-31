@@ -15,11 +15,9 @@ import { RealtimeService } from '../../core/realtime';
 import { patchMatchInRounds, upsertRound } from '../../core/round-sync';
 import { TournamentApi, type PublicBoardDto } from '../../core/tournament-api';
 import { Ball } from '../../ui/ball';
-import { Avatar } from '../../ui/player-line';
-import { RatingChip } from '../../ui/rating-chip';
 import { StatusBadge } from '../../ui/status-badge';
-import { FlipMove, ScoreTick } from '../../ui/motion';
-import { PairResults } from '../tournaments/pair-results';
+import { ScoreTick } from '../../ui/motion';
+import { StandingsView } from '../tournaments/standings-view';
 
 /**
  * Публичное табло по короткой ссылке.
@@ -31,7 +29,7 @@ import { PairResults } from '../tournaments/pair-results';
 @Component({
   selector: 'app-public-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadge, Avatar, RatingChip, Ball, ScoreTick, FlipMove, PairResults],
+  imports: [RouterLink, StatusBadge, Ball, ScoreTick, StandingsView],
   template: `
     @if (loading() && !board()) {
       <div class="stack stack--3">
@@ -59,97 +57,44 @@ import { PairResults } from '../tournaments/pair-results';
 
         @if (currentRound(); as round) {
           @for (key of [round.index]; track key) {
-            <section class="stack stack--2 round-in">
+            <section class="stack stack--2 round-in courts">
               <h2>{{ t()('match.round', { index: round.index + 1 }) }}</h2>
-              @for (match of round.matches; track match.id) {
-                <div class="glass card--tight stack stack--2">
-                  <div class="row row--between">
-                    <span class="tiny faint">{{ courtLine(match) }}</span>
-                    <span class="tiny faint">
-                      {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
-                    </span>
-                  </div>
-                  @for (team of [match.teamA, match.teamB]; track $index) {
-                    <div class="row team">
-                      <div class="grow stack stack--1">
-                        @for (player of team.players; track player.id) {
-                          <span class="truncate small strong">{{ player.fullName }}</span>
-                        }
-                      </div>
-                      <app-score-tick class="score" [value]="team.score" />
+              <div class="courts__grid">
+                @for (match of round.matches; track match.id) {
+                  <div class="glass card--tight stack stack--2">
+                    <div class="row row--between">
+                      <span class="tiny faint">{{ courtLine(match) }}</span>
+                      <span class="tiny faint">
+                        {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
+                      </span>
                     </div>
-                  }
-                </div>
-              }
+                    @for (team of [match.teamA, match.teamB]; track $index) {
+                      <div class="row team">
+                        <div class="grow stack stack--1">
+                          @for (player of team.players; track player.id) {
+                            <span class="truncate small strong">{{ player.fullName }}</span>
+                          }
+                        </div>
+                        <app-score-tick class="score" [value]="team.score" />
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
             </section>
           }
         }
 
-        <section class="stack stack--2">
-          <h2>{{ t()(isFixedPairs(data) ? 'standings.results' : 'standings.title') }}</h2>
-          @if (isFixedPairs(data)) {
-            @if (data.teamStandings.length === 0 && !hasKnockout(data)) {
-              <div class="glass glass--subtle card--tight center small muted">
-                {{ t()('standings.empty') }}
-              </div>
-            } @else {
-              <app-pair-results
-                [teamStandings]="data.teamStandings"
-                [rounds]="data.rounds"
-                [config]="data.bracketConfig"
-              />
-            }
-          } @else if (data.standings.length === 0) {
-            <div class="glass glass--subtle card--tight center small muted">
-              {{ t()('standings.empty') }}
-            </div>
-          } @else {
-            <div class="glass card--tight table-shell">
-              <div class="scroll-x">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th scope="col">{{ t()('standings.rank') }}</th>
-                      <th scope="col">{{ t()('standings.player') }}</th>
-                      <th scope="col">{{ t()('standings.points') }}</th>
-                      <th scope="col">{{ t()('standings.wins') }}</th>
-                      @if (data.tournament.tieRule === 'draw') {
-                        <th scope="col">{{ t()('standings.draws') }}</th>
-                      }
-                      <th scope="col">{{ t()('standings.diff') }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (row of data.standings; track row.player.id; let index = $index) {
-                      <tr [appFlipMove]="row.player.id" [appFlipIndex]="index">
-                        <td>
-                          @if (row.medal) {
-                            <span class="medal" [class]="'medal--' + row.medal">{{ row.rank }}</span>
-                          } @else {
-                            <span class="numeric muted">{{ row.rank }}</span>
-                          }
-                        </td>
-                        <td>
-                          <span class="player">
-                            <app-avatar [player]="row.player" [size]="26" />
-                            <span class="truncate">{{ row.player.fullName }}</span>
-                            <app-rating-chip [player]="row.player" [showLabel]="false" />
-                          </span>
-                        </td>
-                        <td class="numeric strong">{{ row.pointsFor }}</td>
-                        <td class="numeric">{{ row.wins }}</td>
-                        @if (data.tournament.tieRule === 'draw') {
-                          <td class="numeric">{{ row.draws }}</td>
-                        }
-                        <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          }
-        </section>
+        <app-standings-view
+          [isFixedPairs]="isFixedPairs(data)"
+          [status]="data.tournament.status"
+          [tieRule]="data.tournament.tieRule"
+          [standingsSort]="data.tournament.standingsSort"
+          [standings]="data.standings"
+          [teamStandings]="data.teamStandings"
+          [rounds]="data.rounds"
+          [bracketConfig]="data.bracketConfig"
+        />
 
         <a class="btn btn--glass btn--block" routerLink="/tournaments">
           {{ t()('tournament.list') }}
@@ -185,34 +130,16 @@ import { PairResults } from '../tournaments/pair-results';
       animation: round-in-fwd 300ms var(--ease-out) both;
     }
 
-    .player {
-      display: inline-flex;
-      align-items: center;
+    .courts__grid {
+      display: grid;
+      grid-template-columns: 1fr;
       gap: var(--space-2);
-      max-width: 180px;
-      font-weight: 600;
-      color: var(--text-strong);
     }
 
-    .medal {
-      display: inline-grid;
-      place-items: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--ink-900);
-    }
-
-    .medal--gold {
-      background: linear-gradient(160deg, #f7d67a, var(--gold));
-    }
-    .medal--silver {
-      background: linear-gradient(160deg, #e2e6ea, var(--silver));
-    }
-    .medal--bronze {
-      background: linear-gradient(160deg, #e0ab84, var(--bronze));
+    @media (min-width: 720px) {
+      .courts__grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
     }
   `,
 })
@@ -284,12 +211,6 @@ export class PublicBoardPage {
 
   protected isFixedPairs(data: PublicBoardDto): boolean {
     return isFixedPairsFormat(data.tournament.format);
-  }
-
-  protected hasKnockout(data: PublicBoardDto): boolean {
-    return data.rounds.some((round) =>
-      round.matches.some((match) => match.stage === 'playoff' || match.stage === 'consolation'),
-    );
   }
 
   protected courtLine(match: MatchDto): string {

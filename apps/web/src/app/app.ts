@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, NavigationStart, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { isActive, NavigationEnd, NavigationStart, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, take } from 'rxjs';
 import { ApiClient } from './core/api';
 import { readTournamentDeepLink, readTrainingDeepLink } from './core/deep-link';
@@ -28,11 +28,14 @@ import { ToastHost } from './ui/toast-host';
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, Ball, TabBar, ToastHost, ConfirmHost],
+  host: {
+    '[class.board-open]': 'boardOpen()',
+  },
   template: `
     <a class="skip" href="#main">{{ t()('nav.tournaments') }}</a>
 
     <header class="header vt-header">
-      <div class="header__inner shell">
+      <div class="header__inner shell" [class.shell--wide]="boardOpen()">
         <a class="brand" routerLink="/tournaments">
           <app-ball [size]="30" [motion]="connectionBusy() ? 'spin' : 'none'" />
           <span class="brand__text">
@@ -65,13 +68,15 @@ import { ToastHost } from './ui/toast-host';
       </div>
     </header>
 
-    <main id="main" class="shell main vt-main">
+    <main id="main" class="shell main vt-main" [class.shell--wide]="boardOpen()">
       <div class="main__body">
         <router-outlet />
       </div>
     </main>
 
-    <app-tab-bar />
+    @if (!boardOpen()) {
+      <app-tab-bar />
+    }
 
     <app-toast-host />
     <app-confirm-host />
@@ -109,6 +114,14 @@ import { ToastHost } from './ui/toast-host';
       max-width: var(--shell-max);
       margin: 0 auto;
       padding-inline: var(--space-4);
+    }
+
+    .shell--wide {
+      max-width: min(var(--shell-board-max), 100%);
+    }
+
+    :host.board-open {
+      --app-tabbar-space: 24px;
     }
 
     .header {
@@ -209,6 +222,7 @@ export class App {
 
   protected readonly session = inject(SessionStore);
   protected readonly t = this.i18n.t;
+  protected readonly boardOpen = isActive('/board', this.router);
 
   constructor() {
     // Тема применяется к documentElement сразу при старте.

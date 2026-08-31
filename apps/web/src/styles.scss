@@ -80,6 +80,8 @@
   --duration-slow: 420ms;
 
   --shell-max: 720px;
+  /* Только /board: таблица с русскими заголовками ~900px, плюс поля. */
+  --shell-board-max: 1600px;
   --app-height: 100dvh;
   /* Таббар ~59px + 12px от низа + зазор, чтобы карточки не уезжали под него. */
   --app-tabbar-space: 88px;
