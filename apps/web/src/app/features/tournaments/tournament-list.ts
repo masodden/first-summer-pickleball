@@ -147,7 +147,9 @@ function compareTournaments(
                       <div class="row row--wrap tile__meta">
                         <span class="chip">{{ format(item.format) }}</span>
                         <span class="chip">{{ i18n.courts(item.courts) }}</span>
-                        @if (item.roundsPlanned) {
+                        @if (isPairs(item)) {
+                          <span class="chip">{{ t()('tournament.groupsAndPlayoff') }}</span>
+                        } @else if (item.roundsPlanned) {
                           <span class="chip">{{ i18n.games(item.roundsPlanned) }}</span>
                         } @else {
                           <span class="chip">{{ t()('tournament.roundsInfinite') }}</span>
@@ -327,6 +329,10 @@ export class TournamentListPage {
 
   protected format(value: TournamentSummaryDto['format']): string {
     return this.i18n.translate(formatNameKey(value));
+  }
+
+  protected isPairs(item: TournamentSummaryDto): boolean {
+    return isFixedPairsFormat(item.format);
   }
 
   protected occupancy(item: TournamentSummaryDto): string {

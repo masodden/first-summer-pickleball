@@ -126,6 +126,7 @@ export const en: Record<TranslationKey, string> = {
   'tournament.rounds': 'Number of games',
   'tournament.roundsHint': 'Leave empty to play until the organiser stops the tournament',
   'tournament.roundsInfinite': 'Until stopped',
+  'tournament.groupsAndPlayoff': 'Groups + playoff',
   'tournament.tieRule': 'When the timer ends on a tie',
   'tournament.standingsSort': 'Winner determination rule',
   'tournament.winnerRule.pointsDiff': 'Total points + differential',

@@ -57,18 +57,27 @@ import { TournamentJoinPanel } from './tournament-join-panel';
                 <span class="strong numeric">{{ playoff }}</span>
               </div>
             }
-            <div class="cell">
-              <span class="tiny faint">{{ t()('tournament.matchDuration') }}</span>
-              <span class="strong numeric">
-                {{ item.matchDurationMin ?? t()('common.notSet') }}
-              </span>
-            </div>
-            <div class="cell">
-              <span class="tiny faint">{{ t()('tournament.rounds') }}</span>
-              <span class="strong numeric">
-                {{ item.roundsPlanned ?? t()('tournament.roundsInfinite') }}
-              </span>
-            </div>
+            @if (!store.isFixedPairs()) {
+              <div class="cell">
+                <span class="tiny faint">{{ t()('tournament.matchDuration') }}</span>
+                <span class="strong numeric">
+                  {{ item.matchDurationMin ?? t()('common.notSet') }}
+                </span>
+              </div>
+            }
+            @if (store.isFixedPairs()) {
+              <div class="cell">
+                <span class="tiny faint">{{ t()('bracket.groups') }}</span>
+                <span class="strong numeric">{{ item.bracketConfig?.groupCount ?? 0 }}</span>
+              </div>
+            } @else {
+              <div class="cell">
+                <span class="tiny faint">{{ t()('tournament.rounds') }}</span>
+                <span class="strong numeric">
+                  {{ item.roundsPlanned ?? t()('tournament.roundsInfinite') }}
+                </span>
+              </div>
+            }
             <div class="cell">
               <span class="tiny faint">{{ t()('participant.list') }}</span>
               <span class="strong numeric">{{ rosterCountLabel() }}</span>

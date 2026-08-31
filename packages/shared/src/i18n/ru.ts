@@ -124,6 +124,7 @@ export const ru = {
   'tournament.rounds': 'Количество игр',
   'tournament.roundsHint': 'Оставьте пустым, чтобы играть до остановки организатором',
   'tournament.roundsInfinite': 'До остановки',
+  'tournament.groupsAndPlayoff': 'Группы + плей-офф',
   'tournament.tieRule': 'При равном счёте по таймеру',
   'tournament.standingsSort': 'Правило определения победителя',
   'tournament.winnerRule.pointsDiff': 'Сумма очков + разница',
