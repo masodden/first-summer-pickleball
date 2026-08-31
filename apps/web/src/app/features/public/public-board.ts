@@ -73,7 +73,23 @@ import { StandingsView } from '../tournaments/standings-view';
                     <div class="row row--between">
                       <span class="tiny faint">{{ courtLine(match) }}</span>
                       <span class="tiny faint">
-                        {{ t()(match.status === 'running' ? 'match.started' : 'match.waiting') }}
+                        @switch (match.status) {
+                          @case ('running') {
+                            {{ t()('match.started') }}
+                          }
+                          @case ('paused') {
+                            {{ t()('match.paused') }}
+                          }
+                          @case ('finished') {
+                            {{ t()('match.finishedLabel') }}
+                          }
+                          @case ('skipped') {
+                            {{ t()('match.skippedLabel') }}
+                          }
+                          @default {
+                            {{ t()('match.waiting') }}
+                          }
+                        }
                       </span>
                     </div>
                     @for (team of [match.teamA, match.teamB]; track $index) {
