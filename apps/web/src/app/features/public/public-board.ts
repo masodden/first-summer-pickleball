@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { isFixedPairsFormat, knownSlotHeading, type MatchDto, type ServerEvent } from '@fsp/shared';
+import { Title } from '@angular/platform-browser';
 import { I18nService } from '../../core/i18n';
 import { RealtimeService } from '../../core/realtime';
 import { patchMatchInRounds, upsertRound } from '../../core/round-sync';
@@ -40,19 +41,26 @@ import { StandingsView } from '../tournaments/standings-view';
       <div class="stack stack--4">
         <header class="glass card--tight stack stack--2">
           <div class="row row--between">
-            <app-status-badge [status]="data.tournament.status" />
+            <div class="row">
+              <app-status-badge [status]="data.tournament.status" />
+              @if (data.tournament.category) {
+                <span class="chip chip--accent">{{ data.tournament.category }}</span>
+              }
+            </div>
             @if (data.tournament.status === 'running') {
               <app-ball [size]="22" motion="bounce" />
             }
           </div>
           <h1>{{ data.tournament.title }}</h1>
-          <p class="small muted">
-            {{ i18n.formatDate(data.tournament.startsAt) }}
-            @if (data.venue.name) {
-              · {{ data.venue.name }}
-            }
-          </p>
-          <p class="tiny faint">{{ t()('public.spectatorHint') }}</p>
+          <div class="row row--between row--wrap meta">
+            <p class="small muted">
+              {{ i18n.formatDate(data.tournament.startsAt) }}
+              @if (data.venue.name) {
+                · {{ data.venue.name }}
+              }
+            </p>
+            <p class="tiny faint hint">{{ t()('public.spectatorHint') }}</p>
+          </div>
         </header>
 
         @if (currentRound(); as round) {
@@ -107,6 +115,19 @@ import { StandingsView } from '../tournaments/standings-view';
     }
   `,
   styles: `
+    .meta {
+      align-items: baseline;
+    }
+
+    .meta p {
+      margin: 0;
+    }
+
+    .hint {
+      margin-left: auto;
+      text-align: right;
+    }
+
     .team {
       padding: var(--space-2) var(--space-3);
       border-radius: var(--radius-md);
@@ -146,6 +167,7 @@ import { StandingsView } from '../tournaments/standings-view';
 export class PublicBoardPage {
   private readonly api = inject(TournamentApi);
   private readonly realtime = inject(RealtimeService);
+  private readonly pageTitle = inject(Title);
   protected readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
 
@@ -185,6 +207,12 @@ export class PublicBoardPage {
         unlisten?.();
         if (room) this.realtime.unsubscribe(room);
       });
+    });
+
+    effect(() => {
+      const category = this.board()?.tournament.category?.trim();
+      const label = this.i18n.translate('public.title');
+      this.pageTitle.setTitle(category ? `${category} · ${label}` : label);
     });
 
     // Запасной опрос: только когда сокет не открыт, иначе полный GET затрёт живой счёт.
