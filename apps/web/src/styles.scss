@@ -333,10 +333,12 @@ button {
 
 /*
  * Плоское «стекло»: рамка и заливка без blur и без блика.
- * Нужно строкам игроков и панели раунда — blur в WebView даёт плиты и плёнку.
+ * Нужно строкам игроков, карточкам пар и панели раунда — blur в WebView
+ * даёт плиты, плёнку и пропадание при скролле.
  */
 .glass--plain,
-.person.glass {
+.person.glass,
+.pair.glass {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   background: color-mix(in srgb, var(--glass-bg) 72%, transparent);
@@ -345,7 +347,8 @@ button {
 }
 
 .glass--plain::after,
-.person.glass::after {
+.person.glass::after,
+.pair.glass::after {
   content: none;
 }
 

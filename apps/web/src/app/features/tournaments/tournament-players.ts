@@ -98,7 +98,7 @@ import { SheetDismiss } from '../../ui/motion';
             @if (store.isFixedPairs()) {
               @for (pair of store.linkedPairs(); track pair[0].id; let index = $index) {
                 <article
-                  class="glass pair"
+                  class="glass glass--plain pair"
                   [class.pair--confirmed]="pair[0].partnerLocked"
                 >
                   <span class="pair__index faint numeric">{{ index + 1 }}</span>
