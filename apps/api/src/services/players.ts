@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import {
   isValidDuprId,
   normalizeDuprId,
@@ -385,6 +385,17 @@ export async function adoptGuestIntoPlayer(
       .update(playerRatingHistory)
       .set({ playerId: targetId })
       .where(eq(playerRatingHistory.playerId, guestId));
+
+    // Напарник всё ещё указывает на G-… — без этого пара разваливается в UI.
+    await tx
+      .update(tournamentPlayers)
+      .set({ partnerPlayerId: targetId, updatedAt: new Date() })
+      .where(eq(tournamentPlayers.partnerPlayerId, guestId));
+
+    const affectedTournaments = new Set(guestEntries.map((entry) => entry.tournamentId));
+    for (const tournamentId of affectedTournaments) {
+      await restoreOneWayPartnerLinks(tx as Database, tournamentId);
+    }
     // Фото может быть только на аккаунте (telegramPhotoUrl), а не на карточке гостя.
     const [guestAccount] = await tx
       .select({
@@ -430,6 +441,77 @@ export async function adoptGuestIntoPlayer(
       .set({ mergedIntoId: targetId, updatedAt: new Date() })
       .where(eq(players.id, guestId));
   });
+}
+
+/**
+ * После merge гостя в DUPR: указатели partner_player_id на G-… и односторонние
+ * связки (напарник ещё ссылается на гостя, DUPR — на игрока).
+ */
+export async function healMergedPartnerLinks(
+  db: Database,
+  tournamentId: string,
+): Promise<boolean> {
+  const stale = await db
+    .select({
+      id: tournamentPlayers.id,
+      mergedIntoId: players.mergedIntoId,
+    })
+    .from(tournamentPlayers)
+    .innerJoin(players, eq(tournamentPlayers.partnerPlayerId, players.id))
+    .where(
+      and(eq(tournamentPlayers.tournamentId, tournamentId), isNotNull(players.mergedIntoId)),
+    );
+
+  let changed = false;
+  const now = new Date();
+  for (const row of stale) {
+    if (!row.mergedIntoId) continue;
+    await db
+      .update(tournamentPlayers)
+      .set({ partnerPlayerId: row.mergedIntoId, updatedAt: now })
+      .where(eq(tournamentPlayers.id, row.id));
+    changed = true;
+  }
+
+  if (await restoreOneWayPartnerLinks(db, tournamentId)) changed = true;
+  return changed;
+}
+
+async function restoreOneWayPartnerLinks(
+  db: Database,
+  tournamentId: string,
+): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(tournamentPlayers)
+    .where(eq(tournamentPlayers.tournamentId, tournamentId));
+  const byPlayer = new Map(rows.map((row) => [row.playerId, row]));
+  const now = new Date();
+  let changed = false;
+
+  for (const row of rows) {
+    const partnerId = row.partnerPlayerId;
+    if (!partnerId) continue;
+    const partner = byPlayer.get(partnerId);
+    if (!partner) {
+      await db
+        .update(tournamentPlayers)
+        .set({ partnerPlayerId: null, updatedAt: now })
+        .where(eq(tournamentPlayers.id, row.id));
+      changed = true;
+      continue;
+    }
+    if (partner.partnerPlayerId === row.playerId) continue;
+    if (partner.partnerPlayerId) continue;
+    await db
+      .update(tournamentPlayers)
+      .set({ partnerPlayerId: row.playerId, updatedAt: now })
+      .where(eq(tournamentPlayers.id, partner.id));
+    partner.partnerPlayerId = row.playerId;
+    changed = true;
+  }
+
+  return changed;
 }
 
 function pickNonEmpty(

@@ -29,6 +29,7 @@ import { ApiError, forbidden, notFound, wrongStatus } from '../lib/errors.js';
 import { toParticipantDto, toPlayerDto, attachPartners } from './mappers.js';
 import { canManageTournaments, isAdmin, type Viewer } from '../auth/context.js';
 import { recordAudit } from './audit.js';
+import { healMergedPartnerLinks } from './players.js';
 
 function createSlug(): string {
   return randomBytes(6).toString('base64url').toLowerCase();
@@ -803,24 +804,41 @@ export async function listParticipants(
   db: Database,
   tournamentId: string,
 ): Promise<{ rows: TournamentPlayerRow[]; participants: ParticipantDto[] }> {
-  const joined = await db
-    .select({ participant: tournamentPlayers, player: players })
-    .from(tournamentPlayers)
-    .innerJoin(players, eq(players.id, tournamentPlayers.playerId))
-    .where(eq(tournamentPlayers.tournamentId, tournamentId))
-    .orderBy(
-      asc(tournamentPlayers.status),
-      asc(tournamentPlayers.waitlistPosition),
-      asc(tournamentPlayers.createdAt),
-    );
+  const load = async () => {
+    const joined = await db
+      .select({ participant: tournamentPlayers, player: players })
+      .from(tournamentPlayers)
+      .innerJoin(players, eq(players.id, tournamentPlayers.playerId))
+      .where(eq(tournamentPlayers.tournamentId, tournamentId))
+      .orderBy(
+        asc(tournamentPlayers.status),
+        asc(tournamentPlayers.waitlistPosition),
+        asc(tournamentPlayers.createdAt),
+      );
+    return {
+      rows: joined.map((row) => row.participant),
+      items: joined.map((row) => ({
+        participant: row.participant,
+        player: toPlayerDto(row.player),
+      })),
+    };
+  };
 
-  const items = joined.map((row) => ({
-    participant: row.participant,
-    player: toPlayerDto(row.player),
-  }));
+  let snapshot = await load();
+  const byId = new Map(snapshot.rows.map((row) => [row.playerId, row]));
+  const brokenLink = snapshot.rows.some((row) => {
+    const partnerId = row.partnerPlayerId;
+    if (!partnerId) return false;
+    const partner = byId.get(partnerId);
+    return !partner || partner.partnerPlayerId !== row.playerId;
+  });
+  if (brokenLink && (await healMergedPartnerLinks(db, tournamentId))) {
+    snapshot = await load();
+  }
+
   return {
-    rows: joined.map((row) => row.participant),
-    participants: attachPartners(items),
+    rows: snapshot.rows,
+    participants: attachPartners(snapshot.items),
   };
 }
 

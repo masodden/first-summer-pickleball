@@ -12,6 +12,7 @@ import {
   getTournamentRow,
   listParticipants,
 } from './tournaments.js';
+import { healMergedPartnerLinks } from './players.js';
 
 async function participantDto(
   db: Database,
@@ -213,6 +214,8 @@ export async function unlinkPartner(
 }
 
 export async function loadRegisteredPairs(db: Database, tournamentId: string) {
+  await healMergedPartnerLinks(db, tournamentId);
+
   const joined = await db
     .select({ participant: tournamentPlayers, player: players })
     .from(tournamentPlayers)

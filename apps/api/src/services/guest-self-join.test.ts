@@ -23,6 +23,7 @@ import {
   useInvite,
   viewerFromAccount,
 } from './accounts.js';
+import { classicSixPairBracket, groupLinkedRoster } from '@fsp/shared';
 import {
   createPlayer,
   mergeGuestIntoDupr,
@@ -30,6 +31,7 @@ import {
 } from './players.js';
 import { createTournament, addParticipant, listParticipants } from './tournaments.js';
 import { createTraining, addTrainingParticipant, listTrainingParticipants } from './trainings.js';
+import { linkPartner } from './partners.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'];
 
@@ -521,5 +523,114 @@ describe.skipIf(!DATABASE_URL)('guest self-join', () => {
     const restored = await restoreContactsFromMergedGuests(db, duprId);
     expect(restored.telegramUsername).toBe(`oleg_${tag}`.slice(0, 32));
     expect(restored.avatarUrl).toBe('https://example.com/oleg.jpg');
+  });
+
+  it('merge гостя в DUPR сохраняет пару в fixed_pairs', async () => {
+    const adminAccount = await insertAccount('ПарыАдмин');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const tournament = await createTournament(
+      db,
+      {
+        title: `Pairs merge ${tag}`,
+        format: 'fixed_pairs',
+        startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        courts: 1,
+        maxPlayers: 8,
+        pointsToWin: 11,
+        bracketConfig: classicSixPairBracket(),
+      },
+      admin,
+    );
+
+    const anchor = await createPlayer(
+      db,
+      {
+        firstName: 'Анкор',
+        lastName: tag.slice(0, 4),
+        duprId: `A${tag.slice(0, 5)}`.toUpperCase(),
+      },
+      admin,
+    );
+    const guest = await createPlayer(db, { firstName: 'Гость', lastName: 'Партнёр', duprId: null }, admin);
+    await addParticipant(db, tournament.id, anchor.id, admin, { bySelf: false });
+    await addParticipant(db, tournament.id, guest.id, admin, { bySelf: false });
+    await linkPartner(db, tournament.id, anchor.id, guest.id, admin);
+
+    const duprId = `D${tag.slice(0, 5)}`.toUpperCase();
+    await mergeGuestIntoDupr(db, guest.id, duprId, admin);
+
+    const { participants } = await listParticipants(db, tournament.id);
+    const roster = groupLinkedRoster(participants.filter((item) => item.status === 'registered'));
+    expect(roster.pairs).toHaveLength(1);
+    expect(roster.unpaired).toHaveLength(0);
+    const ids = new Set(roster.pairs[0]!.map((item) => item.player.id));
+    expect(ids.has(anchor.id)).toBe(true);
+    expect(ids.has(duprId)).toBe(true);
+  });
+
+  it('подтягивает пару, если merge уже разъехался (старые данные)', async () => {
+    const adminAccount = await insertAccount('HealАдмин');
+    const [adminRow] = await db
+      .update(accounts)
+      .set({ role: 'admin' })
+      .where(eq(accounts.id, adminAccount.id))
+      .returning();
+    const admin = viewerFromAccount(adminRow as AccountRow);
+
+    const tournament = await createTournament(
+      db,
+      {
+        title: `Pairs heal ${tag}`,
+        format: 'fixed_pairs',
+        startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        courts: 1,
+        maxPlayers: 8,
+        pointsToWin: 11,
+        bracketConfig: classicSixPairBracket(),
+      },
+      admin,
+    );
+
+    const anchor = await createPlayer(
+      db,
+      {
+        firstName: 'Хил',
+        lastName: tag.slice(0, 4),
+        duprId: `H${tag.slice(0, 5)}`.toUpperCase(),
+      },
+      admin,
+    );
+    const guest = await createPlayer(db, { firstName: 'Гость', lastName: 'Хил', duprId: null }, admin);
+    const duprId = `K${tag.slice(0, 5)}`.toUpperCase();
+    await db.insert(players).values({
+      id: duprId,
+      duprId,
+      firstName: 'Катя',
+      lastName: 'DUPR',
+      isGuest: false,
+    });
+
+    await addParticipant(db, tournament.id, anchor.id, admin, { bySelf: false });
+    await addParticipant(db, tournament.id, guest.id, admin, { bySelf: false });
+    await linkPartner(db, tournament.id, anchor.id, guest.id, admin);
+
+    await db
+      .update(tournamentPlayers)
+      .set({ playerId: duprId })
+      .where(
+        and(eq(tournamentPlayers.tournamentId, tournament.id), eq(tournamentPlayers.playerId, guest.id)),
+      );
+    await db.update(players).set({ mergedIntoId: duprId }).where(eq(players.id, guest.id));
+
+    const { participants } = await listParticipants(db, tournament.id);
+    const roster = groupLinkedRoster(participants.filter((item) => item.status === 'registered'));
+    expect(roster.pairs).toHaveLength(1);
+    expect(roster.unpaired).toHaveLength(0);
   });
 });
