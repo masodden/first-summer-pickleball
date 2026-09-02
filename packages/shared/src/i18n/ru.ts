@@ -366,6 +366,7 @@ export const ru = {
   'match.vs': 'против',
   'match.enterScore': 'Ввести счёт',
   'match.nextRound': 'Перейти к следующему раунду',
+  'match.nextRoundShort': 'Следующий',
   'match.createNextRound': 'Создать следующий раунд',
   'match.previousRound': 'Предыдущий раунд',
   'match.reshuffle': 'Перемешать игроков',

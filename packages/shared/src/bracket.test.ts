@@ -3,6 +3,7 @@ import {
   classicSixPairBracket,
   classicTwelvePairBracket,
   displayStageName,
+  gameScoreIssue,
   gameSettingsForMatch,
   groupStagesByGames,
   isCompleteGame,
@@ -179,6 +180,18 @@ describe('isCompleteGame', () => {
     expect(isCompleteGame(11, 10, rules)).toBe(false);
     expect(isCompleteGame(12, 10, rules)).toBe(true);
     expect(isCompleteGame(15, 10, rules)).toBe(false);
+  });
+
+  it('с таймером можно остановиться раньше лимита, но не выше', () => {
+    const timed = { pointsToWin: 11, winByTwo: false, allowShort: true, allowTie: true };
+    expect(gameScoreIssue(8, 6, timed)).toBeNull();
+    expect(gameScoreIssue(8, 8, timed)).toBeNull();
+    expect(gameScoreIssue(11, 5, timed)).toBeNull();
+    expect(gameScoreIssue(12, 5, timed)).toBe('over');
+    expect(gameScoreIssue(12, 11, timed)).toBe('over');
+    expect(
+      gameScoreIssue(8, 8, { pointsToWin: 11, winByTwo: false, allowShort: true, allowTie: false }),
+    ).toBe('tie');
   });
 });
 

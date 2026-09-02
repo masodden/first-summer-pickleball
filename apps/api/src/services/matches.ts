@@ -277,8 +277,9 @@ function assertValidGame(
   game: MatchGameDto,
   pointsToWin: number,
   winByTwo: boolean,
+  extras: { allowShort?: boolean; allowTie?: boolean } = {},
 ): void {
-  const issue = gameScoreIssue(game.scoreA, game.scoreB, { pointsToWin, winByTwo });
+  const issue = gameScoreIssue(game.scoreA, game.scoreB, { pointsToWin, winByTwo, ...extras });
   if (issue === 'tie') {
     throw new ApiError('validation_failed', 'В гейме нужен победитель');
   }
@@ -297,6 +298,13 @@ function resolveScorePayload(
 ): { scoreA: number; scoreB: number; games: MatchGameDto[] | null } {
   const config = parseBracketConfig(tournament.format, tournament.bracketConfig, tournament.pointsToWin);
   if (!isFixedPairsFormat(tournament.format) || !config) {
+    const timed = (tournament.matchDurationMin ?? 0) > 0;
+    assertValidGame(
+      { scoreA: input.scoreA, scoreB: input.scoreB },
+      tournament.pointsToWin,
+      false,
+      { allowShort: timed, allowTie: timed && tournament.tieRule === 'draw' },
+    );
     return { scoreA: input.scoreA, scoreB: input.scoreB, games: null };
   }
   const settings = gameSettingsForMatch(config, {

@@ -330,16 +330,23 @@ export type GameScoreIssue = 'tie' | 'short' | 'winByTwo' | 'over';
 export function gameScoreIssue(
   scoreA: number,
   scoreB: number,
-  options: { pointsToWin: number; winByTwo: boolean },
+  options: {
+    pointsToWin: number;
+    winByTwo: boolean;
+    /** Таймер остановил игру раньше лимита — 8:6 при игре до 11 допустим. */
+    allowShort?: boolean;
+    /** Ничья по таймеру, если в турнире разрешён draw. */
+    allowTie?: boolean;
+  },
 ): GameScoreIssue | null {
   if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0) {
     return 'short';
   }
-  if (scoreA === scoreB) return 'tie';
+  if (scoreA === scoreB) return options.allowTie ? null : 'tie';
   const max = Math.max(scoreA, scoreB);
   const min = Math.min(scoreA, scoreB);
   const { pointsToWin, winByTwo } = options;
-  if (max < pointsToWin) return 'short';
+  if (max < pointsToWin) return options.allowShort ? null : 'short';
   if (winByTwo) {
     if (max - min < 2) return 'winByTwo';
     if (max > pointsToWin && max - min !== 2) return 'winByTwo';

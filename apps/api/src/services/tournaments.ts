@@ -288,7 +288,7 @@ export async function createTournament(
       pointsToWin: input.pointsToWin,
       matchDurationMin: input.matchDurationMin ?? null,
       roundsPlanned: input.roundsPlanned ?? null,
-      tieRule: input.tieRule ?? 'draw',
+      tieRule: input.tieRule ?? 'golden_point',
       standingsSort: input.standingsSort ?? ['wins', 'points', 'diff'],
       ratingBalance: input.format === 'fixed_pairs' ? false : (input.ratingBalance ?? true),
       entryFee: input.entryFee ?? null,

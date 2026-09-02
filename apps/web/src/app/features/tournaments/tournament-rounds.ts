@@ -151,10 +151,20 @@ import { MatchCard } from './match-card';
                         }
                       }
                       @case ('finished') {
-                        @if (store.isMexicano() && store.canFinish()) {
+                        @if (store.canCreateNextRound() && store.isLastGeneratedRound()) {
                           <button
                             type="button"
                             class="btn btn--primary"
+                            [disabled]="store.isBusy('next-round')"
+                            (click)="createNextRound()"
+                          >
+                            {{ t()('match.nextRoundShort') }}
+                          </button>
+                        }
+                        @if (store.isMexicano() && store.canFinish()) {
+                          <button
+                            type="button"
+                            class="btn btn--glass"
                             [disabled]="store.isBusy('finish')"
                             (click)="finish()"
                           >
@@ -264,17 +274,15 @@ import { MatchCard } from './match-card';
           </div>
 
           @if (store.currentRound(); as round) {
-            @for (key of [round.index]; track key) {
-              <div
-                class="stack stack--3"
-                [class.round-stage--fwd]="roundDir() === 'fwd'"
-                [class.round-stage--back]="roundDir() === 'back'"
-              >
-                @for (match of round.matches; track match.id) {
-                  <app-match-card [match]="match" />
-                }
-              </div>
-            }
+            <div
+              class="stack stack--3"
+              [class.round-stage--fwd]="roundDir() === 'fwd'"
+              [class.round-stage--back]="roundDir() === 'back'"
+            >
+              @for (match of round.matches; track match.id) {
+                <app-match-card [match]="match" />
+              }
+            </div>
 
             @if (round.sittingOut.length > 0) {
               <section class="glass glass--subtle card--tight stack stack--2">
@@ -298,7 +306,7 @@ import { MatchCard } from './match-card';
                       class="btn btn--primary btn--block"
                       [class.btn--lg]="!(store.isMexicano() && store.canFinish())"
                       [disabled]="store.isBusy('next-round')"
-                      (click)="store.createNextRound()"
+                      (click)="createNextRound()"
                     >
                       {{ isMexicano() ? t()('match.createNextRound') : t()('match.nextRound') }}
                     </button>
@@ -414,6 +422,7 @@ import { MatchCard } from './match-card';
 
     .round-control__bar {
       align-items: center;
+      flex-wrap: wrap;
       gap: var(--space-2);
       min-height: 40px;
     }
@@ -421,6 +430,7 @@ import { MatchCard } from './match-card';
     .round-control__actions {
       display: flex;
       align-items: center;
+      flex-wrap: nowrap;
       gap: var(--space-2);
       flex: 0 0 auto;
     }
@@ -490,8 +500,19 @@ export class TournamentRoundsTab {
   protected goRound(index: number): void {
     const current = this.store.viewRound();
     if (index === current) return;
-    this.roundDir.set(index > current ? 'fwd' : 'back');
+    this.playRoundDir(index > current ? 'fwd' : 'back');
     this.store.showRound(index);
+  }
+
+  protected createNextRound(): void {
+    this.playRoundDir('fwd');
+    void this.store.createNextRound();
+  }
+
+  /** Сброс класса, чтобы анимация сработала повторно без пересоздания карточек. */
+  private playRoundDir(dir: 'fwd' | 'back'): void {
+    this.roundDir.set(null);
+    queueMicrotask(() => this.roundDir.set(dir));
   }
 
   protected readonly allDone = computed(() =>

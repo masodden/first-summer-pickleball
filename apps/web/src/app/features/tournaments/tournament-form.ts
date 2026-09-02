@@ -218,8 +218,8 @@ const FIXED_PAIRS_PLAYER_PRESETS = [24, 16, 12, 8] as const;
           <label class="field">
             <span class="field__label">{{ t()('tournament.tieRule') }}</span>
             <select class="select" [value]="tieRule()" (change)="tieRule.set(tie($event))">
-              <option value="draw">{{ t()('tie.draw') }}</option>
               <option value="golden_point">{{ t()('tie.golden_point') }}</option>
+              <option value="draw">{{ t()('tie.draw') }}</option>
             </select>
           </label>
 
@@ -413,7 +413,7 @@ export class TournamentFormPage {
   protected readonly pointsToWinText = signal('11');
   protected readonly matchDuration = signal('');
   protected readonly rounds = signal('');
-  protected readonly tieRule = signal<TieRule>('draw');
+  protected readonly tieRule = signal<TieRule>('golden_point');
   protected readonly winnerRule = signal<WinnerRuleId>('points_diff');
   protected readonly ratingBalance = signal(true);
   protected readonly bracketConfig = signal<BracketConfig>(classicTwelvePairBracket());

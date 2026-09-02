@@ -369,6 +369,7 @@ export const en: Record<TranslationKey, string> = {
   'match.vs': 'vs',
   'match.enterScore': 'Enter score',
   'match.nextRound': 'Go to next round',
+  'match.nextRoundShort': 'Next',
   'match.createNextRound': 'Create next round',
   'match.previousRound': 'Previous round',
   'match.reshuffle': 'Reshuffle players',

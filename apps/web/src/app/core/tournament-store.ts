@@ -237,11 +237,12 @@ export class TournamentStore {
     return 'checkin.notAllConfirmed';
   });
 
-  /** Перемешать пары можно, пока ни один матч не начали. */
+  /** Перемешать пары можно, пока ни один матч не начали. В mexicano первый раунд
+   *  собирается по рейтингу, дальше — по таблице, поэтому кнопки нет. */
   readonly canReshuffle = computed(() => {
     const tournament = this.tournamentSignal();
     if (!tournament?.canManage || tournament.status !== 'running') return false;
-    if (this.isFixedPairs()) return false;
+    if (this.isFixedPairs() || this.isMexicano()) return false;
     return this.roundsSignal().every((round) =>
       round.matches.every((match) => match.status === 'scheduled'),
     );

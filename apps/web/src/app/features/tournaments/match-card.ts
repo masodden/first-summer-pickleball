@@ -505,13 +505,13 @@ export class MatchCard {
         winsToTake: this.match().winsToTake,
       });
     }
-    const timed = (this.store.tournament()?.matchDurationMin ?? 0) > 0;
-    if (this.store.isFixedPairs() || !timed) {
-      return gameScoreIssue(this.draftA(), this.draftB(), settings);
-    }
-    const tieAllowed = this.store.tournament()?.tieRule === 'draw';
-    if (this.draftA() === this.draftB() && !tieAllowed) return 'tie';
-    return null;
+    const timed =
+      !this.store.isFixedPairs() && (this.store.tournament()?.matchDurationMin ?? 0) > 0;
+    return gameScoreIssue(this.draftA(), this.draftB(), {
+      ...settings,
+      allowShort: timed,
+      allowTie: timed && this.store.tournament()?.tieRule === 'draw',
+    });
   });
 
   protected readonly scoreValid = computed(() => this.scoreIssue() === null);
