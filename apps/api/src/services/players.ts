@@ -394,7 +394,7 @@ export async function adoptGuestIntoPlayer(
 
     const affectedTournaments = new Set(guestEntries.map((entry) => entry.tournamentId));
     for (const tournamentId of affectedTournaments) {
-      await restoreOneWayPartnerLinks(tx as Database, tournamentId);
+      await restoreOneWayPartnerLinks(tx, tournamentId);
     }
     // Фото может быть только на аккаунте (telegramPhotoUrl), а не на карточке гостя.
     const [guestAccount] = await tx
@@ -478,7 +478,7 @@ export async function healMergedPartnerLinks(
 }
 
 async function restoreOneWayPartnerLinks(
-  db: Database,
+  db: Pick<Database, 'select' | 'update'>,
   tournamentId: string,
 ): Promise<boolean> {
   const rows = await db
