@@ -3,7 +3,7 @@
  * было понятно, какая сборка у него на телефоне. commit-msg хук поднимает
  * patch (или minor при `feat:`), если в коммите версию не меняли.
  */
-export const APP_VERSION = '0.10.8';
+export const APP_VERSION = '0.10.9';
 
 /** Как приложение называется в шапке, боте, DUPR-экспорте и манифесте. */
 export const APP_NAME = 'PICKLEBALL Events';
