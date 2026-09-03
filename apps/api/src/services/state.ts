@@ -270,7 +270,6 @@ export async function computeTournamentStandings(
             ratingUpdatedAt: null,
             ratingSource: null,
             ratingStale: false,
-            pendingImportRating: null,
             avatarUrl: null,
             telegramUsername: null,
             clubRole: 'user',

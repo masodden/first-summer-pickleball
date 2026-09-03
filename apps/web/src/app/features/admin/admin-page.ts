@@ -241,7 +241,7 @@ import { PlayerLine } from '../../ui/player-line';
               t()('import.report', {
                 created: result.created,
                 updated: result.updated,
-                conflicts: result.conflicts,
+                skipped: result.skipped,
               })
             }}
           </div>

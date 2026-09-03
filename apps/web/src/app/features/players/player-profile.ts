@@ -141,38 +141,6 @@ import { consumeFirstVisit } from '../../core/motion';
                 {{ t()('common.save') }}
               </button>
             </div>
-
-            @if (data.player.pendingImportRating !== null) {
-              <div class="stack stack--2">
-                <span class="small">
-                  {{
-                    t()('rating.importConflict', {
-                      value: data.player.pendingImportRating.toFixed(3),
-                    })
-                  }}
-                </span>
-                <div class="row">
-                  <button
-                    type="button"
-                    class="btn btn--sm btn--glass grow"
-                    (click)="resolveConflict(false)"
-                  >
-                    {{ t()('rating.keepCurrent') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn--sm btn--primary grow"
-                    (click)="resolveConflict(true)"
-                  >
-                    {{
-                      t()('rating.acceptImport', {
-                        value: data.player.pendingImportRating.toFixed(3),
-                      })
-                    }}
-                  </button>
-                </div>
-              </div>
-            }
           </section>
 
           <section class="glass card--tight stack stack--3">
@@ -681,16 +649,6 @@ export class PlayerProfilePage {
       this.toast.failure(error, () => void this.remove());
     } finally {
       this.saving.set(false);
-    }
-  }
-
-  protected async resolveConflict(accept: boolean): Promise<void> {
-    try {
-      await this.api.resolveRatingConflict(this.id(), accept);
-      this.profile.reload();
-      this.toast.success(this.i18n.translate('rating.updated'));
-    } catch (error) {
-      this.toast.failure(error, () => void this.resolveConflict(accept));
     }
   }
 

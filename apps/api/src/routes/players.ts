@@ -18,7 +18,6 @@ import {
   deletePlayer,
   getPlayerRow,
   mergeGuestIntoDupr,
-  resolveRatingConflict,
   searchPlayers,
   setDoublesRating,
   updatePlayer,
@@ -91,13 +90,6 @@ export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): voi
     const viewer = requireViewer(request);
     const body = parse(updateRatingSchema, request.body);
     const player = await setDoublesRating(db, request.params.id, body.doublesRating, viewer);
-    return { player };
-  });
-
-  app.post<{ Params: { id: string } }>('/api/players/:id/rating-conflict', async (request) => {
-    const viewer = requireViewer(request);
-    const body = parse(z.object({ accept: z.boolean() }), request.body);
-    const player = await resolveRatingConflict(db, request.params.id, body.accept, viewer);
     return { player };
   });
 

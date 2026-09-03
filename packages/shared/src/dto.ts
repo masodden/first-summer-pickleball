@@ -30,8 +30,6 @@ export interface PlayerDto {
   ratingSource: RatingSource | null;
   /** Рейтинг давно не обновляли — чип показывается приглушённым. */
   ratingStale: boolean;
-  /** В свежем импорте значение отличается от текущего; ждёт решения модератора. */
-  pendingImportRating: number | null;
   avatarUrl: string | null;
   telegramUsername: string | null;
   /** Роль в клубе на этой карточке (DUPR), не на Telegram-аккаунте. */
@@ -260,7 +258,6 @@ export interface VenueDto {
 export interface ImportReportDto {
   created: number;
   updated: number;
-  conflicts: number;
   skipped: number;
   total: number;
 }

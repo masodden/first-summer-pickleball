@@ -69,8 +69,6 @@ export const players = pgTable(
     singlesRating: numeric({ precision: 4, scale: 3, mode: 'number' }),
     ratingUpdatedAt: timestamp({ withTimezone: true }),
     ratingSource: ratingSourceEnum(),
-    /** Значение из свежей выгрузки, которое расходится с ручным. Ждёт решения модератора. */
-    pendingImportRating: numeric({ precision: 4, scale: 3, mode: 'number' }),
     avatarUrl: text(),
     telegramUsername: text(),
     /**

@@ -228,8 +228,6 @@ export async function setDoublesRating(
       doublesRating: rating,
       ratingUpdatedAt: rating === null ? null : new Date(),
       ratingSource: rating === null ? null : source,
-      // Расхождение с выгрузкой считается разрешённым: человек только что решил.
-      pendingImportRating: null,
       updatedAt: new Date(),
     })
     .where(eq(players.id, playerId))
@@ -255,53 +253,6 @@ export async function getRatingHistory(db: Database, playerId: string) {
     .orderBy(desc(playerRatingHistory.createdAt))
     .limit(50);
   return rows.map(toRatingHistoryDto);
-}
-
-/** Принять или отклонить значение рейтинга из свежей выгрузки. */
-export async function resolveRatingConflict(
-  db: Database,
-  playerId: string,
-  accept: boolean,
-  actor: Viewer,
-): Promise<PlayerDto> {
-  const current = await getPlayerRow(db, playerId);
-  if (!canEditPlayer(actor, playerId)) throw forbidden();
-  if (current.pendingImportRating === null) {
-    return toPlayerDto(current);
-  }
-
-  if (!accept) {
-    const [row] = await db
-      .update(players)
-      .set({ pendingImportRating: null, updatedAt: new Date() })
-      .where(eq(players.id, playerId))
-      .returning();
-    return toPlayerDto(row as PlayerRow);
-  }
-
-  const rating = current.pendingImportRating;
-  const [row] = await db
-    .update(players)
-    .set({
-      doublesRating: rating,
-      ratingUpdatedAt: new Date(),
-      ratingSource: 'import',
-      pendingImportRating: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(players.id, playerId))
-    .returning();
-
-  await db.insert(playerRatingHistory).values({
-    playerId,
-    previousRating: current.doublesRating,
-    rating,
-    source: 'import',
-    changedByAccountId: actor.accountId,
-    changedByName: actor.displayName,
-  });
-
-  return toPlayerDto(row as PlayerRow);
 }
 
 /**

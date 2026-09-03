@@ -476,9 +476,6 @@ export const en: Record<TranslationKey, string> = {
   'rating.historyEmpty': 'No changes yet',
   'rating.revert': 'Restore this value',
   'rating.range': 'From 2.000 to 8.000',
-  'rating.importConflict': 'The latest import has a different value: {{value}}',
-  'rating.acceptImport': 'Accept {{value}}',
-  'rating.keepCurrent': 'Keep current',
 
   'settings.title': 'Settings',
   'settings.language': 'Language',
@@ -554,10 +551,7 @@ export const en: Record<TranslationKey, string> = {
   'import.upload': 'Choose file',
   'import.run': 'Import',
   'import.done': 'Import finished',
-  'import.report': 'Added {{created}}, updated {{updated}}, conflicts {{conflicts}}',
-  'import.conflicts': 'Rating conflicts',
-  'import.conflictsHint':
-    'These players had their rating set manually and the import has a different value. Choose which one to keep.',
+  'import.report': 'Added {{created}}, updated {{updated}}, unchanged {{skipped}}',
   'import.badFile': 'Could not read the file. Use CSV, JSON, or players.js from a DUPR export.',
 
   'admin.title': 'Administration',

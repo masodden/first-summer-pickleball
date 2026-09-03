@@ -269,10 +269,6 @@ export class TournamentApi {
     );
   }
 
-  resolveRatingConflict(id: string, accept: boolean): Promise<{ player: PlayerDto }> {
-    return this.api.post(`/api/players/${id}/rating-conflict`, { accept });
-  }
-
   mergeGuest(id: string, duprId: string): Promise<{ player: PlayerDto }> {
     return this.api.post(`/api/players/${id}/merge`, { duprId });
   }

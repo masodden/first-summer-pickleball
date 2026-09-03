@@ -27,7 +27,6 @@ export function toPlayerDto(row: PlayerRow, options: { isClaimed?: boolean } = {
     ratingUpdatedAt: row.ratingUpdatedAt?.toISOString() ?? null,
     ratingSource: row.ratingSource,
     ratingStale: isRatingStale(row.ratingUpdatedAt),
-    pendingImportRating: row.pendingImportRating,
     avatarUrl: row.avatarUrl,
     telegramUsername: row.telegramUsername,
     clubRole: row.clubRole,

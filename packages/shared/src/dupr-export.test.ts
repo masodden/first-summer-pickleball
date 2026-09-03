@@ -23,7 +23,6 @@ function player(id: string, fullName: string, duprId: string | null = id): Playe
     ratingUpdatedAt: null,
     ratingSource: 'import',
     ratingStale: false,
-    pendingImportRating: null,
     avatarUrl: null,
     telegramUsername: null,
     clubRole: 'user',

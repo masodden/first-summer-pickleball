@@ -62,7 +62,7 @@ async function main(): Promise<void> {
 
     console.log(
       `Готово. Добавлено: ${report.created}, обновлено: ${report.updated}, ` +
-        `расхождений рейтинга: ${report.conflicts}, без изменений: ${report.skipped}`,
+        `без изменений: ${report.skipped}`,
     );
   } finally {
     await client.end({ timeout: 5 });

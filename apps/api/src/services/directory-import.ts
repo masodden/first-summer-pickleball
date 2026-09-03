@@ -212,12 +212,11 @@ export interface ImportOptions {
 /**
  * Заливает справочник в базу.
  *
- * Сопоставление идёт по DUPR ID, поэтому дубликаты невозможны. Ручные правки
- * защищены: если рейтинг ставили руками и в выгрузке другое значение, оно
- * попадает в `pendingImportRating` и ждёт решения модератора.
+ * Сопоставление идёт по DUPR ID, поэтому дубликаты невозможны.
+ * Если парный рейтинг в выгрузке отличается от текущего — пишем новое.
  *
  * Уже существующие карточки: имена не перетираем (в т.ч. если правили у нас).
- * Обновляем только рейтинг. Telegram-привязки не трогаем.
+ * Telegram-привязки не трогаем.
  */
 export async function importDirectory(
   db: Database,
@@ -227,7 +226,6 @@ export async function importDirectory(
   const report: ImportReportDto = {
     created: 0,
     updated: 0,
-    conflicts: 0,
     skipped: 0,
     total: entries.length,
   };
@@ -284,22 +282,13 @@ export async function importDirectory(
         touched = true;
       }
 
-      const manualRating = current.ratingSource === 'moderator' || current.ratingSource === 'self';
       const ratingDiffers =
         entry.doublesRating !== null && current.doublesRating !== entry.doublesRating;
 
-      if (ratingDiffers && manualRating) {
-        // Не перетираем ручное значение: показываем расхождение модератору.
-        if (current.pendingImportRating !== entry.doublesRating) {
-          patch.pendingImportRating = entry.doublesRating;
-          touched = true;
-        }
-        report.conflicts += 1;
-      } else if (ratingDiffers) {
+      if (ratingDiffers) {
         patch.doublesRating = entry.doublesRating;
         patch.ratingUpdatedAt = now;
         patch.ratingSource = 'import';
-        patch.pendingImportRating = null;
         touched = true;
         await db.insert(playerRatingHistory).values({
           playerId: current.id,

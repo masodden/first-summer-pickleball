@@ -473,9 +473,6 @@ export const ru = {
   'rating.historyEmpty': 'Изменений пока не было',
   'rating.revert': 'Вернуть это значение',
   'rating.range': 'От 2.000 до 8.000',
-  'rating.importConflict': 'В свежей выгрузке другое значение: {{value}}',
-  'rating.acceptImport': 'Принять {{value}}',
-  'rating.keepCurrent': 'Оставить текущее',
 
   'settings.title': 'Настройки',
   'settings.language': 'Язык',
@@ -551,10 +548,7 @@ export const ru = {
   'import.upload': 'Выбрать файл',
   'import.run': 'Импортировать',
   'import.done': 'Импорт завершён',
-  'import.report': 'Добавлено {{created}}, обновлено {{updated}}, расхождений {{conflicts}}',
-  'import.conflicts': 'Расхождения рейтингов',
-  'import.conflictsHint':
-    'У этих игроков рейтинг ставили вручную, и в выгрузке значение другое. Выберите, какое оставить.',
+  'import.report': 'Добавлено {{created}}, обновлено {{updated}}, без изменений {{skipped}}',
   'import.badFile': 'Не удалось прочитать файл. Нужен CSV, JSON или players.js из выгрузки DUPR.',
 
   'admin.title': 'Администрирование',
