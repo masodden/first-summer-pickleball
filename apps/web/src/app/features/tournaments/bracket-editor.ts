@@ -101,7 +101,7 @@ let stageSeq = 0;
             <input
               type="checkbox"
               [checked]="config().groupGames.winByTwo"
-              (change)="setWinByTwo(checked($event))"
+              (change)="patchGroupGames({ winByTwo: checked($event) })"
             />
             <span class="switch__track"></span>
             <span class="switch__thumb"></span>
@@ -162,6 +162,22 @@ let stageSeq = 0;
                   (input)="patchStageGames(stageIndex, { pointsToWin: num($event, 11) })"
                 />
                 <span class="field__hint">{{ t()('bracket.stagePointsHint') }}</span>
+              </label>
+            </div>
+
+            <div class="row row--between">
+              <div class="stack stack--1 grow">
+                <span class="field__label">{{ t()('bracket.winByTwo') }}</span>
+                <span class="field__hint">{{ t()('bracket.winByTwoHint') }}</span>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  [checked]="stage.games.winByTwo"
+                  (change)="patchStageGames(stageIndex, { winByTwo: checked($event) })"
+                />
+                <span class="switch__track"></span>
+                <span class="switch__thumb"></span>
               </label>
             </div>
 
@@ -312,13 +328,12 @@ export class BracketEditor {
   protected readonly issues = computed(() => validateBracketConfig(this.config()));
 
   protected applyPreset(kind: 'twelve' | 'six'): void {
-    const winByTwo = this.config().groupGames.winByTwo;
     if (kind === 'twelve') {
-      this.changed.emit(classicTwelvePairBracket(winByTwo));
+      this.changed.emit(classicTwelvePairBracket());
       this.presetApplied.emit({ players: 24, courts: 6 });
       return;
     }
-    this.changed.emit(classicSixPairBracket(this.config().groupGames.pointsToWin, winByTwo));
+    this.changed.emit(classicSixPairBracket(this.config().groupGames.pointsToWin));
     this.presetApplied.emit({ players: 12, courts: 3 });
   }
 
@@ -328,14 +343,6 @@ export class BracketEditor {
 
   protected patchGroupGames(partial: Partial<BracketConfig['groupGames']>): void {
     this.patch({ groupGames: { ...this.config().groupGames, ...partial } });
-  }
-
-  protected setWinByTwo(winByTwo: boolean): void {
-    const stages = this.config().stages.map((stage) => ({
-      ...stage,
-      games: { ...stage.games, winByTwo },
-    }));
-    this.patch({ groupGames: { ...this.config().groupGames, winByTwo }, stages });
   }
 
   protected patchStage(index: number, partial: Partial<BracketStage>): void {
@@ -372,7 +379,7 @@ export class BracketEditor {
           id,
           kind: 'playoff',
           name: this.i18n.translate('bracket.stagePlayoff'),
-          games: { ...this.config().groupGames, winsToTake: 2 },
+          games: { ...this.config().groupGames, winsToTake: 2, winByTwo: false },
           slots: [{ id: `${id}1`, sourceA: '', sourceB: '' }],
         },
       ],
