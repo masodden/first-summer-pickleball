@@ -27,6 +27,8 @@ export interface PairMatch {
   teamA: EnginePair;
   teamB: EnginePair;
   groupIndex: number;
+  stage?: 'group' | 'playoff' | 'consolation';
+  bracketSlot?: string;
 }
 
 /** Посев: выше суммарный DUPR, при равенстве — стабильный id. */
@@ -83,8 +85,85 @@ export interface PackedPairMatch extends PairMatch {
 }
 
 /**
+ * Чем меньше число — тем важнее матч и тем ближе корт 1.
+ * Финал / полуфинал впереди, утешение и дружеские — сзади.
+ */
+export function pairCourtRank(match: Pick<PairMatch, 'stage' | 'bracketSlot'>): number {
+  if (match.stage === 'group' || !match.stage) return 100;
+  const slot = match.bracketSlot ?? '';
+  if (slot === 'final') return 0;
+  if (slot === 'bronze') return 1;
+  const semi = /^sf(\d*)$/i.exec(slot);
+  if (semi) return 10 + Math.max(0, Number(semi[1] || '1') - 1);
+  const quarter = /^qf(\d*)$/i.exec(slot);
+  if (quarter) return 20 + Math.max(0, Number(quarter[1] || '1') - 1);
+  if (match.stage === 'playoff') return 15;
+  if (slot.startsWith('p58')) return 32;
+  if (slot === 'p5') return 35;
+  if (slot === 'p7') return 37;
+  if (slot.startsWith('p912')) return 42;
+  if (slot === 'p9') return 43;
+  if (slot === 'p11') return 45;
+  if (slot === 'friendly' || slot.includes('friendly')) return 80;
+  const place = Number((/\d+/.exec(slot) ?? [])[0]);
+  return Number.isFinite(place) ? 30 + place : 50;
+}
+
+function isConsolationMatch(match: Pick<PairMatch, 'stage'>): boolean {
+  return match.stage === 'consolation';
+}
+
+function comparePairCourts(left: PairMatch, right: PairMatch): number {
+  return (
+    pairCourtRank(left) - pairCourtRank(right) ||
+    (left.bracketSlot ?? '').localeCompare(right.bracketSlot ?? '')
+  );
+}
+
+function lastFreeCourt(used: readonly number[], courts: number): number | null {
+  for (let court = courts; court >= 1; court -= 1) {
+    if (!used.includes(court)) return court;
+  }
+  return null;
+}
+
+function firstFreeCourt(used: readonly number[], courts: number): number | null {
+  for (let court = 1; court <= courts; court += 1) {
+    if (!used.includes(court)) return court;
+  }
+  return null;
+}
+
+/**
+ * Титульные — с корта 1 вверх (четверти 1–4, полуфинал/финал 1–2).
+ * Утешение — с последних свободных вниз. Занятые корты (уже идущие игры)
+ * не трогаем: новый круг из-за этого не открываем.
+ */
+export function assignPairCourts(
+  matches: readonly PairMatch[],
+  courts: number,
+  occupiedCourts: readonly number[] = [],
+): PackedPairMatch[] {
+  const used = occupiedCourts.filter((court) => court >= 1 && court <= courts);
+  const title = [...matches].filter((match) => !isConsolationMatch(match)).sort(comparePairCourts);
+  const consolation = [...matches].filter(isConsolationMatch).sort(comparePairCourts);
+  const assigned: PackedPairMatch[] = [];
+
+  const take = (match: PairMatch, fromBack: boolean): void => {
+    const court = fromBack ? lastFreeCourt(used, courts) : firstFreeCourt(used, courts);
+    if (court === null) return;
+    used.push(court);
+    assigned.push({ ...match, court });
+  };
+
+  for (const match of title) take(match, false);
+  for (const match of consolation) take(match, true);
+  return assigned;
+}
+
+/**
  * Раскладывает матчи по раундам: в раунде не больше `courts` игр,
- * одна пара не играет дважды за раунд.
+ * одна пара не играет дважды за раунд. Корты внутри круга — по важности.
  */
 export function packPairMatches(
   fixtures: readonly PairMatch[],
@@ -115,13 +194,13 @@ export function packPairMatches(
       }
       used.add(match.teamA.id);
       used.add(match.teamB.id);
-      round.push({ ...match, court: round.length + 1 });
+      round.push({ ...match, court: 0 });
       remaining.splice(i, 1);
     }
     if (round.length === 0) {
       throw new ScheduleError('schedule_impossible', 'Не удалось разложить матчи по кортам');
     }
-    rounds.push(round);
+    rounds.push(assignPairCourts(round, courts));
     sittingPairIds.push(allIds.filter((id) => !used.has(id)));
   }
   return { rounds, sittingPairIds };
@@ -139,16 +218,10 @@ export interface SeatedPairMatch {
   court: number;
 }
 
-function firstFreeCourt(used: readonly number[], courts: number): number | null {
-  for (let court = 1; court <= courts; court += 1) {
-    if (!used.includes(court)) return court;
-  }
-  return null;
-}
-
 /**
  * Добивает уже открытые раунды плей-офф, пока есть свободный корт
- * и пары в этом круге ещё не играют. Остаток — новый packPairMatches.
+ * и пары в этом круге ещё не играют. Титульные сажаем с корта 1,
+ * утешение — с последних. Остаток — новый packPairMatches.
  */
 export function seatPairMatches(
   fixtures: readonly PairMatch[],
@@ -163,14 +236,16 @@ export function seatPairMatches(
   const seated: SeatedPairMatch[] = [];
   const leftover: PairMatch[] = [];
 
-  for (const match of fixtures) {
+  for (const match of [...fixtures].sort(comparePairCourts)) {
     const ids = [match.teamA.id, match.teamB.id];
     let placed = false;
     for (let i = mutable.length - 1; i >= 0; i -= 1) {
       const round = mutable[i]!;
       if (round.usedCourts.length >= courts) continue;
       if (ids.some((id) => round.pairIds.has(id))) continue;
-      const court = firstFreeCourt(round.usedCourts, courts);
+      const court = isConsolationMatch(match)
+        ? lastFreeCourt(round.usedCourts, courts)
+        : firstFreeCourt(round.usedCourts, courts);
       if (court === null) continue;
       round.usedCourts.push(court);
       for (const id of ids) round.pairIds.add(id);

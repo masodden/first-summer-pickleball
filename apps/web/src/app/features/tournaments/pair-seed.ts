@@ -1,6 +1,6 @@
 import type { PlayerDto, TeamStandingRowDto } from '@fsp/shared';
 
-/** Посев пары по составу: тот же номер, что в групповой таблице. */
+/** Посев пары по составу: тот же номер, что в сетке плей-офф. */
 export function pairSeed(
   standings: readonly TeamStandingRowDto[],
   players: readonly PlayerDto[],

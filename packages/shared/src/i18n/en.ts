@@ -358,7 +358,7 @@ export const en: Record<TranslationKey, string> = {
   'match.resume': 'Resume',
   'match.finish': 'Finish game',
   'match.finishEarly': 'Finish early',
-  'match.started': 'Game started',
+  'match.started': 'Live',
   'match.paused': 'Paused',
   'match.finishedLabel': 'Game finished',
   'match.skippedLabel': 'Skipped',

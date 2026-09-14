@@ -355,7 +355,7 @@ export const ru = {
   'match.resume': 'Продолжить',
   'match.finish': 'Завершить игру',
   'match.finishEarly': 'Завершить досрочно',
-  'match.started': 'Игра началась',
+  'match.started': 'Идёт',
   'match.paused': 'Пауза',
   'match.finishedLabel': 'Игра завершена',
   'match.skippedLabel': 'Пропущен',

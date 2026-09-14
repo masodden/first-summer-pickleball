@@ -4,6 +4,7 @@ import {
   pairIdFromPlayers,
   resolveSourceToken,
   computeTeamStandings,
+  assignPairCourts,
   seatPairMatches,
   type EnginePair,
   type OpenPairRound,
@@ -220,64 +221,143 @@ export async function syncFixedPairsBracket(db: Database, tournament: Tournament
       fresh.push({
         stage,
         slotId: slot.id,
-        match: { teamA, teamB, groupIndex: 0 },
+        match: {
+          teamA,
+          teamB,
+          groupIndex: 0,
+          stage: stage.kind,
+          bracketSlot: slot.id,
+        },
       });
     }
   }
 
-  if (fresh.length === 0) return changed;
-
-  const playoffRounds = openPlayoffRounds(lined, tournament.courts);
-  const placed = seatPairMatches(
-    fresh.map((item) => item.match),
-    playoffRounds,
-    tournament.courts,
-  );
-
-  const metaOf = (match: PairMatch) =>
-    fresh.find(
-      (item) => item.match.teamA.id === match.teamA.id && item.match.teamB.id === match.teamB.id,
+  if (fresh.length > 0) {
+    const playoffRounds = openPlayoffRounds(lined, tournament.courts);
+    const placed = seatPairMatches(
+      fresh.map((item) => item.match),
+      playoffRounds,
+      tournament.courts,
     );
 
-  for (const seated of placed.seated) {
-    const meta = metaOf(seated.match);
-    await persistMatchInRound(db, tournament.id, seated.roundIndex, {
-      court: seated.court,
-      teamA: seated.match.teamA.players,
-      teamB: seated.match.teamB.players,
-      stage: meta?.stage.kind ?? 'playoff',
-      groupIndex: null,
-      bracketSlot: meta?.slotId ?? null,
-    });
-    changed = true;
+    const metaOf = (match: PairMatch) =>
+      fresh.find(
+        (item) => item.match.teamA.id === match.teamA.id && item.match.teamB.id === match.teamB.id,
+      );
+
+    for (const seated of placed.seated) {
+      const meta = metaOf(seated.match);
+      await persistMatchInRound(db, tournament.id, seated.roundIndex, {
+        court: seated.court,
+        teamA: seated.match.teamA.players,
+        teamB: seated.match.teamB.players,
+        stage: meta?.stage.kind ?? 'playoff',
+        groupIndex: null,
+        bracketSlot: meta?.slotId ?? null,
+      });
+      changed = true;
+    }
+
+    const [maxRow] = await db
+      .select({ value: max(matches.roundIndex) })
+      .from(matches)
+      .where(eq(matches.tournamentId, tournament.id));
+    let nextIndex = (maxRow?.value ?? -1) + 1;
+
+    for (const round of placed.packed.rounds) {
+      await persistRound(db, tournament.id, {
+        index: nextIndex,
+        sittingOut: [],
+        matches: round.map((match) => {
+          const meta = metaOf(match);
+          return {
+            court: match.court,
+            teamA: match.teamA.players,
+            teamB: match.teamB.players,
+            stage: meta?.stage.kind ?? 'playoff',
+            groupIndex: null,
+            bracketSlot: meta?.slotId ?? null,
+          };
+        }),
+      });
+      nextIndex += 1;
+      changed = true;
+    }
   }
 
-  const [maxRow] = await db
-    .select({ value: max(matches.roundIndex) })
-    .from(matches)
-    .where(eq(matches.tournamentId, tournament.id));
-  let nextIndex = (maxRow?.value ?? -1) + 1;
+  if (await rebalanceScheduledKnockoutCourts(db, tournament)) changed = true;
+  return changed;
+}
 
-  for (const round of placed.packed.rounds) {
-    await persistRound(db, tournament.id, {
-      index: nextIndex,
-      sittingOut: [],
-      matches: round.map((match) => {
-        const meta = metaOf(match);
-        return {
-          court: match.court,
-          teamA: match.teamA.players,
-          teamB: match.teamB.players,
-          stage: meta?.stage.kind ?? 'playoff',
-          groupIndex: null,
-          bracketSlot: meta?.slotId ?? null,
-        };
+function courtLocked(item: LinedMatch): boolean {
+  return item.match.status !== 'scheduled' || item.match.scoreA !== null || item.match.scoreB !== null;
+}
+
+/** Титул вперёд, утешение назад — только среди ещё не начатых матчей круга. */
+async function rebalanceScheduledKnockoutCourts(
+  db: Database,
+  tournament: TournamentRow,
+): Promise<boolean> {
+  const lined = await loadLinedMatches(db, tournament.id);
+  const byRound = new Map<number, LinedMatch[]>();
+  for (const item of lined) {
+    if (item.match.stage !== 'playoff' && item.match.stage !== 'consolation') continue;
+    const list = byRound.get(item.match.roundIndex) ?? [];
+    list.push(item);
+    byRound.set(item.match.roundIndex, list);
+  }
+
+  let changed = false;
+  for (const items of byRound.values()) {
+    const locked = items.filter(courtLocked);
+    const movable = items.filter((item) => !courtLocked(item));
+    if (movable.length === 0) continue;
+    const occupied = locked
+      .map((item) => item.match.court)
+      .filter((court) => court >= 1 && court <= tournament.courts);
+    const assigned = assignPairCourts(
+      movable.flatMap((item) => {
+        const teamA = pairFromIds(item.teamA, new Map());
+        const teamB = pairFromIds(item.teamB, new Map());
+        if (!teamA || !teamB) return [];
+        return [
+          {
+            teamA,
+            teamB,
+            groupIndex: 0,
+            stage: item.match.stage === 'consolation' ? ('consolation' as const) : ('playoff' as const),
+            bracketSlot: item.match.bracketSlot ?? undefined,
+          },
+        ];
       }),
-    });
-    nextIndex += 1;
+      tournament.courts,
+      occupied,
+    );
+    const courtBySlot = new Map(
+      assigned.map((match) => [match.bracketSlot ?? '', match.court] as const),
+    );
+    const moves: { id: string; court: number }[] = [];
+    for (const item of movable) {
+      const court = courtBySlot.get(item.match.bracketSlot ?? '');
+      if (court === undefined || court === item.match.court) continue;
+      moves.push({ id: item.match.id, court });
+    }
+    if (moves.length === 0) continue;
+    // Уникальность (раунд, корт): сначала уводим на запасные номера.
+    for (const [index, move] of moves.entries()) {
+      await db
+        .update(matches)
+        .set({ court: 100 + index, updatedAt: new Date() })
+        .where(eq(matches.id, move.id));
+    }
+    for (const move of moves) {
+      await db
+        .update(matches)
+        .set({ court: move.court, updatedAt: new Date() })
+        .where(eq(matches.id, move.id));
+    }
     changed = true;
   }
-
   return changed;
 }
 

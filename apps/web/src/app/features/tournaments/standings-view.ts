@@ -32,12 +32,14 @@ interface Column {
   imports: [RouterLink, Avatar, FlipMove, PairResults],
   template: `
     <div class="stack stack--3">
-      <div class="row row--between">
-        <h2>{{ t()(isFixedPairs() ? 'standings.results' : 'standings.title') }}</h2>
-        @if (status() === 'running') {
-          <span class="chip chip--go chip--live">{{ t()('standings.live') }}</span>
-        }
-      </div>
+      @if (layout() !== 'board') {
+        <div class="row row--between">
+          <h2>{{ t()(isFixedPairs() ? 'standings.results' : 'standings.title') }}</h2>
+          @if (status() === 'running') {
+            <span class="chip chip--go chip--live">{{ t()('standings.live') }}</span>
+          }
+        </div>
+      }
 
       @if (isFixedPairs()) {
         @if (teamStandings().length === 0 && !hasKnockout()) {
@@ -46,6 +48,7 @@ interface Column {
           </div>
         } @else {
           <app-pair-results
+            [layout]="layout()"
             [teamStandings]="teamStandings()"
             [rounds]="rounds()"
             [config]="bracketConfig()"
@@ -196,6 +199,7 @@ export class StandingsView {
   protected readonly t = this.i18n.t;
 
   readonly isFixedPairs = input(false);
+  readonly layout = input<'stack' | 'board'>('stack');
   readonly status = input<TournamentStatus | null>(null);
   readonly tieRule = input<TieRule>('draw');
   readonly standingsSort = input<StandingsSortKey[]>(['wins', 'points', 'diff']);

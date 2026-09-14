@@ -12,6 +12,7 @@ import {
   type TranslationKey,
 } from '@fsp/shared';
 import { I18nService } from '../../core/i18n';
+import { pendingKnockoutMatch, previewSlotTeams } from './knockout-preview';
 import { pairSeed } from './pair-seed';
 
 interface PlaceRow {
@@ -39,6 +40,16 @@ interface KnockoutStageView {
   showHeadings: boolean;
   matches: KnockoutItem[];
 }
+
+interface KnockoutRowView {
+  id: string;
+  name: string;
+  showHeadings: boolean;
+  matches: KnockoutItem[];
+}
+
+/** Полуфиналы, финал и бронза — одна строка на широком табло. */
+const TITLE_ROUND_IDS = new Set(['sf', 'final', 'bronze']);
 
 function pairName(row: TeamStandingRowDto): string {
   return `${row.players[0].fullName} / ${row.players[1].fullName}`;
@@ -113,9 +124,12 @@ function consolationOrder(name: string): number {
 @Component({
   selector: 'app-pair-results',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.layout--board]': "layout() === 'board'",
+  },
   template: `
     @if (places().length > 0) {
-      <section class="stack stack--2">
+      <section class="stack stack--2 places">
         <h3>{{ t()('standings.places') }}</h3>
         <div class="glass card--tight podium">
           @for (row of places(); track row.place) {
@@ -140,70 +154,94 @@ function consolationOrder(name: string): number {
       </section>
     }
 
-    @if (groups().length > 1) {
-      <h3>{{ t()('standings.groupStage') }}</h3>
-    }
-    @for (group of groups(); track group.title) {
-      <section class="stack stack--2">
-        @if (groups().length > 1) {
-          <h4>{{ group.title }}</h4>
-        } @else {
-          <h3>{{ group.title }}</h3>
-        }
-        <div class="glass card--tight table-shell">
-          <div class="scroll-x">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th scope="col">{{ t()('standings.rank') }}</th>
-                  <th scope="col">{{ t()('standings.pair') }}</th>
-                  <th scope="col">{{ t()('standings.wins') }}</th>
-                  <th scope="col">{{ t()('standings.diff') }}</th>
-                  <th scope="col">{{ t()('standings.points') }}</th>
-                  <th scope="col">{{ t()('standings.played') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of group.rows; track row.players[0].id + row.players[1].id) {
+    @if (groups().length > 0) {
+      @if (groups().length > 1) {
+        <h3>{{ t()('standings.groupStage') }}</h3>
+      }
+      <div class="groups-grid">
+        @for (group of groups(); track group.title) {
+        <section class="stack stack--2">
+          @if (groups().length > 1) {
+            <h4>{{ group.title }}</h4>
+          } @else {
+            <h3>{{ group.title }}</h3>
+          }
+          <div class="glass card--tight table-shell">
+            <div class="scroll-x">
+              <table class="table">
+                <thead>
                   <tr>
-                    <td>
-                      <span class="numeric muted">{{ row.rank }}</span>
-                    </td>
-                    <td>
-                      <span class="pair">
-                        <span
-                          class="seed"
-                          [title]="t()('standings.seed', { n: row.seed })"
-                        >[{{ row.seed }}]</span>
-                        {{ row.players[0].fullName }} / {{ row.players[1].fullName }}
-                      </span>
-                    </td>
-                    <td class="numeric strong">{{ row.wins }}</td>
-                    <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
-                    <td class="numeric">{{ row.pointsFor }}</td>
-                    <td class="numeric">{{ row.played }}</td>
+                    <th scope="col">{{ t()('standings.rank') }}</th>
+                    <th scope="col">{{ t()('standings.pair') }}</th>
+                    <th scope="col">{{ t()('standings.wins') }}</th>
+                    <th scope="col">{{ t()('standings.diff') }}</th>
+                    <th scope="col">{{ t()('standings.points') }}</th>
+                    <th scope="col">{{ t()('standings.played') }}</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (row of group.rows; track row.players[0].id + row.players[1].id) {
+                    <tr>
+                      <td>
+                        <span class="numeric muted">{{ row.rank }}</span>
+                      </td>
+                      <td>
+                        <span class="pair">
+                          {{ row.players[0].fullName }}
+                          <span class="pair__sep">/</span>
+                          {{ row.players[1].fullName }}
+                        </span>
+                      </td>
+                      <td class="numeric strong">{{ row.wins }}</td>
+                      <td class="numeric">{{ row.diff > 0 ? '+' + row.diff : row.diff }}</td>
+                      <td class="numeric">{{ row.pointsFor }}</td>
+                      <td class="numeric">{{ row.played }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-        @if (group.notes.length > 0) {
-          <div class="stack stack--1 notes">
-            @for (note of group.notes; track note) {
-              <p class="tiny muted">{{ note }}</p>
-            }
-          </div>
-        }
-      </section>
+          @if (group.notes.length > 0) {
+            <div class="stack stack--1 notes">
+              @for (note of group.notes; track note) {
+                <p class="tiny muted">{{ note }}</p>
+              }
+            </div>
+          }
+        </section>
+      }
+      </div>
     }
 
-    @for (stage of knockout(); track stage.id) {
+    @for (stage of knockoutRows(); track stage.id) {
       <section class="stack stack--2">
-        <h3>{{ stage.name }}</h3>
-        @for (item of stage.matches; track item.match.id) {
-          <article class="glass card--tight knockout">
-            @if (stage.showHeadings) {
+        @if (stage.name) {
+          <h3>{{ stage.name }}</h3>
+        }
+        <div class="knockout-list">
+          @for (item of stage.matches; track item.match.id) {
+            <article
+              class="glass card--tight knockout"
+              [class.knockout--live]="item.match.status === 'running' || item.match.status === 'paused'"
+            >
+            @if (layout() === 'board') {
+              <div class="knockout__head">
+                @if (stage.showHeadings || item.heading) {
+                  <p class="knockout__label">{{ item.heading }}</p>
+                }
+                <span class="knockout__meta">
+                  @if (courtOf(item.match); as court) {
+                    <span>{{ court }}</span>
+                  }
+                  @if (item.match.status === 'running') {
+                    <span class="knockout__live">{{ t()('match.started') }}</span>
+                  } @else if (item.match.status === 'paused') {
+                    <span>{{ t()('match.paused') }}</span>
+                  }
+                </span>
+              </div>
+            } @else if (stage.showHeadings) {
               <p class="knockout__label">{{ item.heading }}</p>
             }
             <div class="knockout__board">
@@ -215,8 +253,13 @@ function consolationOrder(name: string): number {
                 <span class="knockout__name">
                   @if (seedOf(item.match, 'A'); as n) {
                     <span class="seed" [title]="t()('standings.seed', { n })">[{{ n }}]</span>
+                  } @else if (seedOf(item.match, 'B')) {
+                    <span class="seed" aria-hidden="true"></span>
                   }
-                  <span class="knockout__pair">{{ pairLabel(item.match, 'A') }}</span>
+                  <span
+                    class="knockout__pair"
+                    [class.knockout__pair--empty]="!hasPlayers(item.match, 'A')"
+                  >{{ pairLabel(item.match, 'A') }}</span>
                 </span>
                 @for (game of extraSets(item.games); track $index) {
                   <span
@@ -236,8 +279,13 @@ function consolationOrder(name: string): number {
                 <span class="knockout__name">
                   @if (seedOf(item.match, 'B'); as n) {
                     <span class="seed" [title]="t()('standings.seed', { n })">[{{ n }}]</span>
+                  } @else if (seedOf(item.match, 'A')) {
+                    <span class="seed" aria-hidden="true"></span>
                   }
-                  <span class="knockout__pair">{{ pairLabel(item.match, 'B') }}</span>
+                  <span
+                    class="knockout__pair"
+                    [class.knockout__pair--empty]="!hasPlayers(item.match, 'B')"
+                  >{{ pairLabel(item.match, 'B') }}</span>
                 </span>
                 @for (game of extraSets(item.games); track $index) {
                   <span
@@ -252,6 +300,7 @@ function consolationOrder(name: string): number {
             </div>
           </article>
         }
+        </div>
       </section>
     }
   `,
@@ -260,6 +309,61 @@ function consolationOrder(name: string): number {
       display: flex;
       flex-direction: column;
       gap: var(--space-3);
+    }
+
+    .groups-grid {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .knockout-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    @media (min-width: 720px) {
+      :host.layout--board .knockout-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+    }
+
+    @media (min-width: 960px) {
+      :host.layout--board .groups-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+        align-items: start;
+        gap: var(--space-3);
+      }
+
+      :host.layout--board .table th {
+        padding: 8px var(--space-2);
+      }
+
+      :host.layout--board .table td {
+        padding: 7px var(--space-2);
+      }
+
+      :host.layout--board .podium {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: repeat(6, auto);
+        grid-auto-flow: column;
+        column-gap: var(--space-4);
+      }
+
+      :host.layout--board .podium__row:nth-child(7) {
+        border-top: none;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      :host.layout--board .knockout-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
     }
 
     h3 {
@@ -299,14 +403,11 @@ function consolationOrder(name: string): number {
       line-height: 1.35;
     }
 
-    .table .pair {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 0.4em;
-    }
-
     .seed {
       flex-shrink: 0;
+      box-sizing: content-box;
+      width: 3.5ch;
+      text-align: end;
       color: var(--text-faint);
       font-weight: 700;
       font-variant-numeric: tabular-nums;
@@ -371,12 +472,36 @@ function consolationOrder(name: string): number {
       padding: 12px 14px;
     }
 
+    .knockout__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     .knockout__label {
       margin: 0;
+      min-width: 0;
+      flex: 1 1 auto;
       font-size: 11px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-faint);
+    }
+
+    .knockout__meta {
+      flex-shrink: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-faint);
+      text-align: right;
+    }
+
+    .knockout__live {
+      color: var(--success);
+      font-weight: 700;
     }
 
     .knockout__board {
@@ -395,8 +520,10 @@ function consolationOrder(name: string): number {
     .knockout__name {
       display: flex;
       align-items: baseline;
+      justify-content: flex-start;
       gap: 0.4em;
       min-width: 0;
+      text-align: left;
       font-weight: 600;
       color: var(--text-strong);
     }
@@ -406,6 +533,12 @@ function consolationOrder(name: string): number {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      text-align: left;
+    }
+
+    .knockout__pair--empty {
+      color: var(--text-faint);
+      font-weight: 500;
     }
 
     .knockout__pts {
@@ -435,12 +568,17 @@ function consolationOrder(name: string): number {
     .knockout__row--win .knockout__sum {
       color: var(--accent-strong);
     }
+
+    .knockout--live {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 55%, transparent);
+    }
   `,
 })
 export class PairResults {
   readonly teamStandings = input.required<TeamStandingRowDto[]>();
   readonly rounds = input.required<RoundDto[]>();
   readonly config = input<BracketConfig | null>(null);
+  readonly layout = input<'stack' | 'board'>('stack');
 
   private readonly i18n = inject(I18nService);
   protected readonly t = this.i18n.t;
@@ -471,7 +609,7 @@ export class PairResults {
       if (winner) winner.label = pairNameFromPlayers(decided.winner);
       if (loser) loser.label = pairNameFromPlayers(decided.loser);
     }
-    return rows;
+    return rows.every((row) => row.label) ? rows : [];
   });
 
   protected readonly groups = computed((): GroupTable[] => {
@@ -538,12 +676,27 @@ export class PairResults {
       const items: KnockoutItem[] = [];
       for (const slot of stage.slots) {
         const match = bySlot.get(slot.id);
-        if (!match) continue;
-        used.add(match.id);
+        if (match) {
+          used.add(match.id);
+          items.push({
+            heading: slotHeading(config!, slot.id),
+            match,
+            games: playedGames(match),
+          });
+          continue;
+        }
+        const preview = previewSlotTeams(
+          slot.sourceA,
+          slot.sourceB,
+          this.teamStandings(),
+          this.rounds(),
+          config!.groupCount,
+        );
+        if (preview.teamA.length < 2 && preview.teamB.length < 2) continue;
         items.push({
           heading: slotHeading(config!, slot.id),
-          match,
-          games: playedGames(match),
+          match: pendingKnockoutMatch(slot.id, stage.kind, preview.teamA, preview.teamB),
+          games: [],
         });
       }
       if (items.length > 0) {
@@ -579,8 +732,116 @@ export class PairResults {
     });
   });
 
+  protected readonly knockoutRows = computed((): KnockoutRowView[] => {
+    const stages = this.knockout();
+    if (this.layout() !== 'board') {
+      return stages.map((stage) => ({
+        id: stage.id,
+        name: stage.name,
+        showHeadings: stage.showHeadings,
+        matches: stage.matches,
+      }));
+    }
+
+    const rows: KnockoutRowView[] = [];
+    const qf = stages.find((stage) => stage.id === 'qf');
+    if (qf) {
+      rows.push({
+        id: qf.id,
+        name: qf.name,
+        showHeadings: qf.showHeadings,
+        matches: qf.matches,
+      });
+    }
+
+    const titleStages = (this.config()?.stages ?? []).filter((stage) =>
+      TITLE_ROUND_IDS.has(stage.id),
+    );
+    const bySlot = new Map(
+      stages.flatMap((stage) =>
+        stage.matches.map((item) => [item.match.bracketSlot ?? '', item] as const),
+      ),
+    );
+    if (titleStages.length > 0) {
+      const matches: KnockoutItem[] = [];
+      for (const stage of titleStages) {
+        for (const slot of stage.slots) {
+          const existing = bySlot.get(slot.id);
+          if (existing) {
+            matches.push(existing);
+            continue;
+          }
+          const config = this.config();
+          if (!config) continue;
+          const preview = previewSlotTeams(
+            slot.sourceA,
+            slot.sourceB,
+            this.teamStandings(),
+            this.rounds(),
+            config.groupCount,
+          );
+          matches.push({
+            heading: slotHeading(config, slot.id),
+            match: pendingKnockoutMatch(slot.id, stage.kind, preview.teamA, preview.teamB),
+            games: [],
+          });
+        }
+      }
+      if (matches.some((item) => !item.match.id.startsWith('pending:'))) {
+        rows.push({
+          id: titleStages.map((stage) => stage.id).join('+'),
+          name: titleStages.map((stage) => displayStageName(stage.name)).join(' · '),
+          showHeadings: true,
+          matches,
+        });
+      }
+    } else {
+      const title = stages.filter((stage) => TITLE_ROUND_IDS.has(stage.id));
+      if (title.length === 1) {
+        const stage = title[0]!;
+        rows.push({
+          id: stage.id,
+          name: stage.name,
+          showHeadings: stage.showHeadings,
+          matches: stage.matches,
+        });
+      } else if (title.length > 1) {
+        rows.push({
+          id: title.map((stage) => stage.id).join('+'),
+          name: title.map((stage) => stage.name).join(' · '),
+          showHeadings: true,
+          matches: title.flatMap((stage) => stage.matches),
+        });
+      }
+    }
+
+    const rest = stages
+      .filter((stage) => stage.id !== 'qf' && !TITLE_ROUND_IDS.has(stage.id))
+      .flatMap((stage) => stage.matches);
+    for (let index = 0; index < rest.length; index += 4) {
+      const chunk = rest.slice(index, index + 4);
+      rows.push({
+        id: `rest-${index}`,
+        name: '',
+        showHeadings: true,
+        matches: chunk,
+      });
+    }
+    return rows;
+  });
+
   protected pairLabel(match: MatchDto, side: 'A' | 'B'): string {
     return pairLabel(match, side, this.i18n.translate('standings.tbd'));
+  }
+
+  protected hasPlayers(match: MatchDto, side: 'A' | 'B'): boolean {
+    const team = side === 'A' ? match.teamA : match.teamB;
+    return team.players.length > 0;
+  }
+
+  protected courtOf(match: MatchDto): string | null {
+    const name = match.courtName?.trim();
+    return name ? this.i18n.court(name) : null;
   }
 
   protected seedOf(match: MatchDto, side: 'A' | 'B'): number | null {

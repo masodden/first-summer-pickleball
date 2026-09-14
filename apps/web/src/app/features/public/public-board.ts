@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { isFixedPairsFormat, knownSlotHeading, roundDisplayName, type MatchDto, type PlayerDto, type ServerEvent } from '@fsp/shared';
+import { isFixedPairsFormat, knownSlotHeading, roundDisplayName, type MatchDto, type ServerEvent } from '@fsp/shared';
 import { Title } from '@angular/platform-browser';
 import { I18nService } from '../../core/i18n';
 import { RealtimeService } from '../../core/realtime';
@@ -19,7 +19,9 @@ import { Ball } from '../../ui/ball';
 import { StatusBadge } from '../../ui/status-badge';
 import { ScoreTick } from '../../ui/motion';
 import { StandingsView } from '../tournaments/standings-view';
-import { knockoutPairSeed } from '../tournaments/pair-seed';
+
+/** С этой ширины табло раскладывается в дашборд, как на MacBook. */
+const BOARD_LAYOUT_QUERY = '(min-width: 960px)';
 
 /**
  * Публичное табло по короткой ссылке.
@@ -39,8 +41,8 @@ import { knockoutPairSeed } from '../tournaments/pair-seed';
         <div class="skeleton" style="height: 260px"></div>
       </div>
     } @else if (board(); as data) {
-      <div class="stack stack--4">
-        <header class="glass card--tight stack stack--2">
+      <div class="stack stack--4 board">
+        <header class="glass card--tight stack stack--2 board__head">
           <div class="row row--between">
             <div class="row">
               <app-status-badge [status]="data.tournament.status" />
@@ -65,39 +67,42 @@ import { knockoutPairSeed } from '../tournaments/pair-seed';
         </header>
 
         @if (currentRound(); as round) {
-          @for (key of [round.index]; track key) {
+          @if (showLiveCourts()) {
+            @for (key of [round.index]; track key) {
             <section class="stack stack--2 round-in courts">
               <h2>{{ roundHeading(round) }}</h2>
               <div class="courts__grid">
                 @for (match of round.matches; track match.id) {
                   <div class="glass card--tight stack stack--2">
-                    <div class="row row--between">
-                      <span class="tiny faint">{{ courtLine(match) }}</span>
-                      <span class="tiny faint">
+                    <div class="row card-head">
+                      <span class="tiny faint card-title">
+                        {{ courtName(match) }}
+                        @if (matchHeading(match); as heading) {
+                          <span class="card-match">{{ heading }}</span>
+                        }
+                      </span>
+                      <span class="card-status">
                         @switch (match.status) {
                           @case ('running') {
-                            {{ t()('match.started') }}
+                            <span class="chip chip--go">{{ t()('match.started') }}</span>
                           }
                           @case ('paused') {
-                            {{ t()('match.paused') }}
+                            <span class="tiny faint">{{ t()('match.paused') }}</span>
                           }
                           @case ('finished') {
-                            {{ t()('match.finishedLabel') }}
+                            <span class="tiny faint">{{ t()('match.finishedLabel') }}</span>
                           }
                           @case ('skipped') {
-                            {{ t()('match.skippedLabel') }}
+                            <span class="tiny faint">{{ t()('match.skippedLabel') }}</span>
                           }
                           @default {
-                            {{ t()('match.waiting') }}
+                            <span class="tiny faint">{{ t()('match.waiting') }}</span>
                           }
                         }
                       </span>
                     </div>
                     @for (team of [match.teamA, match.teamB]; track $index) {
                       <div class="row team">
-                        @if (teamSeed(match, team.players); as n) {
-                          <span class="seed" [title]="t()('standings.seed', { n })">[{{ n }}]</span>
-                        }
                         <div class="grow stack stack--1">
                           @for (player of team.players; track player.id) {
                             <span class="truncate small strong">{{ player.fullName }}</span>
@@ -110,10 +115,12 @@ import { knockoutPairSeed } from '../tournaments/pair-seed';
                 }
               </div>
             </section>
+            }
           }
         }
 
         <app-standings-view
+          [layout]="boardLayout()"
           [isFixedPairs]="isFixedPairs(data)"
           [status]="data.tournament.status"
           [tieRule]="data.tournament.tieRule"
@@ -148,20 +155,32 @@ import { knockoutPairSeed } from '../tournaments/pair-seed';
       text-align: right;
     }
 
+    .card-head {
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .card-title {
+      min-width: 0;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      white-space: normal;
+    }
+
+    .card-status {
+      flex-shrink: 0;
+      margin-left: auto;
+      text-align: right;
+    }
+
     .team {
       padding: var(--space-2) var(--space-3);
       border-radius: var(--radius-md);
       background: var(--glass-bg-subtle);
       align-items: center;
       gap: 8px;
-    }
-
-    .seed {
-      flex-shrink: 0;
-      color: var(--text-faint);
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      font-feature-settings: 'tnum';
     }
 
     .score {
@@ -187,6 +206,16 @@ import { knockoutPairSeed } from '../tournaments/pair-seed';
       gap: var(--space-2);
     }
 
+    @media (min-width: 960px) {
+      .board {
+        gap: var(--space-3);
+      }
+
+      .board__head h1 {
+        font-size: 22px;
+      }
+    }
+
     @media (min-width: 720px) {
       .courts__grid {
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -205,8 +234,16 @@ export class PublicBoardPage {
 
   protected readonly board = signal<PublicBoardDto | null>(null);
   protected readonly loading = signal(true);
+  /** Дашборд сетки — только широкий экран; телефон остаётся столбиком. */
+  private readonly wideScreen = signal(
+    typeof window !== 'undefined' && window.matchMedia(BOARD_LAYOUT_QUERY).matches,
+  );
 
   constructor() {
+    const media = window.matchMedia(BOARD_LAYOUT_QUERY);
+    this.wideScreen.set(media.matches);
+    const onViewport = (): void => this.wideScreen.set(media.matches);
+    media.addEventListener('change', onViewport);
     effect((onCleanup) => {
       const slug = this.slug();
       this.loading.set(true);
@@ -258,8 +295,13 @@ export class PublicBoardPage {
           // Табло подождёт следующий тик или восстановление сокета.
         });
     }, 15_000);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(timer);
+      media.removeEventListener('change', onViewport);
+    });
   }
+
+  protected readonly boardLayout = computed(() => (this.wideScreen() ? 'board' : 'stack'));
 
   /** Показываем последний раунд, в котором ещё не всё сыграно. */
   protected readonly currentRound = computed(() => {
@@ -267,20 +309,27 @@ export class PublicBoardPage {
     return rounds.find((round) => !round.allScored) ?? rounds[rounds.length - 1] ?? null;
   });
 
+  /** На широком табло живые карточки только у групп: плей-офф уже в сетке. */
+  protected readonly showLiveCourts = computed(() => {
+    const round = this.currentRound();
+    if (!round) return false;
+    if (!this.wideScreen()) return true;
+    return round.matches.some(
+      (match) => match.stage !== 'playoff' && match.stage !== 'consolation',
+    );
+  });
+
   protected isFixedPairs(data: PublicBoardDto): boolean {
     return isFixedPairsFormat(data.tournament.format);
   }
 
-  protected teamSeed(match: MatchDto, players: readonly PlayerDto[]): number | null {
-    return knockoutPairSeed(match.stage, this.board()?.teamStandings ?? [], players);
+  protected courtName(match: MatchDto): string {
+    return this.i18n.court(match.courtName);
   }
 
-  protected courtLine(match: MatchDto): string {
-    const court = this.i18n.court(match.courtName);
+  protected matchHeading(match: MatchDto): string | null {
     const config = this.board()?.bracketConfig;
-    const heading =
-      config && match.bracketSlot ? knownSlotHeading(config, match.bracketSlot) : null;
-    return heading ? `${court} · ${heading}` : court;
+    return config && match.bracketSlot ? knownSlotHeading(config, match.bracketSlot) : null;
   }
 
   protected roundHeading(round: { index: number; matches: MatchDto[] }): string {
