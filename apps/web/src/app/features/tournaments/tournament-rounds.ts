@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { roundDisplayName } from '@fsp/shared';
 import { ClockService, elapsedMs, formatClock } from '../../core/clock';
