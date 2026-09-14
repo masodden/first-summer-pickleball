@@ -9,6 +9,8 @@ import {
   isCompleteGame,
   knownSlotHeading,
   parseBracketConfig,
+  placementSlots,
+  roundDisplayName,
   seriesScoreIssue,
   slotHeading,
   validateBracketConfig,
@@ -151,17 +153,69 @@ describe('slotHeading', () => {
       'p7',
     ]);
     expect(slots[0]).toMatchObject({ sourceA: 'G1.1', sourceB: 'G2.4' });
+    expect(slots[1]).toMatchObject({ sourceA: 'G2.2', sourceB: 'G1.3' });
     expect(slots[2]).toMatchObject({ sourceA: 'G2.1', sourceB: 'G1.4' });
+    expect(slots[3]).toMatchObject({ sourceA: 'G1.2', sourceB: 'G2.3' });
     expect(slots[6]).toMatchObject({ sourceA: 'qf1.W', sourceB: 'qf2.W' });
     expect(slots[12]).toMatchObject({ sourceA: 'sf1.W', sourceB: 'sf2.W' });
     expect(slots[13]).toMatchObject({ sourceA: 'sf1.L', sourceB: 'sf2.L' });
     expect(slots[14]).toMatchObject({ sourceA: 'p58a.W', sourceB: 'p58b.W' });
   });
 
+  it('12 пар: 1-е групп и 1–2 одной группы не в одной половине', () => {
+    const config = classicTwelvePairBracket();
+    const qf = config.stages.find((stage) => stage.id === 'qf')!.slots;
+    const half1 = new Set([qf[0]!.sourceA, qf[0]!.sourceB, qf[1]!.sourceA, qf[1]!.sourceB]);
+    const half2 = new Set([qf[2]!.sourceA, qf[2]!.sourceB, qf[3]!.sourceA, qf[3]!.sourceB]);
+    expect(half1.has('G1.1') !== half1.has('G2.1')).toBe(true);
+    expect(half2.has('G1.1') !== half2.has('G2.1')).toBe(true);
+    expect(half1.has('G1.1') && half1.has('G1.2')).toBe(false);
+    expect(half1.has('G2.1') && half1.has('G2.2')).toBe(false);
+    expect(half2.has('G1.1') && half2.has('G1.2')).toBe(false);
+    expect(half2.has('G2.1') && half2.has('G2.2')).toBe(false);
+  });
+
   it('knownSlotHeading прячет групповые id', () => {
     const config = classicSixPairBracket();
     expect(knownSlotHeading(config, 'sf2')).toBe('Полуфинал 2');
     expect(knownSlotHeading(config, 'G1:a|b:c|d')).toBeNull();
+  });
+
+  it('раунд с полуфиналами называется полуфиналами, даже если рядом утешение', () => {
+    const config = classicTwelvePairBracket();
+    expect(
+      roundDisplayName(config, [
+        { stage: 'playoff', bracketSlot: 'sf1' },
+        { stage: 'playoff', bracketSlot: 'sf2' },
+        { stage: 'consolation', bracketSlot: 'p58a' },
+        { stage: 'consolation', bracketSlot: 'p9' },
+      ]),
+    ).toBe('Полуфиналы');
+    expect(
+      roundDisplayName(config, [
+        { stage: 'playoff', bracketSlot: 'final' },
+        { stage: 'playoff', bracketSlot: 'bronze' },
+        { stage: 'consolation', bracketSlot: 'p5' },
+      ]),
+    ).toBe('Финал');
+    expect(roundDisplayName(config, [{ stage: 'group', bracketSlot: null }])).toBeNull();
+  });
+
+  it('места 1–12 закрывают финал, бронзу и матчи за место', () => {
+    const twelve = placementSlots(classicTwelvePairBracket());
+    expect(twelve).toEqual([
+      { slotId: 'p9', winnerPlace: 9, loserPlace: 10 },
+      { slotId: 'p11', winnerPlace: 11, loserPlace: 12 },
+      { slotId: 'final', winnerPlace: 1, loserPlace: 2 },
+      { slotId: 'bronze', winnerPlace: 3, loserPlace: 4 },
+      { slotId: 'p5', winnerPlace: 5, loserPlace: 6 },
+      { slotId: 'p7', winnerPlace: 7, loserPlace: 8 },
+    ]);
+    expect(placementSlots(classicSixPairBracket())).toEqual([
+      { slotId: 'final', winnerPlace: 1, loserPlace: 2 },
+      { slotId: 'bronze', winnerPlace: 3, loserPlace: 4 },
+      { slotId: 'friendly', winnerPlace: 5, loserPlace: 6 },
+    ]);
   });
 });
 

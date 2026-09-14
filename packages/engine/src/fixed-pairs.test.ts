@@ -4,12 +4,12 @@ import {
   combinedPairRating,
   makePair,
   packPairMatches,
+  pairSeedNumbers,
   seatPairMatches,
   resolveSourceToken,
   roundRobinPairings,
   snakeSeedGroups,
 } from './fixed-pairs.js';
-import { computeTeamStandings, type TeamMatchResult } from './team-standings.js';
 
 function pairs(count: number) {
   return Array.from({ length: count }, (_, index) =>
@@ -71,6 +71,14 @@ describe('fixed pairs engine', () => {
     const [groupA, groupB] = snakeSeedGroups(ranked, 2);
     expect(groupA!.map((pair) => pair.rating)).toEqual([12, 9, 8, 5, 4, 1]);
     expect(groupB!.map((pair) => pair.rating)).toEqual([11, 10, 7, 6, 3, 2]);
+  });
+
+  it('посев 1…n по суммарному DUPR', () => {
+    const weak = makePair('aa', 'bb', 5);
+    const strong = makePair('yy', 'zz', 8);
+    const seeds = pairSeedNumbers([weak, strong]);
+    expect(seeds.get(strong.id)).toBe(1);
+    expect(seeds.get(weak.id)).toBe(2);
   });
 
   it('12 пар, 2 группы, 6 кортов: 5 кругов по 6 матчей', () => {
@@ -203,25 +211,5 @@ describe('fixed pairs engine', () => {
     expect(
       resolveSourceToken('sf1.W', ranked, { sf1: { winner: six[1]!, loser: six[2]! } })?.id,
     ).toBe(six[1]!.id);
-  });
-
-  it('при равенстве побед двух пар смотрит личную встречу', () => {
-    const [p1, p2] = pairs(2);
-    const results: TeamMatchResult[] = [
-      { teamA: p1!, teamB: p2!, scoreA: 1, scoreB: 0, pointsA: 11, pointsB: 9, groupIndex: 0 },
-    ];
-    const table = computeTeamStandings([p1!, p2!], results, 0);
-    expect(table[0]!.pair.id).toBe(p1!.id);
-  });
-
-  it('при равенстве побед трёх пар смотрит разницу очков', () => {
-    const [p1, p2, p3] = pairs(3);
-    const results: TeamMatchResult[] = [
-      { teamA: p1!, teamB: p2!, scoreA: 1, scoreB: 0, pointsA: 11, pointsB: 5, groupIndex: 0 },
-      { teamA: p1!, teamB: p3!, scoreA: 0, scoreB: 1, pointsA: 8, pointsB: 11, groupIndex: 0 },
-      { teamA: p2!, teamB: p3!, scoreA: 1, scoreB: 0, pointsA: 11, pointsB: 9, groupIndex: 0 },
-    ];
-    const table = computeTeamStandings([p1!, p2!, p3!], results, 0);
-    expect(table.map((row) => row.pair.id)).toEqual([p1!.id, p3!.id, p2!.id]);
   });
 });

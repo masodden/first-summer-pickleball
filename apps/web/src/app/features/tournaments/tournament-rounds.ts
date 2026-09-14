@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { roundDisplayName } from '@fsp/shared';
 import { ClockService, elapsedMs, formatClock } from '../../core/clock';
 import { ConfirmService } from '../../core/confirm';
 import { I18nService } from '../../core/i18n';
@@ -56,16 +57,7 @@ import { MatchCard } from './match-card';
               </button>
 
               <div class="center stack stack--1">
-                <span class="strong">
-                  {{
-                    plannedRounds()
-                      ? t()('match.roundOf', {
-                          index: store.viewRound() + 1,
-                          total: plannedRounds() ?? 0,
-                        })
-                      : t()('match.round', { index: store.viewRound() + 1 })
-                  }}
-                </span>
+                <span class="strong">{{ roundHeading() }}</span>
                 @if (roundStatus(); as status) {
                   <span class="tiny muted">{{ status }}</span>
                 }
@@ -494,6 +486,23 @@ export class TournamentRoundsTab {
   protected readonly t = this.i18n.t;
   protected readonly tournament = this.store.tournament;
   protected readonly plannedRounds = this.store.plannedRounds;
+
+  protected readonly roundHeading = computed(() => {
+    const round = this.store.currentRound();
+    const config = this.store.tournament()?.bracketConfig;
+    if (config && round) {
+      const name = roundDisplayName(config, round.matches);
+      if (name) return name;
+    }
+    const planned = this.plannedRounds();
+    if (planned) {
+      return this.i18n.translate('match.roundOf', {
+        index: this.store.viewRound() + 1,
+        total: planned,
+      });
+    }
+    return this.i18n.translate('match.round', { index: this.store.viewRound() + 1 });
+  });
   protected readonly isMexicano = this.store.isMexicano;
   protected readonly roundDir = signal<'fwd' | 'back' | null>(null);
 

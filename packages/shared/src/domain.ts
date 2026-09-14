@@ -143,6 +143,18 @@ export const STANDINGS_SORT_KEYS = [
 ] as const;
 export type StandingsSortKey = (typeof STANDINGS_SORT_KEYS)[number];
 
+/** Почему в группе фиксированных пар одна пара выше другой при равных победах. */
+export const TEAM_TIE_BREAK_KINDS = [
+  'headToHead',
+  'miniLeague',
+  'circularDiff',
+  'pointDiff',
+  'headToHeadDiff',
+  'vsNextHighest',
+  'pointsFor',
+] as const;
+export type TeamTieBreakKind = (typeof TEAM_TIE_BREAK_KINDS)[number];
+
 /** Пресеты правила победителя в форме турнира → цепочка standingsSort. */
 export const WINNER_RULE_IDS = ['points_diff', 'points_wins', 'wins_points'] as const;
 export type WinnerRuleId = (typeof WINNER_RULE_IDS)[number];
@@ -264,6 +276,36 @@ export function groupLinkedRoster<T extends LinkableParticipant>(
   }
 
   return { pairs, unpaired };
+}
+
+type SeedablePlayer = { id: string; doublesRating: number | null };
+type SeedableParticipant = { player: SeedablePlayer };
+
+/** Стартовый лист: по посеву (суммарный DUPR), без номера на карточке. */
+export function sortLinkedPairsBySeed<T extends SeedableParticipant>(
+  pairs: readonly [T, T][],
+  seeds: readonly { seed: number; players: readonly { id: string }[] }[],
+): [T, T][] {
+  const seedOf = (pair: [T, T]): number | null => {
+    const ids = new Set([pair[0].player.id, pair[1].player.id]);
+    const row = seeds.find(
+      (item) =>
+        item.players.length >= 2 &&
+        ids.has(item.players[0]!.id) &&
+        ids.has(item.players[1]!.id),
+    );
+    return row?.seed ?? null;
+  };
+  const rating = (pair: [T, T]) =>
+    (pair[0].player.doublesRating ?? 0) + (pair[1].player.doublesRating ?? 0);
+  return [...pairs].sort((left, right) => {
+    const seedLeft = seedOf(left);
+    const seedRight = seedOf(right);
+    if (seedLeft !== null && seedRight !== null && seedLeft !== seedRight) {
+      return seedLeft - seedRight;
+    }
+    return rating(right) - rating(left) || left[0].player.id.localeCompare(right[0].player.id);
+  });
 }
 
 /** Итоговый статус турнира: завершён или убран в архив. */

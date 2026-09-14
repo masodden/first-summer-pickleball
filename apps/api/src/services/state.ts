@@ -2,8 +2,10 @@ import { and, asc, eq, isNotNull, ne } from 'drizzle-orm';
 import {
   computeStandings,
   computeTeamStandings,
+  combinedPairRating,
   makePair,
   pairIdFromPlayers,
+  pairSeedNumbers,
   resolveMedals,
   type MatchResult,
   type EnginePair,
@@ -21,6 +23,7 @@ import type {
   StandingRowDto,
   StandingsSortKey,
   TeamStandingRowDto,
+  TeamTieBreakKind,
   TournamentStateDto,
 } from '@fsp/shared';
 import type { Database } from '../db/index.js';
@@ -301,11 +304,16 @@ export async function computeTournamentTeamStandings(
   const catalog = new Map<string, EnginePair>();
   const playerById = new Map<string, PlayerDto>();
   for (const { a, b } of pairs) {
-    const pair = makePair(a.player.id, b.player.id);
+    const pair = makePair(
+      a.player.id,
+      b.player.id,
+      combinedPairRating(a.player.doublesRating, b.player.doublesRating),
+    );
     catalog.set(pair.id, pair);
     playerById.set(a.player.id, a.player);
     playerById.set(b.player.id, b.player);
   }
+  const seeds = pairSeedNumbers([...catalog.values()]);
 
   const rows = await db
     .select({ match: matches, lineup: matchPlayers })
@@ -400,6 +408,8 @@ export async function computeTournamentTeamStandings(
         pointsAgainst: row.pointsAgainst,
         diff: row.diff,
         medal,
+        seed: seeds.get(row.pair.id) ?? row.rank,
+        tieBreak: row.tieBreak as TeamTieBreakKind | null,
       });
     }
   }

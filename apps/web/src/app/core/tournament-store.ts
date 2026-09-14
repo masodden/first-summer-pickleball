@@ -2,6 +2,7 @@ import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core'
 import {
   formatDuprExportFilename,
   groupLinkedRoster,
+  sortLinkedPairsBySeed,
   isFixedPairsFormat,
   isUnpairedParticipant,
   validateBracketConfig,
@@ -92,7 +93,9 @@ export class TournamentStore {
     const byId = new Map(items.map((item) => [item.player.id, item]));
     return items.filter((item) => isUnpairedParticipant(item, byId));
   });
-  readonly linkedPairs = computed(() => groupLinkedRoster(this.registered()).pairs);
+  readonly linkedPairs = computed(() =>
+    sortLinkedPairsBySeed(groupLinkedRoster(this.registered()).pairs, this.teamStandingsSignal()),
+  );
   readonly pairCount = computed(() => this.linkedPairs().length);
   /** На вкладке: пары, когда все слинкованы; иначе игроки (ещё есть без пары). */
   readonly rosterTabCount = computed(() => {

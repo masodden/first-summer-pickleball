@@ -6,6 +6,7 @@ import type {
   RatingSource,
   Role,
   StandingsSortKey,
+  TeamTieBreakKind,
   TieRule,
   TournamentFormat,
   TournamentStatus,
@@ -204,6 +205,10 @@ export interface TeamStandingRowDto {
   pointsAgainst: number;
   diff: number;
   medal: 'gold' | 'silver' | 'bronze' | null;
+  /** Посев по суммарному DUPR на весь турнир: 1 — сильнейшая пара. */
+  seed: number;
+  /** На верхней строке ничейной группы по победам; иначе null. */
+  tieBreak: TeamTieBreakKind | null;
 }
 
 export interface TournamentStateDto {

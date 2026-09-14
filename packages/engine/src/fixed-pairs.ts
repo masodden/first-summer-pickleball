@@ -29,10 +29,22 @@ export interface PairMatch {
   groupIndex: number;
 }
 
+/** Посев: выше суммарный DUPR, при равенстве — стабильный id. */
+export function rankPairsBySeed(pairs: readonly EnginePair[]): EnginePair[] {
+  return [...pairs].sort(
+    (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.id.localeCompare(b.id),
+  );
+}
+
+/** Номер посева 1…n по всему составу, как на сетке ATP / PPA. */
+export function pairSeedNumbers(pairs: readonly EnginePair[]): Map<string, number> {
+  return new Map(rankPairsBySeed(pairs).map((pair, index) => [pair.id, index + 1]));
+}
+
 /** Змейка по рейтингу: 1-я пара → группа 0, 2-я → 1, … затем обратно. */
 export function snakeSeedGroups(pairs: readonly EnginePair[], groupCount: number): EnginePair[][] {
   const groups: EnginePair[][] = Array.from({ length: Math.max(1, groupCount) }, () => []);
-  const ranked = [...pairs].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const ranked = rankPairsBySeed(pairs);
   const count = groups.length;
   ranked.forEach((pair, index) => {
     const block = Math.floor(index / count);

@@ -96,12 +96,11 @@ import { SheetDismiss } from '../../ui/motion';
 
           <div class="stack stack--2" [class.stagger]="stagger">
             @if (store.isFixedPairs()) {
-              @for (pair of store.linkedPairs(); track pair[0].id; let index = $index) {
+              @for (pair of store.linkedPairs(); track pair[0].id) {
                 <article
                   class="glass glass--plain pair"
                   [class.pair--confirmed]="pair[0].partnerLocked"
                 >
-                  <span class="pair__index faint numeric">{{ index + 1 }}</span>
                   <div class="pair__body">
                     @for (member of pair; track member.id) {
                       <div class="pair__row">
@@ -458,20 +457,10 @@ import { SheetDismiss } from '../../ui/motion';
 
     .pair {
       display: grid;
-      grid-template-columns: 20px minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: var(--space-2);
       padding: 10px 12px;
       align-items: stretch;
-    }
-
-    .pair__index {
-      width: 20px;
-      align-self: center;
-      text-align: right;
-      flex: 0 0 auto;
-      font-size: 13px;
-      font-weight: 600;
-      line-height: 1;
     }
 
     .pair__body {

@@ -400,6 +400,7 @@ export const en: Record<TranslationKey, string> = {
   'standings.groupStage': 'Group stage',
   'standings.groupN': 'Group {{number}}',
   'standings.podium': 'Podium',
+  'standings.places': 'Places',
   'standings.tbd': '—',
   'standings.rank': '#',
   'standings.player': 'Player',
@@ -419,6 +420,21 @@ export const en: Record<TranslationKey, string> = {
   'standings.medalGold': 'First place',
   'standings.medalSilver': 'Second place',
   'standings.medalBronze': 'Third place',
+  'standings.seed': 'Seed {{n}}',
+  'standings.tie.headToHead':
+    '{{above}} above {{below}}: they won the head-to-head.',
+  'standings.tie.miniLeague':
+    '{{above}} sit above the other pairs on {{wins}} wins — they took more matches among this group.',
+  'standings.tie.circularDiff':
+    '{{pairs}} have the same wins, and among themselves each beat one and lost to the other. So the better group point differential ranks higher.',
+  'standings.tie.pointDiff':
+    'Same number of wins — better point differential goes higher: {{pairs}}.',
+  'standings.tie.headToHeadDiff':
+    'Head-to-head wins are even — more points in those matches goes higher: {{pairs}}.',
+  'standings.tie.vsNextHighest':
+    'Differentials are even — closer result against the leader goes higher: {{pairs}}.',
+  'standings.tie.pointsFor':
+    'Differentials are even — more points scored goes higher: {{pairs}}.',
 
   'player.card': 'Player card',
   'player.profile': 'Profile',

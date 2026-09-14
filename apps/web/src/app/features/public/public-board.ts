@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { isFixedPairsFormat, knownSlotHeading, type MatchDto, type ServerEvent } from '@fsp/shared';
+import { isFixedPairsFormat, knownSlotHeading, roundDisplayName, type MatchDto, type PlayerDto, type ServerEvent } from '@fsp/shared';
 import { Title } from '@angular/platform-browser';
 import { I18nService } from '../../core/i18n';
 import { RealtimeService } from '../../core/realtime';
@@ -19,6 +19,7 @@ import { Ball } from '../../ui/ball';
 import { StatusBadge } from '../../ui/status-badge';
 import { ScoreTick } from '../../ui/motion';
 import { StandingsView } from '../tournaments/standings-view';
+import { knockoutPairSeed } from '../tournaments/pair-seed';
 
 /**
  * Публичное табло по короткой ссылке.
@@ -66,7 +67,7 @@ import { StandingsView } from '../tournaments/standings-view';
         @if (currentRound(); as round) {
           @for (key of [round.index]; track key) {
             <section class="stack stack--2 round-in courts">
-              <h2>{{ t()('match.round', { index: round.index + 1 }) }}</h2>
+              <h2>{{ roundHeading(round) }}</h2>
               <div class="courts__grid">
                 @for (match of round.matches; track match.id) {
                   <div class="glass card--tight stack stack--2">
@@ -94,6 +95,9 @@ import { StandingsView } from '../tournaments/standings-view';
                     </div>
                     @for (team of [match.teamA, match.teamB]; track $index) {
                       <div class="row team">
+                        @if (teamSeed(match, team.players); as n) {
+                          <span class="seed" [title]="t()('standings.seed', { n })">[{{ n }}]</span>
+                        }
                         <div class="grow stack stack--1">
                           @for (player of team.players; track player.id) {
                             <span class="truncate small strong">{{ player.fullName }}</span>
@@ -148,6 +152,16 @@ import { StandingsView } from '../tournaments/standings-view';
       padding: var(--space-2) var(--space-3);
       border-radius: var(--radius-md);
       background: var(--glass-bg-subtle);
+      align-items: center;
+      gap: 8px;
+    }
+
+    .seed {
+      flex-shrink: 0;
+      color: var(--text-faint);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum';
     }
 
     .score {
@@ -257,12 +271,22 @@ export class PublicBoardPage {
     return isFixedPairsFormat(data.tournament.format);
   }
 
+  protected teamSeed(match: MatchDto, players: readonly PlayerDto[]): number | null {
+    return knockoutPairSeed(match.stage, this.board()?.teamStandings ?? [], players);
+  }
+
   protected courtLine(match: MatchDto): string {
     const court = this.i18n.court(match.courtName);
     const config = this.board()?.bracketConfig;
     const heading =
       config && match.bracketSlot ? knownSlotHeading(config, match.bracketSlot) : null;
     return heading ? `${court} · ${heading}` : court;
+  }
+
+  protected roundHeading(round: { index: number; matches: MatchDto[] }): string {
+    const config = this.board()?.bracketConfig;
+    const name = config ? roundDisplayName(config, round.matches) : null;
+    return name ?? this.i18n.translate('match.round', { index: round.index + 1 });
   }
 
   private applyEvent(event: ServerEvent, tournamentId: string, slug: string): void {

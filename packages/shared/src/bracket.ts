@@ -56,6 +56,9 @@ export function pairPlayers(id: string): [string, string] | null {
  * Пресет 1: 12 пар, 2 группы. Группа до 11, четверти/полуфиналы/места до 15,
  * финал и 3-е — серия до двух побед по 11. Порядок стадий задаёт корты:
  * титульные матчи занимают первые корты волны.
+ *
+ * Четверти — кросс PPA/ATP: победители групп в разных половинах, 1-е и 2-е
+ * одной группы тоже только в финале (не в полуфинале).
  */
 export function classicTwelvePairBracket(winByTwo = false): BracketConfig {
   const group = defaultGameSettings(11, winByTwo);
@@ -73,9 +76,9 @@ export function classicTwelvePairBracket(winByTwo = false): BracketConfig {
         games: to15,
         slots: [
           { id: 'qf1', sourceA: 'G1.1', sourceB: 'G2.4' },
-          { id: 'qf2', sourceA: 'G1.2', sourceB: 'G2.3' },
+          { id: 'qf2', sourceA: 'G2.2', sourceB: 'G1.3' },
           { id: 'qf3', sourceA: 'G2.1', sourceB: 'G1.4' },
-          { id: 'qf4', sourceA: 'G2.2', sourceB: 'G1.3' },
+          { id: 'qf4', sourceA: 'G1.2', sourceB: 'G2.3' },
         ],
       },
       {
@@ -322,6 +325,59 @@ export function slotHeading(config: BracketConfig, slotId: string): string {
 export function knownSlotHeading(config: BracketConfig, slotId: string): string | null {
   const known = config.stages.some((stage) => stage.slots.some((slot) => slot.id === slotId));
   return known ? slotHeading(config, slotId) : null;
+}
+
+/**
+ * Заголовок раунда на вкладке «Игры»: «Полуфиналы», а не «Раунд 6».
+ * Если в волне титульные и утешение — берём плей-офф (четверти, полуфинал, финал).
+ */
+export function roundDisplayName(
+  config: BracketConfig,
+  matches: readonly { stage?: string | null; bracketSlot?: string | null }[],
+): string | null {
+  const ids: string[] = [];
+  for (const match of matches) {
+    if (match.stage === 'group' || !match.bracketSlot) continue;
+    const stage = config.stages.find((item) =>
+      item.slots.some((slot) => slot.id === match.bracketSlot),
+    );
+    if (stage && !ids.includes(stage.id)) ids.push(stage.id);
+  }
+  if (ids.length === 0) return null;
+  const playoff = config.stages.find((stage) => stage.kind === 'playoff' && ids.includes(stage.id));
+  const headline = playoff ?? config.stages.find((stage) => ids.includes(stage.id));
+  return headline ? displayStageName(headline.name) : null;
+}
+
+/** Финал / бронза / «За N место» / дружеский — места победителя и проигравшего. */
+export function slotPlaceRange(stage: BracketStage): { winner: number; loser: number } | null {
+  if (stage.slots.length !== 1) return null;
+  if (stage.id === 'final') return { winner: 1, loser: 2 };
+  if (stage.id === 'bronze') return { winner: 3, loser: 4 };
+  if (stage.id === 'friendly') return { winner: 5, loser: 6 };
+  const numbered = stage.name.match(/^За (\d+) место/i);
+  if (!numbered) return null;
+  const place = Number(numbered[1]);
+  if (!Number.isInteger(place) || place < 1) return null;
+  return { winner: place, loser: place + 1 };
+}
+
+export interface PlacementSlot {
+  slotId: string;
+  winnerPlace: number;
+  loserPlace: number;
+}
+
+/** Слоты, которые закрывают итоговые места (не полуфиналы утешения). */
+export function placementSlots(config: BracketConfig): PlacementSlot[] {
+  const rows: PlacementSlot[] = [];
+  for (const stage of config.stages) {
+    const range = slotPlaceRange(stage);
+    const slot = stage.slots[0];
+    if (!range || !slot) continue;
+    rows.push({ slotId: slot.id, winnerPlace: range.winner, loserPlace: range.loser });
+  }
+  return rows;
 }
 
 export type GameScoreIssue = 'tie' | 'short' | 'winByTwo' | 'over';

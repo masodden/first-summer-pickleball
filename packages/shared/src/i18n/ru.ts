@@ -397,6 +397,7 @@ export const ru = {
   'standings.groupStage': 'Групповой этап',
   'standings.groupN': 'Группа {{number}}',
   'standings.podium': 'Призёры',
+  'standings.places': 'Места',
   'standings.tbd': '—',
   'standings.rank': '#',
   'standings.player': 'Игрок',
@@ -416,6 +417,21 @@ export const ru = {
   'standings.medalGold': 'Первое место',
   'standings.medalSilver': 'Второе место',
   'standings.medalBronze': 'Третье место',
+  'standings.seed': 'Посев {{n}}',
+  'standings.tie.headToHead':
+    '{{above}} выше {{below}}: выиграли личную встречу.',
+  'standings.tie.miniLeague':
+    '{{above}} выше остальных с {{wins}} победами — в играх между ними у этой пары больше побед.',
+  'standings.tie.circularDiff':
+    'У {{pairs}} одинаковые победы, а в играх между собой каждая выиграла у одной и проиграла другой. Поэтому выше та, у кого лучше разница очков в группе.',
+  'standings.tie.pointDiff':
+    'Победы одинаковые — выше та, у кого лучше разница: {{pairs}}.',
+  'standings.tie.headToHeadDiff':
+    'В личных одинаково по победам — выше та, кто взяла больше очков в этих матчах: {{pairs}}.',
+  'standings.tie.vsNextHighest':
+    'Разница одинаковая — выше та, кто ближе сыграла с лидером: {{pairs}}.',
+  'standings.tie.pointsFor':
+    'И разница одна — выше та, кто набрала больше очков: {{pairs}}.',
 
   'player.card': 'Карточка игрока',
   'player.profile': 'Профиль',
