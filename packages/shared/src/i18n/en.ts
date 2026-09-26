@@ -266,7 +266,8 @@ export const en: Record<TranslationKey, string> = {
   'bracket.groupPointsToWin': 'Group game to',
   'bracket.groupPointsHint': 'Points needed to win a group game',
   'bracket.winsToTake': 'Wins to take the match',
-  'bracket.stageWinsHint': '1 — a single set, 2 — first to two wins. Semis and the final can differ.',
+  'bracket.stageWinsHint':
+    '1 — a single set, 2 — first to two wins. Semis and the final can differ.',
   'bracket.stagePointsHint': 'Points to win a set. Semis and the final are set separately.',
   'bracket.winByTwo': 'Win by 2 points',
   'bracket.winByTwoHint': '11–10 is not enough — it has to be 11–9 or 12–10',
@@ -421,8 +422,7 @@ export const en: Record<TranslationKey, string> = {
   'standings.medalSilver': 'Second place',
   'standings.medalBronze': 'Third place',
   'standings.seed': 'Seed {{n}}',
-  'standings.tie.headToHead':
-    '{{above}} above {{below}}: they won the head-to-head.',
+  'standings.tie.headToHead': '{{above}} above {{below}}: they won the head-to-head.',
   'standings.tie.miniLeague':
     '{{above}} sit above the other pairs on {{wins}} wins — they took more matches among this group.',
   'standings.tie.circularDiff':
@@ -433,8 +433,7 @@ export const en: Record<TranslationKey, string> = {
     'Head-to-head wins are even — more points in those matches goes higher: {{pairs}}.',
   'standings.tie.vsNextHighest':
     'Differentials are even — closer result against the leader goes higher: {{pairs}}.',
-  'standings.tie.pointsFor':
-    'Differentials are even — more points scored goes higher: {{pairs}}.',
+  'standings.tie.pointsFor': 'Differentials are even — more points scored goes higher: {{pairs}}.',
 
   'player.card': 'Player card',
   'player.profile': 'Profile',
@@ -467,6 +466,12 @@ export const en: Record<TranslationKey, string> = {
   'player.mergeGuestHint':
     "Enter the guest's real DUPR ID. Their games and statistics will move to the profile with that ID.",
   'player.merged': 'Profiles merged',
+  'player.reassignDupr': 'Change DUPR ID',
+  'player.reassignDuprHint':
+    'Matches, entries, and the Telegram link move to the new ID. History in finished tournaments stays with this player.',
+  'player.reassignDuprConfirm':
+    'Move {{name}} from {{from}} to {{duprId}}? The old ID will remain only as an archived profile.',
+  'player.reassigned': 'DUPR ID changed, history moved',
   'player.delete': 'Remove from database',
   'player.deleteConfirm':
     "Remove {{name}} from the database? Their Telegram link will be cleared and they can claim again. This player's match history will also be removed.",

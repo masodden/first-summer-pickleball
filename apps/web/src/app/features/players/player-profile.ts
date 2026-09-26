@@ -214,6 +214,38 @@ import { consumeFirstVisit } from '../../core/motion';
               </div>
             }
 
+            @if (
+              session.isAdmin() &&
+              !data.player.isGuest &&
+              data.player.duprId &&
+              !data.isBootstrapAdmin
+            ) {
+              <div class="stack stack--2">
+                <span class="field__label">{{ t()('player.reassignDupr') }}</span>
+                <span class="field__hint">{{ t()('player.reassignDuprHint') }}</span>
+                <div class="row">
+                  <input
+                    class="input grow"
+                    autocapitalize="characters"
+                    maxlength="6"
+                    [attr.aria-label]="t()('player.reassignDupr')"
+                    [value]="reassignId()"
+                    (input)="reassignId.set(text($event).toUpperCase())"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn--primary"
+                    [disabled]="
+                      reassignId().length !== 6 || reassignId() === data.player.duprId || saving()
+                    "
+                    (click)="reassignDupr()"
+                  >
+                    {{ t()('common.apply') }}
+                  </button>
+                </div>
+              </div>
+            }
+
             @if (session.isAdmin()) {
               <button
                 type="button"
@@ -452,6 +484,7 @@ export class PlayerProfilePage {
   protected readonly lastName = signal('');
   protected readonly telegramUsername = signal('');
   protected readonly mergeId = signal('');
+  protected readonly reassignId = signal('');
   protected readonly saving = signal(false);
   protected readonly inviteUrl = signal<string | null>(null);
   protected readonly inviteExpires = signal<string | null>(null);
@@ -647,6 +680,37 @@ export class PlayerProfilePage {
       await this.router.navigate(['/players']);
     } catch (error) {
       this.toast.failure(error, () => void this.remove());
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async reassignDupr(): Promise<void> {
+    const data = this.profile.value();
+    const from = data?.player.duprId;
+    if (!data || !from) return;
+    const duprId = this.reassignId().trim().toUpperCase();
+    const confirmed = await this.confirm.ask({
+      title: this.i18n.translate('player.reassignDupr'),
+      message: this.i18n.translate('player.reassignDuprConfirm', {
+        name: data.player.fullName,
+        from,
+        duprId,
+      }),
+      confirmLabel: this.i18n.translate('common.apply'),
+    });
+    if (!confirmed) return;
+
+    const previousId = data.player.id;
+    this.saving.set(true);
+    try {
+      const { player } = await this.api.reassignDupr(previousId, duprId);
+      if (this.session.playerId() === previousId) await this.session.refresh();
+      this.toast.success(this.i18n.translate('player.reassigned'));
+      this.reassignId.set('');
+      await this.router.navigate(['/players', player.id]);
+    } catch (error) {
+      this.toast.failure(error, () => void this.reassignDupr());
     } finally {
       this.saving.set(false);
     }

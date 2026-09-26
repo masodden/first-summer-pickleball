@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, like, or, sql } from 'drizzle-orm';
 import {
+  isBootstrapAdminDupr,
+  isRoleAtLeast,
   isValidDuprId,
   normalizeDuprId,
+  pairId,
+  type BracketConfig,
   type CreatePlayerInput,
   type PlayerDto,
   type RatingSource,
@@ -12,11 +16,14 @@ import type { Database } from '../db/index.js';
 import {
   accounts,
   claims,
+  invites,
   matchPlayers,
   matches,
   playerRatingHistory,
   players,
+  roundSitouts,
   tournamentPlayers,
+  tournaments,
   trainingPlayers,
   type PlayerRow,
 } from '../db/schema.js';
@@ -366,14 +373,10 @@ export async function adoptGuestIntoPlayer(
 
     // Контакты: предпочитаем данные гостя/аккаунта, иначе оставляем целевые.
     const telegramUsername =
-      guest.telegramUsername ??
-      guestAccount?.telegramUsername ??
-      target.telegramUsername;
+      guest.telegramUsername ?? guestAccount?.telegramUsername ?? target.telegramUsername;
     const guestAvatar = guest.avatarUrl ?? guestAccount?.telegramPhotoUrl ?? null;
     const avatarUrl = guestAvatar ?? target.avatarUrl;
-    const avatarSource = guestAvatar
-      ? (guest.avatarSource ?? 'self')
-      : target.avatarSource;
+    const avatarSource = guestAvatar ? (guest.avatarSource ?? 'self') : target.avatarSource;
 
     await tx
       .update(players)
@@ -398,10 +401,7 @@ export async function adoptGuestIntoPlayer(
  * После merge гостя в DUPR: указатели partner_player_id на G-… и односторонние
  * связки (напарник ещё ссылается на гостя, DUPR — на игрока).
  */
-export async function healMergedPartnerLinks(
-  db: Database,
-  tournamentId: string,
-): Promise<boolean> {
+export async function healMergedPartnerLinks(db: Database, tournamentId: string): Promise<boolean> {
   const stale = await db
     .select({
       id: tournamentPlayers.id,
@@ -409,9 +409,7 @@ export async function healMergedPartnerLinks(
     })
     .from(tournamentPlayers)
     .innerJoin(players, eq(tournamentPlayers.partnerPlayerId, players.id))
-    .where(
-      and(eq(tournamentPlayers.tournamentId, tournamentId), isNotNull(players.mergedIntoId)),
-    );
+    .where(and(eq(tournamentPlayers.tournamentId, tournamentId), isNotNull(players.mergedIntoId)));
 
   let changed = false;
   const now = new Date();
@@ -499,10 +497,7 @@ export async function restoreContactsFromMergedGuests(
   const player = await getPlayerRow(db, playerId);
   if (player.telegramUsername && player.avatarUrl) return player;
 
-  const guests = await db
-    .select()
-    .from(players)
-    .where(eq(players.mergedIntoId, playerId));
+  const guests = await db.select().from(players).where(eq(players.mergedIntoId, playerId));
 
   const withTelegram = guests.find((row) => row.telegramUsername);
   const withAvatar = guests.find((row) => row.avatarUrl);
@@ -576,17 +571,300 @@ export async function mergeGuestIntoDupr(
 }
 
 /**
+ * Меняет DUPR ID у настоящей карточки.
+ *
+ * Ключ игрока поменять нельзя, поэтому история переезжает на карточку с новым
+ * ID: матчи, заявки, пропуски кругов, сетка фиксированных пар и привязка
+ * Telegram. Старая карточка остаётся архивной ссылкой и в списках не видна.
+ * На занятый ID — с матчами или своим Telegram — перенос не делается.
+ */
+export async function reassignPlayerDuprId(
+  db: Database,
+  playerId: string,
+  rawDuprId: string,
+  actor: Viewer,
+): Promise<PlayerDto> {
+  if (actor.role !== 'admin') throw forbidden();
+
+  const duprId = normalizeDuprId(rawDuprId);
+  if (!isValidDuprId(duprId)) {
+    throw new ApiError('validation_failed', 'DUPR ID указан неверно');
+  }
+
+  const source = await getPlayerRow(db, playerId);
+  if (source.isGuest || !source.duprId) {
+    throw new ApiError(
+      'validation_failed',
+      'Сменить DUPR ID можно только у игрока, у которого он уже указан',
+    );
+  }
+  if (source.mergedIntoId) {
+    throw new ApiError('validation_failed', 'Эта карточка уже объединена с другой');
+  }
+  if (duprId === source.id || duprId === normalizeDuprId(source.duprId)) {
+    throw new ApiError('validation_failed', 'Укажите другой DUPR ID');
+  }
+  if (
+    isBootstrapAdminDupr(source.duprId) ||
+    isBootstrapAdminDupr(source.id) ||
+    isBootstrapAdminDupr(duprId)
+  ) {
+    throw new ApiError('validation_failed', 'Этот DUPR ID зарезервирован для администратора клуба');
+  }
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(players).where(eq(players.id, duprId)).limit(1);
+    if (!existing) {
+      await tx.insert(players).values({
+        id: duprId,
+        duprId,
+        firstName: source.firstName,
+        lastName: source.lastName,
+        doublesRating: source.doublesRating,
+        singlesRating: source.singlesRating,
+        ratingUpdatedAt: source.ratingUpdatedAt,
+        ratingSource: source.ratingSource,
+        avatarUrl: source.avatarUrl,
+        telegramUsername: source.telegramUsername,
+        nameSource: source.nameSource,
+        avatarSource: source.avatarSource,
+        clubRole: source.clubRole,
+        isGuest: false,
+      });
+    } else {
+      if (existing.mergedIntoId) {
+        throw new ApiError('validation_failed', 'Целевая карточка уже объединена с другой');
+      }
+      if (existing.isGuest) {
+        throw new ApiError('validation_failed', 'Нельзя перенести историю на гостевую карточку');
+      }
+      await assertDuprTargetIsEmpty(tx, duprId);
+      const keepRating = existing.doublesRating != null;
+      await tx
+        .update(players)
+        .set({
+          duprId: existing.duprId ?? duprId,
+          firstName: pickNonEmpty(existing.firstName, source.firstName) ?? existing.firstName,
+          lastName: pickNonEmpty(existing.lastName, source.lastName) ?? existing.lastName,
+          telegramUsername: source.telegramUsername ?? existing.telegramUsername,
+          avatarUrl: source.avatarUrl ?? existing.avatarUrl,
+          avatarSource: source.avatarUrl ? source.avatarSource : existing.avatarSource,
+          clubRole: isRoleAtLeast(source.clubRole, existing.clubRole)
+            ? source.clubRole
+            : existing.clubRole,
+          ...(keepRating
+            ? {}
+            : {
+                doublesRating: source.doublesRating,
+                singlesRating: source.singlesRating,
+                ratingUpdatedAt: source.ratingUpdatedAt,
+                ratingSource: source.ratingSource,
+              }),
+          updatedAt: new Date(),
+        })
+        .where(eq(players.id, duprId));
+    }
+
+    const affected = await tx
+      .select({ tournamentId: tournamentPlayers.tournamentId })
+      .from(tournamentPlayers)
+      .where(
+        or(
+          eq(tournamentPlayers.playerId, source.id),
+          eq(tournamentPlayers.partnerPlayerId, source.id),
+        ),
+      );
+
+    await tx
+      .update(tournamentPlayers)
+      .set({ playerId: duprId })
+      .where(eq(tournamentPlayers.playerId, source.id));
+    await tx
+      .update(tournamentPlayers)
+      .set({ partnerPlayerId: duprId, updatedAt: new Date() })
+      .where(eq(tournamentPlayers.partnerPlayerId, source.id));
+    await tx
+      .update(trainingPlayers)
+      .set({ playerId: duprId })
+      .where(eq(trainingPlayers.playerId, source.id));
+    await tx
+      .update(matchPlayers)
+      .set({ playerId: duprId })
+      .where(eq(matchPlayers.playerId, source.id));
+    await tx
+      .update(roundSitouts)
+      .set({ playerId: duprId })
+      .where(eq(roundSitouts.playerId, source.id));
+    await tx
+      .update(playerRatingHistory)
+      .set({ playerId: duprId })
+      .where(eq(playerRatingHistory.playerId, source.id));
+    await tx.update(accounts).set({ playerId: duprId }).where(eq(accounts.playerId, source.id));
+    await tx.update(claims).set({ playerId: duprId }).where(eq(claims.playerId, source.id));
+    await tx.update(invites).set({ playerId: duprId }).where(eq(invites.playerId, source.id));
+
+    for (const tournamentId of new Set(affected.map((row) => row.tournamentId))) {
+      await restoreOneWayPartnerLinks(tx, tournamentId);
+    }
+
+    await rewriteStoredPairIds(tx, source.id, duprId);
+
+    // Гости, которых раньше слили в старую карточку, должны указывать на новую.
+    await tx
+      .update(players)
+      .set({ mergedIntoId: duprId, updatedAt: new Date() })
+      .where(eq(players.mergedIntoId, source.id));
+    await tx
+      .update(players)
+      .set({ mergedIntoId: duprId, updatedAt: new Date() })
+      .where(eq(players.id, source.id));
+  });
+
+  await recordAudit(db, actor, {
+    action: 'player.reassign_dupr',
+    entityType: 'player',
+    entityId: duprId,
+    payload: {
+      fromId: source.id,
+      fromDuprId: source.duprId,
+      toDuprId: duprId,
+      fullName: `${source.firstName} ${source.lastName}`.trim(),
+    },
+  });
+
+  return toPlayerDto(await getPlayerRow(db, duprId));
+}
+
+/** Пустая карточка из базы: правильный ID уже заведён, но игр и Telegram ещё нет. */
+async function assertDuprTargetIsEmpty(
+  db: Pick<Database, 'select'>,
+  targetId: string,
+): Promise<void> {
+  const checks = await Promise.all([
+    db
+      .select({ id: matchPlayers.id })
+      .from(matchPlayers)
+      .where(eq(matchPlayers.playerId, targetId))
+      .limit(1),
+    db
+      .select({ id: tournamentPlayers.id })
+      .from(tournamentPlayers)
+      .where(
+        or(
+          eq(tournamentPlayers.playerId, targetId),
+          eq(tournamentPlayers.partnerPlayerId, targetId),
+        ),
+      )
+      .limit(1),
+    db
+      .select({ id: trainingPlayers.id })
+      .from(trainingPlayers)
+      .where(eq(trainingPlayers.playerId, targetId))
+      .limit(1),
+    db.select({ id: accounts.id }).from(accounts).where(eq(accounts.playerId, targetId)).limit(1),
+    db.select({ id: claims.id }).from(claims).where(eq(claims.playerId, targetId)).limit(1),
+    db
+      .select({ id: roundSitouts.id })
+      .from(roundSitouts)
+      .where(eq(roundSitouts.playerId, targetId))
+      .limit(1),
+    db
+      .select({ token: invites.token })
+      .from(invites)
+      .where(eq(invites.playerId, targetId))
+      .limit(1),
+    db.select({ id: players.id }).from(players).where(eq(players.mergedIntoId, targetId)).limit(1),
+  ]);
+  if (checks.some((rows) => rows.length > 0)) {
+    throw new ApiError(
+      'validation_failed',
+      'Этот DUPR ID уже используется другим игроком. Перенос возможен только на свободный ID или пустую карточку из базы.',
+    );
+  }
+}
+
+/**
+ * В группе id пары зашит в ключ `pairGroups` и в слот матча `G1:a|b:c|d`.
+ * После смены id строка должна собраться заново, иначе таблица группы
+ * перестанет находить пару.
+ */
+async function rewriteStoredPairIds(
+  db: Pick<Database, 'select' | 'update'>,
+  fromId: string,
+  toId: string,
+): Promise<void> {
+  const configs = await db
+    .select({ id: tournaments.id, bracketConfig: tournaments.bracketConfig })
+    .from(tournaments)
+    .where(isNotNull(tournaments.bracketConfig));
+
+  for (const row of configs) {
+    const config = row.bracketConfig;
+    if (!config?.pairGroups) continue;
+    const nextGroups: Record<string, number> = {};
+    let changed = false;
+    for (const [key, group] of Object.entries(config.pairGroups)) {
+      const rewritten = rewritePlayerTokens(key, fromId, toId);
+      if (rewritten !== key) changed = true;
+      if (
+        Object.prototype.hasOwnProperty.call(nextGroups, rewritten) &&
+        nextGroups[rewritten] !== group
+      ) {
+        throw new ApiError('validation_failed', 'Новый DUPR ID уже стоит в сетке турнира');
+      }
+      nextGroups[rewritten] = group;
+    }
+    if (!changed) continue;
+    const bracketConfig: BracketConfig = { ...config, pairGroups: nextGroups };
+    await db
+      .update(tournaments)
+      .set({ bracketConfig, updatedAt: new Date() })
+      .where(eq(tournaments.id, row.id));
+  }
+
+  const slotRows = await db
+    .select({ id: matches.id, bracketSlot: matches.bracketSlot })
+    .from(matches)
+    .where(like(matches.bracketSlot, `%${fromId}%`));
+
+  for (const row of slotRows) {
+    if (!row.bracketSlot) continue;
+    const rewritten = rewritePlayerTokens(row.bracketSlot, fromId, toId);
+    if (rewritten === row.bracketSlot) continue;
+    await db
+      .update(matches)
+      .set({ bracketSlot: rewritten, updatedAt: new Date() })
+      .where(eq(matches.id, row.id));
+  }
+}
+
+/** Меняет id игрока только как целый токен в `a|b` и `G1:a|b:c|d`, затем сортирует пару. */
+export function rewritePlayerTokens(value: string, fromId: string, toId: string): string {
+  if (!value.includes(fromId)) return value;
+  return value
+    .split(':')
+    .map((part) => rewritePairPart(part, fromId, toId))
+    .join(':');
+}
+
+function rewritePairPart(part: string, fromId: string, toId: string): string {
+  if (part === fromId) return toId;
+  if (!part.includes('|') && !part.includes(fromId)) return part;
+  const bits = part.split('|');
+  if (!bits.includes(fromId)) return part;
+  const next = bits.map((bit) => (bit === fromId ? toId : bit));
+  if (next.length === 2 && next[0] && next[1]) return pairId(next[0], next[1]);
+  return next.join('|');
+}
+
+/**
  * Полное удаление карточки из нашей базы.
  *
  * Аккаунт Telegram отвязывается (SET NULL), заявки и история участия уходят
  * каскадом. После повторного импорта или создания карточки с тем же DUPR ID
  * можно привязаться заново — как будто игрока не было.
  */
-export async function deletePlayer(
-  db: Database,
-  playerId: string,
-  actor: Viewer,
-): Promise<void> {
+export async function deletePlayer(db: Database, playerId: string, actor: Viewer): Promise<void> {
   const current = await getPlayerRow(db, playerId);
 
   await db.transaction(async (tx) => {

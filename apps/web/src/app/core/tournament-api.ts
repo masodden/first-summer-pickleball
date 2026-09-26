@@ -273,6 +273,10 @@ export class TournamentApi {
     return this.api.post(`/api/players/${id}/merge`, { duprId });
   }
 
+  reassignDupr(id: string, duprId: string): Promise<{ player: PlayerDto }> {
+    return this.api.post(`/api/players/${id}/reassign-dupr`, { duprId });
+  }
+
   createInvite(playerId: string): Promise<{ invite: InviteDto }> {
     return this.api.post(`/api/players/${playerId}/invite`);
   }

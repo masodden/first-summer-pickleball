@@ -264,7 +264,8 @@ export const ru = {
   'bracket.groupPointsToWin': 'Счёт гейма в группе',
   'bracket.groupPointsHint': 'До скольких очков играют в круговом этапе',
   'bracket.winsToTake': 'Побед в серии',
-  'bracket.stageWinsHint': '1 — один сет, 2 — серия до двух побед. У полуфинала и финала можно поставить разное.',
+  'bracket.stageWinsHint':
+    '1 — один сет, 2 — серия до двух побед. У полуфинала и финала можно поставить разное.',
   'bracket.stagePointsHint': 'До скольких очков сет. Полуфинал и финал настраиваются отдельно.',
   'bracket.winByTwo': 'Победа с разницей в 2 очка',
   'bracket.winByTwoHint': 'Нельзя закончить 11:10 — нужно 11:9 или 12:10',
@@ -418,20 +419,17 @@ export const ru = {
   'standings.medalSilver': 'Второе место',
   'standings.medalBronze': 'Третье место',
   'standings.seed': 'Посев {{n}}',
-  'standings.tie.headToHead':
-    '{{above}} выше {{below}}: выиграли личную встречу.',
+  'standings.tie.headToHead': '{{above}} выше {{below}}: выиграли личную встречу.',
   'standings.tie.miniLeague':
     '{{above}} выше остальных с {{wins}} победами — в играх между ними у этой пары больше побед.',
   'standings.tie.circularDiff':
     'У {{pairs}} одинаковые победы, а в играх между собой каждая выиграла у одной и проиграла другой. Поэтому выше та, у кого лучше разница очков в группе.',
-  'standings.tie.pointDiff':
-    'Победы одинаковые — выше та, у кого лучше разница: {{pairs}}.',
+  'standings.tie.pointDiff': 'Победы одинаковые — выше та, у кого лучше разница: {{pairs}}.',
   'standings.tie.headToHeadDiff':
     'В личных одинаково по победам — выше та, кто взяла больше очков в этих матчах: {{pairs}}.',
   'standings.tie.vsNextHighest':
     'Разница одинаковая — выше та, кто ближе сыграла с лидером: {{pairs}}.',
-  'standings.tie.pointsFor':
-    'И разница одна — выше та, кто набрала больше очков: {{pairs}}.',
+  'standings.tie.pointsFor': 'И разница одна — выше та, кто набрала больше очков: {{pairs}}.',
 
   'player.card': 'Карточка игрока',
   'player.profile': 'Профиль',
@@ -464,6 +462,12 @@ export const ru = {
   'player.mergeGuestHint':
     'Введите настоящий DUPR ID гостя. Его игры и статистика перенесутся в карточку с этим ID.',
   'player.merged': 'Карточки объединены',
+  'player.reassignDupr': 'Сменить DUPR ID',
+  'player.reassignDuprHint':
+    'Все матчи, заявки и привязка Telegram перейдут на новый ID. В завершённых турнирах история останется у этого игрока.',
+  'player.reassignDuprConfirm':
+    'Перенести {{name}} с {{from}} на {{duprId}}? Старый ID останется только как архивная карточка.',
+  'player.reassigned': 'DUPR ID изменён, история перенесена',
   'player.delete': 'Удалить из базы',
   'player.deleteConfirm':
     'Удалить {{name}} из базы? Привязка Telegram сбросится, привязаться можно будет заново. История матчей этого игрока тоже исчезнет.',

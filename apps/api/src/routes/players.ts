@@ -18,6 +18,7 @@ import {
   deletePlayer,
   getPlayerRow,
   mergeGuestIntoDupr,
+  reassignPlayerDuprId,
   searchPlayers,
   setDoublesRating,
   updatePlayer,
@@ -97,6 +98,14 @@ export function registerPlayerRoutes(app: FastifyInstance, ctx: AppContext): voi
     const viewer = requireRole(request, 'moderator');
     const body = parse(mergeGuestSchema, request.body);
     const player = await mergeGuestIntoDupr(db, request.params.id, body.duprId, viewer);
+    return { player };
+  });
+
+  /** Смена ошибочного DUPR ID: матчи, сетка и Telegram переезжают на новый ID. */
+  app.post<{ Params: { id: string } }>('/api/players/:id/reassign-dupr', async (request) => {
+    const viewer = requireRole(request, 'admin');
+    const body = parse(mergeGuestSchema, request.body);
+    const player = await reassignPlayerDuprId(db, request.params.id, body.duprId, viewer);
     return { player };
   });
 
